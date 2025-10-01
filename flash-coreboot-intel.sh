@@ -39,6 +39,9 @@ fi
 
 CUSTOM_ROM="$1"
 
+# 获取ROM文件的绝对路径
+CUSTOM_ROM=$(realpath "$CUSTOM_ROM")
+
 # 检查 ROM 文件是否存在
 if [ ! -f "$CUSTOM_ROM" ]; then
     log_error "找不到 ROM 文件 / ROM file not found: $CUSTOM_ROM"
@@ -47,6 +50,11 @@ fi
 
 log_info "准备刷写固件 / Preparing to flash firmware: $CUSTOM_ROM"
 echo ""
+
+# 获取脚本所在目录
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TOOLS_DIR="$SCRIPT_DIR/tools"
+mkdir -p "$TOOLS_DIR"
 
 # 获取 MAC 地址作为设备标识
 MAC_ADDR=$(ip link show | grep -A 1 "state UP" | grep "link/ether" | head -1 | awk '{print $2}' | tr -d ':' | tr '[:lower:]' '[:upper:]')
@@ -74,32 +82,36 @@ echo ""
 # 步骤 1: 下载工具
 # ========================================
 log_info "步骤 1/6: 下载必要工具 / Step 1/6: Downloading required tools"
+log_info "工具目录 / Tools directory: $TOOLS_DIR"
 
-if [ ! -f "flashrom" ]; then
+if [ ! -f "$TOOLS_DIR/flashrom" ]; then
     log_info "下载 flashrom..."
-    wget -q --show-progress -O flashrom.tar.gz https://mrchromebox.tech/files/util/flashrom_ups_libpci37_20240418.tar.gz
-    tar -zxf flashrom.tar.gz
-    chmod +x flashrom
+    wget -q --show-progress -O "$TOOLS_DIR/flashrom.tar.gz" https://mrchromebox.tech/files/util/flashrom_ups_libpci37_20240418.tar.gz
+    tar -zxf "$TOOLS_DIR/flashrom.tar.gz" -C "$TOOLS_DIR"
+    chmod +x "$TOOLS_DIR/flashrom"
+    rm -f "$TOOLS_DIR/flashrom.tar.gz"
     log_info "flashrom 下载完成"
 else
     log_info "flashrom 已存在，跳过下载"
 fi
 
-if [ ! -f "cbfstool" ]; then
+if [ ! -f "$TOOLS_DIR/cbfstool" ]; then
     log_info "下载 cbfstool..."
-    wget -q --show-progress https://mrchromebox.tech/files/util/cbfstool.tar.gz
-    tar -zxf cbfstool.tar.gz
-    chmod +x cbfstool
+    wget -q --show-progress -O "$TOOLS_DIR/cbfstool.tar.gz" https://mrchromebox.tech/files/util/cbfstool.tar.gz
+    tar -zxf "$TOOLS_DIR/cbfstool.tar.gz" -C "$TOOLS_DIR"
+    chmod +x "$TOOLS_DIR/cbfstool"
+    rm -f "$TOOLS_DIR/cbfstool.tar.gz"
     log_info "cbfstool 下载完成"
 else
     log_info "cbfstool 已存在，跳过下载"
 fi
 
-if [ ! -f "gbb_utility" ]; then
+if [ ! -f "$TOOLS_DIR/gbb_utility" ]; then
     log_info "下载 gbb_utility..."
-    wget -q --show-progress https://mrchromebox.tech/files/util/gbb_utility.tar.gz
-    tar -zxf gbb_utility.tar.gz
-    chmod +x gbb_utility
+    wget -q --show-progress -O "$TOOLS_DIR/gbb_utility.tar.gz" https://mrchromebox.tech/files/util/gbb_utility.tar.gz
+    tar -zxf "$TOOLS_DIR/gbb_utility.tar.gz" -C "$TOOLS_DIR"
+    chmod +x "$TOOLS_DIR/gbb_utility"
+    rm -f "$TOOLS_DIR/gbb_utility.tar.gz"
     log_info "gbb_utility 下载完成"
 else
     log_info "gbb_utility 已存在，跳过下载"
@@ -116,7 +128,7 @@ log_info "步骤 2/6: 备份当前固件 / Step 2/6: Backing up current firmware
 log_info "设备目录 / Device directory: $DEVICE_DIR"
 log_warn "此步骤可能需要几分钟，请耐心等待 / This may take a few minutes, please wait"
 
-./flashrom -p internal -r "$BACKUP_FILE" --ifd -i bios
+"$TOOLS_DIR/flashrom" -p internal -r "$BACKUP_FILE" --ifd -i bios
 log_info "备份完成: $BACKUP_FILE"
 
 echo ""
@@ -126,7 +138,7 @@ echo ""
 # ========================================
 log_info "步骤 3/6: 从备份中提取 VPD / Step 3/6: Extracting VPD from backup"
 
-./cbfstool "$BACKUP_FILE" read -r RO_VPD -f vpd.bin
+"$TOOLS_DIR/cbfstool" "$BACKUP_FILE" read -r RO_VPD -f vpd.bin
 if [ -f "vpd.bin" ]; then
     log_info "VPD 提取完成: vpd.bin"
 else
@@ -142,11 +154,11 @@ echo ""
 log_info "步骤 4/6: 准备自定义 ROM / Step 4/6: Preparing custom ROM"
 
 # 复制自定义 ROM 到工作目录
-cp "../$CUSTOM_ROM" ./coreboot.rom
+cp "$CUSTOM_ROM" ./coreboot.rom
 
 # 注入 VPD
 log_info "注入 VPD 到自定义 ROM..."
-./cbfstool coreboot.rom write -r RO_VPD -f vpd.bin
+"$TOOLS_DIR/cbfstool" coreboot.rom write -r RO_VPD -f vpd.bin
 log_info "VPD 注入完成"
 
 echo ""
@@ -157,19 +169,19 @@ echo ""
 log_info "步骤 5/6: 提取并注入 HWID / Step 5/6: Extracting and injecting HWID"
 
 # 尝试从固件实用程序脚本的固件中提取
-if ./cbfstool "$BACKUP_FILE" extract -n hwid -f hwid.txt 2>/dev/null; then
+if "$TOOLS_DIR/cbfstool" "$BACKUP_FILE" extract -n hwid -f hwid.txt 2>/dev/null; then
     log_info "从固件实用程序脚本固件中提取 HWID"
 else
     # 从库存固件中提取
     log_info "从库存固件中提取 HWID"
-    ./gbb_utility "$BACKUP_FILE" --get --hwid > hwid.txt
+    "$TOOLS_DIR/gbb_utility" "$BACKUP_FILE" --get --hwid > hwid.txt
 fi
 
 if [ -f "hwid.txt" ] && [ -s "hwid.txt" ]; then
     log_info "HWID: $(cat hwid.txt)"
-    ./cbfstool coreboot.rom add -n hwid -f hwid.txt -t raw 2>/dev/null || \
-    ./cbfstool coreboot.rom remove -n hwid 2>/dev/null && \
-    ./cbfstool coreboot.rom add -n hwid -f hwid.txt -t raw
+    "$TOOLS_DIR/cbfstool" coreboot.rom add -n hwid -f hwid.txt -t raw 2>/dev/null || \
+    "$TOOLS_DIR/cbfstool" coreboot.rom remove -n hwid 2>/dev/null && \
+    "$TOOLS_DIR/cbfstool" coreboot.rom add -n hwid -f hwid.txt -t raw
     log_info "HWID 注入完成"
 else
     log_warn "HWID 提取失败或为空，跳过注入（某些设备可能不需要）"
@@ -193,7 +205,7 @@ if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
 fi
 
 log_info "开始刷写固件（Intel 设备）..."
-./flashrom -p internal --ifd -i bios -w coreboot.rom -N
+"$TOOLS_DIR/flashrom" -p internal --ifd -i bios -w coreboot.rom -N
 
 if [ $? -eq 0 ]; then
     echo ""
