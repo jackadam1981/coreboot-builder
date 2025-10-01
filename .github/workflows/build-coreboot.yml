@@ -280,21 +280,11 @@ on:
           - 'Toshiba Chromebook 2 (2014) (swanky)'
           - 'Toshiba Chromebook 2 (2015) (gandof)'
 
-      enable_pxe:
-        description: '启用 PXE 网络启动 / Enable PXE Network Boot'
-        required: true
-        type: boolean
-        default: true
       enable_ipxe:
-        description: '启用 iPXE ROM (需要 PXE) / Enable iPXE ROM'
+        description: '启用 iPXE 网络启动 (仅 kaisa) / Enable iPXE (kaisa only)'
         required: false
         type: boolean
         default: true
-      pxe_rom_id:
-        description: 'PCI ID (留空=支持所有网卡，推荐) / PCI ID (empty=all NICs)'
-        required: false
-        type: string
-        default: ''
       release:
         description: '创建 Release 发布 / Create Release'
         required: false
@@ -355,95 +345,6 @@ jobs:
           echo "📦 编译设备 / Building device: $DEVICE"
         fi
 
-    - name: 添加 PXE 支持配置 / Add PXE Support
-      if: ${{ inputs.enable_pxe == true }}
-      run: |
-        cd coreboot
-        DEVICE="${{ steps.extract.outputs.codename }}"
-        
-        if [ "$DEVICE" = "all" ]; then
-          echo "为所有设备添加 PXE 支持..."
-          find configs -name "*.uefi" -type f | while read cfg; do
-            if ! grep -q "CONFIG_EDK2_NETWORK_PXE_SUPPORT" "$cfg"; then
-              echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> "$cfg"
-            fi
-          done
-        else
-          # 查找设备配置文件
-          CONFIG_FILE=$(find configs -name "config.$DEVICE.uefi" -type f | head -1)
-          if [ -f "$CONFIG_FILE" ]; then
-            if ! grep -q "CONFIG_EDK2_NETWORK_PXE_SUPPORT" "$CONFIG_FILE"; then
-              echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> "$CONFIG_FILE"
-              echo "✅ 已为 $DEVICE 添加 PXE 支持"
-            else
-              echo "ℹ️  $DEVICE 已启用 PXE 支持"
-            fi
-            
-            # 显示配置文件内容
-            echo ""
-            echo "📄 配置文件内容预览 / Config file preview:"
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            cat "$CONFIG_FILE"
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo ""
-          else
-            echo "⚠️ 未找到设备 $DEVICE 的配置文件"
-            exit 1
-          fi
-        fi
-
-    - name: 配置 iPXE ROM / Configure iPXE ROM
-      if: ${{ inputs.enable_ipxe == true }}
-      run: |
-        cd coreboot
-        DEVICE="${{ steps.extract.outputs.codename }}"
-        PCI_ID="${{ inputs.pxe_rom_id }}"
-        
-        if [ "$DEVICE" = "all" ]; then
-          echo "为所有设备添加 iPXE ROM 配置..."
-          find configs -name "*.uefi" -type f | while read cfg; do
-            if ! grep -q "CONFIG_BUILD_IPXE" "$cfg"; then
-              echo "CONFIG_BUILD_IPXE=y" >> "$cfg"
-              echo "CONFIG_IPXE_MASTER=y" >> "$cfg"
-              echo "CONFIG_IPXE_SERIAL_CONSOLE=y" >> "$cfg"
-              echo "CONFIG_IPXE_HAS_HTTPS=y" >> "$cfg"
-              echo "CONFIG_IPXE_TRUST_CMD=y" >> "$cfg"
-              if [ -n "$PCI_ID" ]; then
-                echo "CONFIG_PXE_ROM_ID=\"$PCI_ID\"" >> "$cfg"
-              fi
-            fi
-          done
-        else
-          CONFIG_FILE=$(find configs -name "config.$DEVICE.uefi" -type f | head -1)
-          if [ -f "$CONFIG_FILE" ]; then
-            if ! grep -q "CONFIG_BUILD_IPXE" "$CONFIG_FILE"; then
-              echo "CONFIG_BUILD_IPXE=y" >> "$CONFIG_FILE"
-              echo "CONFIG_IPXE_MASTER=y" >> "$CONFIG_FILE"
-              echo "CONFIG_IPXE_SERIAL_CONSOLE=y" >> "$CONFIG_FILE"
-              echo "CONFIG_IPXE_HAS_HTTPS=y" >> "$CONFIG_FILE"
-              echo "CONFIG_IPXE_TRUST_CMD=y" >> "$CONFIG_FILE"
-              if [ -n "$PCI_ID" ]; then
-                echo "CONFIG_PXE_ROM_ID=\"$PCI_ID\"" >> "$CONFIG_FILE"
-                echo "✅ 已为 $DEVICE 添加 iPXE ROM (PCI ID: $PCI_ID)"
-              else
-                echo "✅ 已为 $DEVICE 添加 iPXE ROM (支持所有网卡)"
-              fi
-            else
-              echo "ℹ️  $DEVICE 已配置 iPXE ROM"
-            fi
-            
-            echo ""
-            echo "📄 iPXE 配置 / iPXE Config:"
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            grep -E "IPXE|PXE_ROM" "$CONFIG_FILE" || echo "未找到 iPXE 配置"
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo ""
-          else
-            echo "⚠️ 未找到设备 $DEVICE 的配置文件"
-            exit 1
-          fi
-        fi
-
     - name: 拉取 Coreboot SDK 容器 / Pull Coreboot SDK
       run: docker pull coreboot/coreboot-sdk:latest
 
@@ -459,14 +360,35 @@ jobs:
     - name: 编译固件 / Build Firmware
       run: |
         mkdir -p roms
-        TARGET="${{ steps.device.outputs.target }}"
-        docker run --rm --user root \
-          -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
-          -v ${{ github.workspace }}/roms:/home/coreboot/roms \
-          -w /home/coreboot/coreboot \
-          coreboot/coreboot-sdk:latest \
-          bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
-                   ./build-uefi.sh $TARGET"
+        TARGET="${{ steps.extract.outputs.codename }}"
+        DEVICE="${{ steps.extract.outputs.codename }}"
+        
+        # 如果启用了 iPXE，使用自定义配置并直接 make
+        if [[ "${{ inputs.enable_ipxe }}" == "true" ]] && [ -f "config.kaisa-ipxe.uefi" ] && [ "$DEVICE" = "kaisa" ]; then
+          echo "使用 iPXE 自定义配置编译..."
+          cp config.kaisa-ipxe.uefi coreboot/.config
+          
+          docker run --rm --user root \
+            -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+            -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+            -w /home/coreboot/coreboot \
+            coreboot/coreboot-sdk:latest \
+            bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
+                     echo 'CONFIG_LOCALVERSION=\"-ipxe\"' >> .config && \
+                     make olddefconfig && \
+                     make -j\$(nproc) && \
+                     cp ./build/coreboot.rom ../roms/coreboot_edk2-${DEVICE}-mrchromebox_ipxe_\$(date +\"%Y%m%d\").rom && \
+                     cd ../roms && sha1sum coreboot_edk2-${DEVICE}-mrchromebox_ipxe_\$(date +\"%Y%m%d\").rom > coreboot_edk2-${DEVICE}-mrchromebox_ipxe_\$(date +\"%Y%m%d\").rom.sha1"
+        else
+          # 使用标准的 build-uefi.sh 脚本
+          docker run --rm --user root \
+            -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+            -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+            -w /home/coreboot/coreboot \
+            coreboot/coreboot-sdk:latest \
+            bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
+                     ./build-uefi.sh $TARGET"
+        fi
 
     - name: 列出编译产物 / List Build Artifacts
       run: |
@@ -497,10 +419,8 @@ jobs:
           ## Coreboot 固件编译 / Coreboot Firmware Build
           
           **设备代号 / Device:** ${{ inputs.device }}
-          **PXE 支持 / PXE Support:** ${{ inputs.enable_pxe }}
-          **iPXE ROM:** ${{ inputs.enable_ipxe }}
-          **PCI ID:** ${{ inputs.pxe_rom_id || '所有网卡 / All NICs' }}
-          **构建日期 / Build Date:** ${{ github.event.head_commit.timestamp }}
+          **iPXE 网络启动 / iPXE Support:** ${{ inputs.enable_ipxe }}
+          **构建日期 / Build Date:** ${{ github.run_id }}
           **源码版本 / Source:** MrChromebox Coreboot
           
           > 查看设备型号对照：https://mrchromebox.tech/#devices
