@@ -191,6 +191,29 @@ else
     # 复制自定义 ROM 到工作目录
     cp "$CUSTOM_ROM" ./coreboot.rom
     
+    # 校验固件完整性 (在修改之前校验)
+    log_info "校验原始固件完整性 / Verifying original firmware integrity"
+    SHA1_FILE="${CUSTOM_ROM}.sha1"
+    if [ -f "$SHA1_FILE" ]; then
+        log_info "找到SHA1校验文件: $(basename $SHA1_FILE)"
+        
+        CALCULATED_SHA1=$(sha1sum coreboot.rom | awk '{print $1}')
+        EXPECTED_SHA1=$(cat "$SHA1_FILE" | awk '{print $1}')
+        
+        if [ "$CALCULATED_SHA1" = "$EXPECTED_SHA1" ]; then
+            log_info "✅ SHA1 校验通过 / SHA1 verification passed"
+        else
+            log_error "❌ SHA1 校验失败！/ SHA1 verification failed!"
+            log_error "   预期值 Expected: $EXPECTED_SHA1"
+            log_error "   实际值 Actual: $CALCULATED_SHA1"
+            log_error "   固件文件可能已损坏或被篡改，刷写中止！"
+            exit 1
+        fi
+    else
+        log_warn "⚠️  未找到SHA1校验文件，跳过校验"
+    fi
+    echo ""
+    
     # 注入 VPD
     log_info "注入 VPD 到自定义 ROM..."
     "$TOOLS_DIR/cbfstool" coreboot.rom write -r RO_VPD -f vpd.bin
@@ -212,12 +235,16 @@ else
     
     if [ -f "hwid.txt" ] && [ -s "hwid.txt" ]; then
         log_info "HWID: $(cat hwid.txt)"
-        "$TOOLS_DIR/cbfstool" coreboot.rom add -n hwid -f hwid.txt -t raw 2>/dev/null || \
-        "$TOOLS_DIR/cbfstool" coreboot.rom remove -n hwid 2>/dev/null && \
+        
+        # 先尝试删除现有HWID（如果存在），忽略错误
+        "$TOOLS_DIR/cbfstool" coreboot.rom remove -n hwid 2>/dev/null || true
+        
+        # 添加新的HWID
         "$TOOLS_DIR/cbfstool" coreboot.rom add -n hwid -f hwid.txt -t raw
-        log_info "HWID 注入完成"
+        log_info "✅ HWID 注入完成"
     else
-        log_warn "HWID 提取失败或为空，跳过注入（某些设备可能不需要）"
+        log_warn "⚠️  HWID 提取失败或为空，跳过注入"
+        log_warn "   某些设备或固件可能不需要HWID"
     fi
     
     echo ""
@@ -229,37 +256,6 @@ else
     log_info "✅ 已保存处理好的 ROM: $READY_ROM_PATH"
     log_info "此 ROM 可直接用于刷写，无需重复处理"
     
-    echo ""
-fi
-
-# ========================================
-# 校验固件完整性 (SHA1)
-# ========================================
-if [ "$USE_READY_ROM" = false ]; then
-    log_info "校验固件完整性 / Verifying firmware integrity"
-    
-    SHA1_FILE="${CUSTOM_ROM}.sha1"
-    if [ -f "$SHA1_FILE" ]; then
-        log_info "找到SHA1校验文件: $(basename $SHA1_FILE)"
-        
-        # 计算ROM的SHA1
-        CALCULATED_SHA1=$(sha1sum coreboot.rom | awk '{print $1}')
-        EXPECTED_SHA1=$(cat "$SHA1_FILE" | awk '{print $1}')
-        
-        if [ "$CALCULATED_SHA1" = "$EXPECTED_SHA1" ]; then
-            log_info "✅ SHA1 校验通过 / SHA1 verification passed"
-            log_info "   预期值: $EXPECTED_SHA1"
-        else
-            log_error "❌ SHA1 校验失败！/ SHA1 verification failed!"
-            log_error "   预期值 Expected: $EXPECTED_SHA1"
-            log_error "   实际值 Actual: $CALCULATED_SHA1"
-            log_error "   固件文件可能已损坏或被篡改，刷写中止！"
-            exit 1
-        fi
-    else
-        log_warn "⚠️  未找到SHA1校验文件，跳过校验"
-        log_warn "   建议下载时同时获取 .sha1 文件以确保安全"
-    fi
     echo ""
 fi
 
