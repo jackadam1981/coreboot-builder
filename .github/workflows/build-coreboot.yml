@@ -285,6 +285,16 @@ on:
         required: true
         type: boolean
         default: true
+      enable_ipxe:
+        description: '启用 iPXE ROM (需要 PXE) / Enable iPXE ROM'
+        required: false
+        type: boolean
+        default: true
+      pxe_rom_id:
+        description: 'PCI ID (留空=支持所有网卡，推荐) / PCI ID (empty=all NICs)'
+        required: false
+        type: string
+        default: ''
       release:
         description: '创建 Release 发布 / Create Release'
         required: false
@@ -382,6 +392,58 @@ jobs:
           fi
         fi
 
+    - name: 配置 iPXE ROM / Configure iPXE ROM
+      if: ${{ inputs.enable_ipxe == true }}
+      run: |
+        cd coreboot
+        DEVICE="${{ steps.extract.outputs.codename }}"
+        PCI_ID="${{ inputs.pxe_rom_id }}"
+        
+        if [ "$DEVICE" = "all" ]; then
+          echo "为所有设备添加 iPXE ROM 配置..."
+          find configs -name "*.uefi" -type f | while read cfg; do
+            if ! grep -q "CONFIG_BUILD_IPXE" "$cfg"; then
+              echo "CONFIG_BUILD_IPXE=y" >> "$cfg"
+              echo "CONFIG_IPXE_MASTER=y" >> "$cfg"
+              echo "CONFIG_IPXE_SERIAL_CONSOLE=y" >> "$cfg"
+              echo "CONFIG_IPXE_HAS_HTTPS=y" >> "$cfg"
+              echo "CONFIG_IPXE_TRUST_CMD=y" >> "$cfg"
+              if [ -n "$PCI_ID" ]; then
+                echo "CONFIG_PXE_ROM_ID=\"$PCI_ID\"" >> "$cfg"
+              fi
+            fi
+          done
+        else
+          CONFIG_FILE=$(find configs -name "config.$DEVICE.uefi" -type f | head -1)
+          if [ -f "$CONFIG_FILE" ]; then
+            if ! grep -q "CONFIG_BUILD_IPXE" "$CONFIG_FILE"; then
+              echo "CONFIG_BUILD_IPXE=y" >> "$CONFIG_FILE"
+              echo "CONFIG_IPXE_MASTER=y" >> "$CONFIG_FILE"
+              echo "CONFIG_IPXE_SERIAL_CONSOLE=y" >> "$CONFIG_FILE"
+              echo "CONFIG_IPXE_HAS_HTTPS=y" >> "$CONFIG_FILE"
+              echo "CONFIG_IPXE_TRUST_CMD=y" >> "$CONFIG_FILE"
+              if [ -n "$PCI_ID" ]; then
+                echo "CONFIG_PXE_ROM_ID=\"$PCI_ID\"" >> "$CONFIG_FILE"
+                echo "✅ 已为 $DEVICE 添加 iPXE ROM (PCI ID: $PCI_ID)"
+              else
+                echo "✅ 已为 $DEVICE 添加 iPXE ROM (支持所有网卡)"
+              fi
+            else
+              echo "ℹ️  $DEVICE 已配置 iPXE ROM"
+            fi
+            
+            echo ""
+            echo "📄 iPXE 配置 / iPXE Config:"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            grep -E "IPXE|PXE_ROM" "$CONFIG_FILE" || echo "未找到 iPXE 配置"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo ""
+          else
+            echo "⚠️ 未找到设备 $DEVICE 的配置文件"
+            exit 1
+          fi
+        fi
+
     - name: 拉取 Coreboot SDK 容器 / Pull Coreboot SDK
       run: docker pull coreboot/coreboot-sdk:latest
 
@@ -436,6 +498,8 @@ jobs:
           
           **设备代号 / Device:** ${{ inputs.device }}
           **PXE 支持 / PXE Support:** ${{ inputs.enable_pxe }}
+          **iPXE ROM:** ${{ inputs.enable_ipxe }}
+          **PCI ID:** ${{ inputs.pxe_rom_id || '所有网卡 / All NICs' }}
           **构建日期 / Build Date:** ${{ github.event.head_commit.timestamp }}
           **源码版本 / Source:** MrChromebox Coreboot
           
