@@ -29,25 +29,34 @@
    - cbfstool (Coreboot 文件系统工具)
    - gbb_utility (Google Binary Block 工具)
 
-2. ✅ **备份当前固件**
+2. ✅ **校验固件完整性**
+   - 自动查找 .sha1 校验文件
+   - 验证固件未损坏或被篡改
+   - 校验失败会中止刷写操作
+
+3. ✅ **备份当前固件**
    - 自动备份到设备专属目录
    - 文件名：`backup_<时间戳>.rom`
    - 仅备份 BIOS 区域（Intel 设备）
    - 每个设备（MAC地址）有独立目录
 
-3. ✅ **提取 VPD (Vital Product Data)**
+4. ✅ **提取 VPD (Vital Product Data)**
    - 从备份中提取 VPD
    - VPD 包含序列号等重要信息
 
-4. ✅ **准备自定义 ROM**
+5. ✅ **准备自定义 ROM**
    - 将 VPD 注入到新固件
    - 保留设备身份信息
 
-5. ✅ **提取并注入 HWID**
+6. ✅ **提取并注入 HWID**
    - 提取硬件 ID
    - 注入到新固件
 
-6. ✅ **刷写固件**
+7. ✅ **保存处理后的ROM**
+   - 保存到 ready_roms/ 目录
+   - 可用于将来快速刷写
+
+8. ✅ **刷写固件**
    - 使用安全参数刷写
    - 仅更新 BIOS 区域
 
@@ -73,6 +82,8 @@
 
 ```
 工作目录/
+├── coreboot_edk2-kaisa-mrchromebox_20251001.rom  # GitHub Actions 编译的原始固件
+├── coreboot_edk2-kaisa-mrchromebox_20251001.rom.sha1
 ├── tools/                              # 工具目录（所有设备共享）
 │   ├── flashrom
 │   ├── cbfstool
@@ -148,6 +159,12 @@ A: 首次运行需要联网下载工具，之后可离线使用。
 
 **Q: 多次刷写同一设备会怎样？**
 A: 每次刷写会在设备目录下创建新的时间戳子目录，保留完整历史记录，不会覆盖旧备份。
+
+**Q: SHA1 校验失败怎么办？**
+A: 说明固件文件已损坏或被篡改，请重新下载固件。确保从 GitHub Releases 或 Artifacts 下载完整的 .rom 和 .sha1 文件。
+
+**Q: 如何使用快速刷写模式？**
+A: 如果之前已经刷写过，可以使用 `sudo ./flash-coreboot-intel.sh --use-ready` 直接刷写最新的已处理ROM，跳过备份和VPD/HWID处理步骤。
 
 ### 技术支持
 

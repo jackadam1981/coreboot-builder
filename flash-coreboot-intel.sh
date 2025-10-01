@@ -233,6 +233,37 @@ else
 fi
 
 # ========================================
+# 校验固件完整性 (SHA1)
+# ========================================
+if [ "$USE_READY_ROM" = false ]; then
+    log_info "校验固件完整性 / Verifying firmware integrity"
+    
+    SHA1_FILE="${CUSTOM_ROM}.sha1"
+    if [ -f "$SHA1_FILE" ]; then
+        log_info "找到SHA1校验文件: $(basename $SHA1_FILE)"
+        
+        # 计算ROM的SHA1
+        CALCULATED_SHA1=$(sha1sum coreboot.rom | awk '{print $1}')
+        EXPECTED_SHA1=$(cat "$SHA1_FILE" | awk '{print $1}')
+        
+        if [ "$CALCULATED_SHA1" = "$EXPECTED_SHA1" ]; then
+            log_info "✅ SHA1 校验通过 / SHA1 verification passed"
+            log_info "   预期值: $EXPECTED_SHA1"
+        else
+            log_error "❌ SHA1 校验失败！/ SHA1 verification failed!"
+            log_error "   预期值 Expected: $EXPECTED_SHA1"
+            log_error "   实际值 Actual: $CALCULATED_SHA1"
+            log_error "   固件文件可能已损坏或被篡改，刷写中止！"
+            exit 1
+        fi
+    else
+        log_warn "⚠️  未找到SHA1校验文件，跳过校验"
+        log_warn "   建议下载时同时获取 .sha1 文件以确保安全"
+    fi
+    echo ""
+fi
+
+# ========================================
 # 步骤 6: 刷写固件
 # ========================================
 log_info "步骤 6/6: 刷写自定义固件 / Step 6/6: Flashing custom firmware"
