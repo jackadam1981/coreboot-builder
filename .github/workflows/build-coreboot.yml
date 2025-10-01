@@ -17,6 +17,13 @@ on:
         required: false
         type: boolean
         default: true
+      
+      enable_legacy:
+        description: '启用 Legacy SeaBIOS 模式 (推荐用于 iPXE) / Enable Legacy SeaBIOS Mode (recommended for iPXE)'
+        required: false
+        type: boolean
+        default: false
+      
       release:
         description: '创建 Release 发布 / Create Release'
         required: false
@@ -87,9 +94,22 @@ jobs:
         DEVICE="${{ steps.extract.outputs.codename }}"
         
         # 如果启用了 iPXE，使用自定义配置并直接 make
-        if [[ "${{ inputs.enable_ipxe }}" == "true" ]] && [ -f "config.kaisa-ipxe.uefi" ] && [ "$DEVICE" = "kaisa" ]; then
-          echo "使用 iPXE 自定义配置编译..."
-          cp config.kaisa-ipxe.uefi coreboot/.config
+        if [[ "${{ inputs.enable_ipxe }}" == "true" ]] && [ "$DEVICE" = "kaisa" ]; then
+          # 根据 Legacy 选项选择配置文件
+          if [[ "${{ inputs.enable_legacy }}" == "true" ]] && [ -f "config.kaisa-ipxe.legacy" ]; then
+            echo "🔧 使用 Legacy SeaBIOS + iPXE 自定义配置编译..."
+            CONFIG_FILE="config.kaisa-ipxe.legacy"
+            PAYLOAD_TYPE="seabios"
+          elif [ -f "config.kaisa-ipxe.uefi" ]; then
+            echo "🔧 使用 UEFI + iPXE 自定义配置编译..."
+            CONFIG_FILE="config.kaisa-ipxe.uefi"
+            PAYLOAD_TYPE="edk2"
+          else
+            echo "❌ 错误: 未找到自定义配置文件"
+            exit 1
+          fi
+          
+          cp "$CONFIG_FILE" coreboot/.config
           
           docker run --rm --user root \
             -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
@@ -100,8 +120,9 @@ jobs:
                      echo 'CONFIG_LOCALVERSION=\"-ipxe\"' >> .config && \
                      make olddefconfig && \
                      make -j\$(nproc) && \
-                     cp ./build/coreboot.rom ../roms/coreboot_edk2-${DEVICE}-mrchromebox_ipxe_\$(date +\"%Y%m%d\").rom && \
-                     cd ../roms && sha1sum coreboot_edk2-${DEVICE}-mrchromebox_ipxe_\$(date +\"%Y%m%d\").rom > coreboot_edk2-${DEVICE}-mrchromebox_ipxe_\$(date +\"%Y%m%d\").rom.sha1"
+                     cp ./build/coreboot.rom ../roms/coreboot_${PAYLOAD_TYPE}-${DEVICE}-mrchromebox_ipxe_\$(date +\"%Y%m%d\").rom && \
+                     cd ../roms && \
+                     sha1sum coreboot_${PAYLOAD_TYPE}-${DEVICE}-mrchromebox_ipxe_\$(date +\"%Y%m%d\").rom > coreboot_${PAYLOAD_TYPE}-${DEVICE}-mrchromebox_ipxe_\$(date +\"%Y%m%d\").rom.sha1"
         else
           # 使用标准的 build-uefi.sh 脚本
           docker run --rm --user root \
@@ -143,6 +164,7 @@ jobs:
           
           **设备代号 / Device:** ${{ inputs.device }}
           **iPXE 网络启动 / iPXE Support:** ${{ inputs.enable_ipxe }}
+          **Legacy SeaBIOS 模式 / Legacy Mode:** ${{ inputs.enable_legacy }}
           **构建日期 / Build Date:** ${{ github.run_id }}
           **源码版本 / Source:** MrChromebox Coreboot
           
@@ -152,6 +174,17 @@ jobs:
           1. 下载对应设备的 `.rom` 文件
           2. 使用 flashrom 或其他工具刷写固件
           3. 详细说明请参考项目 README
+          
+          ### 固件类型说明 / Firmware Types
+          - **UEFI (EDK2)**: 现代 UEFI 固件，支持安全启动和 GPT 分区
+          - **Legacy (SeaBIOS)**: 传统 BIOS 模式，与 iPXE 兼容性更好
+          
+          ### iPXE 网络启动说明 / iPXE Network Boot
+          如果启用了 iPXE:
+          - ✅ 已集成 iPXE ROM (Realtek RTL8168 网卡)
+          - ✅ 已配置 Option ROM 加载
+          - ✅ 启动时会出现 PXE 网络启动选项
+          
           
         files: |
           roms/*.rom
