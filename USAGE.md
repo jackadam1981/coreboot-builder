@@ -49,26 +49,32 @@
 
 ## 💡 高级用法
 
-### 添加自定义配置
+### 自定义启动 Logo
 
-1. 在 `configs/` 目录下添加您的配置文件
-2. 推送到仓库
-3. 自动触发构建（如果在 `main` 分支）
+替换仓库中的 `coreboot_logo.bmp` 文件：
 
-### 修改构建选项
+1. 准备您的 Logo 文件（推荐尺寸：638 x 531 像素，BMP 格式）
+2. 将文件命名为 `coreboot_logo.bmp`
+3. 替换仓库根目录的同名文件
+4. 手动触发构建即可应用
 
-编辑 `.github/workflows/build-coreboot.yml` 文件：
+### 修改设备列表
+
+编辑 `.github/workflows/build-coreboot.yml` 文件中的设备选项：
 
 ```yaml
-# 添加更多设备
-options:
-  - 'kaisa'
-  - 'your-device'  # 添加您的设备
+device:
+  description: '选择设备 / Select Device'
+  type: choice
+  options:
+    - 'all - 编译所有设备'
+    - 'Acer Chromebox CXI4 (kaisa)'
+    - 'Your Device Name (your-codename)'  # 添加您的设备
 ```
 
-### 本地测试配置
+### 本地测试构建
 
-如果想在本地测试配置：
+如果想在本地测试构建流程：
 
 ```bash
 # 克隆 coreboot
@@ -76,8 +82,8 @@ git clone https://github.com/mrchromebox/coreboot.git
 cd coreboot
 git submodule update --init --checkout --recursive
 
-# 复制配置
-cp ../configs/cml/config.kaisa.uefi configs/cml/
+# 替换 Logo（可选）
+cp /path/to/your/coreboot_logo.bmp Documentation/
 
 # 使用 Docker 构建
 docker pull coreboot/coreboot-sdk:latest
