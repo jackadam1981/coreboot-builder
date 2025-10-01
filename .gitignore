@@ -1,0 +1,27 @@
+# Coreboot 源码目录（构建时克隆）
+coreboot/
+
+# 编译产物
+roms/
+*.rom
+*.sha1
+build/
+
+# IDE 和编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 临时文件
+*.log
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+

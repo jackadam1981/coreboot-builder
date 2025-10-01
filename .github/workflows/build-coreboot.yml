@@ -1,0 +1,148 @@
+name: Build Coreboot Firmware
+
+on:
+  # 支持手动触发，可选择设备和选项
+  workflow_dispatch:
+    inputs:
+      device:
+        description: '选择要编译的设备 / Select Device'
+        required: true
+        type: choice
+        options:
+          - 'kaisa'              # Acer Chromebox CXI4
+          - 'eve'                # Google Pixelbook
+          - 'fizz'               # HP Chromebox G2
+          - 'atlas'              # Google Pixelbook Go
+          - 'samus'              # Google Chromebook Pixel 2015
+          - 'panther'            # Google Chromebook Pixel 2013
+          - 'all'                # 编译所有设备
+      enable_pxe:
+        description: '启用 PXE 网络启动 / Enable PXE Network Boot'
+        required: true
+        type: boolean
+        default: true
+      release:
+        description: '创建 Release 发布 / Create Release'
+        required: false
+        type: boolean
+        default: false
+
+  # 支持推送触发（可选）
+  push:
+    branches:
+      - main
+    paths:
+      - 'configs/**'
+      - '.github/workflows/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 检出构建仓库 / Checkout Builder Repository
+      uses: actions/checkout@v4
+
+    - name: 克隆 MrChromebox Coreboot 源码 / Clone Coreboot Source
+      run: |
+        git clone https://github.com/mrchromebox/coreboot.git coreboot
+        cd coreboot
+        git submodule update --init --checkout --recursive
+
+    - name: 应用自定义配置 / Apply Custom Configs
+      run: |
+        # 如果存在自定义配置，复制到 coreboot 目录
+        if [ -d "configs" ]; then
+          cp -r configs/* coreboot/configs/ || true
+        fi
+
+    - name: 添加 PXE 支持配置 / Add PXE Support
+      if: ${{ inputs.enable_pxe == true || github.event_name == 'push' }}
+      run: |
+        cd coreboot
+        # 为选中的设备添加 PXE 支持
+        DEVICE="${{ inputs.device }}"
+        if [ "$DEVICE" != "all" ]; then
+          CONFIG_FILE=$(find configs -name "config.$DEVICE.uefi" -type f | head -1)
+          if [ -f "$CONFIG_FILE" ]; then
+            echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> "$CONFIG_FILE"
+            echo "已为 $DEVICE 添加 PXE 支持 / Added PXE support for $DEVICE"
+          fi
+        else
+          # 为所有 UEFI 配置添加 PXE 支持
+          find configs -name "*.uefi" -type f | while read cfg; do
+            if ! grep -q "CONFIG_EDK2_NETWORK_PXE_SUPPORT" "$cfg"; then
+              echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> "$cfg"
+            fi
+          done
+        fi
+
+    - name: 拉取 Coreboot SDK 容器 / Pull Coreboot SDK
+      run: docker pull coreboot/coreboot-sdk:latest
+
+    - name: 构建工具链 / Build Toolchain
+      run: |
+        docker run --rm --user root \
+          -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+          -w /home/coreboot/coreboot \
+          coreboot/coreboot-sdk:latest \
+          bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
+                   make crossgcc-i386 CPUS=$(nproc)"
+
+    - name: 编译固件 / Build Firmware
+      run: |
+        mkdir -p roms
+        docker run --rm --user root \
+          -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+          -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+          -w /home/coreboot/coreboot \
+          coreboot/coreboot-sdk:latest \
+          bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
+                   ./build-uefi.sh ${{ inputs.device }}"
+
+    - name: 列出编译产物 / List Build Artifacts
+      run: |
+        echo "=== 编译完成的固件 / Compiled Firmware ==="
+        ls -lh roms/
+
+    - name: 上传固件 / Upload Firmware Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: coreboot-firmware-${{ inputs.device }}-${{ github.run_number }}
+        path: roms/*.rom
+        retention-days: 30
+
+    - name: 上传校验和 / Upload Checksums
+      uses: actions/upload-artifact@v4
+      with:
+        name: coreboot-checksums-${{ inputs.device }}-${{ github.run_number }}
+        path: roms/*.sha1
+        retention-days: 30
+
+    - name: 创建 Release / Create Release
+      if: ${{ inputs.release == true }}
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: firmware-${{ inputs.device }}-${{ github.run_number }}
+        name: Coreboot Firmware - ${{ inputs.device }}
+        body: |
+          ## Coreboot 固件编译 / Coreboot Firmware Build
+          
+          **设备 / Device:** ${{ inputs.device }}
+          **PXE 支持 / PXE Support:** ${{ inputs.enable_pxe }}
+          **构建日期 / Build Date:** ${{ github.event.head_commit.timestamp }}
+          **源码版本 / Source:** MrChromebox Coreboot
+          
+          ### 使用说明 / Instructions
+          1. 下载对应设备的 `.rom` 文件
+          2. 使用 flashrom 或其他工具刷写固件
+          3. 详细说明请参考项目 README
+          
+        files: |
+          roms/*.rom
+          roms/*.sha1
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
