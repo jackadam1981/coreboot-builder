@@ -331,7 +331,7 @@ jobs:
           CODENAME="all"
         else
           # 提取括号中的代号
-          CODENAME=$(echo "$SELECTED" | sed 's/.*(\(.*\))//')
+          CODENAME=$(echo "$SELECTED" | sed 's/.*(\(.*\))/\1/')
         fi
         echo "codename=$CODENAME" >> $GITHUB_OUTPUT
         echo "提取的代号: $CODENAME"
