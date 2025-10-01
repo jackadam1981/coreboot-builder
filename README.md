@@ -28,25 +28,33 @@
 
 ## 🔧 使用方法
 
+> **📌 注意**：GitHub Actions 需要在您 Fork 的仓库中运行。如果您不是仓库所有者，请先 Fork 本仓库到您的账号。
+
 ### GitHub Actions 手动触发
 
-1. **进入 Actions 页面**
-   - 访问仓库的 `Actions` 标签页
+1. **Fork 本仓库**（如果您还没有 Fork）
+   - 点击页面右上角的 `Fork` 按钮
+   - Fork 到您的 GitHub 账号
+
+2. **进入 Actions 页面**
+   - 访问您 Fork 仓库的 `Actions` 标签页
    - 选择 `Build Coreboot Firmware` 工作流
 
-2. **配置构建参数**
+3. **配置构建参数**
    - 点击 `Run workflow` 按钮
    - 选择要编译的设备（或选择 `all` 编译所有设备）
    - 勾选是否启用 PXE 网络启动
    - 勾选是否创建 Release 发布
 
-3. **等待构建完成**
+4. **等待构建完成**
    - 构建过程约 30-60 分钟
    - 完成后在 `Artifacts` 中下载固件
 
-4. **下载固件**
+5. **下载固件**
    - 在 Actions 运行记录中下载 `coreboot-firmware-xxx` 文件
    - 如果创建了 Release，也可以在 Releases 页面下载
+
+> **🚀 即将推出**：未来将支持通过提交 Issue 来触发编译，方便没有 Fork 仓库的用户使用。
 
 ## 📁 项目结构
 
