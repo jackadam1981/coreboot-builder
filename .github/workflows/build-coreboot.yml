@@ -5,12 +5,11 @@ on:
   workflow_dispatch:
     inputs:
       device:
-        description: '选择设备 / Select Device (查看 https://mrchromebox.tech/#devices 了解详情)'
+        description: '选择设备 / Select Device (iPXE 仅支持 kaisa)'
         required: true
         type: choice
-        default: 'all - 编译所有设备'
+        default: 'Acer Chromebox CXI4 (kaisa)'
         options:
-          - 'all - 编译所有设备'
           - 'ADVAN Chromebook 116J (kracko)'
           - 'AOpen Chromebase Commercial (sumo)'
           - 'AOpen Chromebox Commercial (ninja)'
@@ -347,15 +346,6 @@ jobs:
 
     - name: 拉取 Coreboot SDK 容器 / Pull Coreboot SDK
       run: docker pull coreboot/coreboot-sdk:latest
-
-    - name: 构建工具链 / Build Toolchain
-      run: |
-        docker run --rm --user root \
-          -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
-          -w /home/coreboot/coreboot \
-          coreboot/coreboot-sdk:latest \
-          bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
-                   make crossgcc-i386 CPUS=$(nproc)"
 
     - name: 编译固件 / Build Firmware
       run: |
