@@ -82,8 +82,9 @@
 
 ```
 工作目录/
+├── flash-coreboot-intel.sh             # 刷写脚本
 ├── coreboot_edk2-kaisa-mrchromebox_20251001.rom  # GitHub Actions 编译的原始固件
-├── coreboot_edk2-kaisa-mrchromebox_20251001.rom.sha1
+├── coreboot_edk2-kaisa-mrchromebox_20251001.rom.sha1  # SHA1 校验文件
 ├── tools/                              # 工具目录（所有设备共享）
 │   ├── flashrom
 │   ├── cbfstool
