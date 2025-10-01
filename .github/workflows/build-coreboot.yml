@@ -4,35 +4,9 @@ on:
   # 支持手动触发，可选择设备和选项
   workflow_dispatch:
     inputs:
-      platform:
-        description: '选择平台 / Select Platform (查看README了解各平台设备)'
-        required: true
-        type: choice
-        options:
-          - 'Comet Lake (cml) - 22设备'
-          - 'Jasper Lake (jsl) - 49设备'
-          - 'Gemini Lake (glk) - 34设备'
-          - 'Alder Lake-N (adl_n) - 29设备'
-          - 'Alder Lake (adl) - 27设备'
-          - 'Apollo Lake (apl) - 20设备'
-          - 'Bay Trail (byt) - 16设备'
-          - 'Kaby Lake (kbl) - 14设备'
-          - 'Tiger Lake (tgl) - 13设备'
-          - 'Broadwell (bdw) - 11设备'
-          - 'Braswell (bsw) - 11设备'
-          - 'Haswell (hsw) - 9设备'
-          - 'Skylake (skl) - 8设备'
-          - 'Picasso (pco) - 8设备'
-          - 'Sandy/Ivy Bridge (snb_ivb) - 6设备'
-          - 'Stoney Ridge (str) - 6设备'
-          - 'Mendocino (mdn) - 5设备'
-          - 'Cezanne (czn) - 2设备'
-          - 'Whiskey Lake (whl) - 2设备'
-          - '所有平台 (all) - 292设备'
-        default: 'Comet Lake (cml) - 22设备'
       device:
-        description: '设备型号 / Device Model (例如kaisa, 留空=all, 查看README获取完整列表)'
-        required: false
+        description: '设备代号 / Device Codename (如kaisa, 或all编译所有, 查看 https://mrchromebox.tech/#devices)'
+        required: true
         type: string
         default: 'kaisa'
       enable_pxe:
@@ -78,48 +52,25 @@ jobs:
     - name: 确定目标设备 / Determine Target Device
       id: device
       run: |
-        # 从选项中提取平台代码（括号中的部分）
-        PLATFORM_INPUT="${{ inputs.platform }}"
-        PLATFORM=$(echo "$PLATFORM_INPUT" | sed 's/.*(\([^)]*\)).*/\1/')
         DEVICE="${{ inputs.device }}"
         
-        echo "选择的平台: $PLATFORM_INPUT"
-        echo "平台代码: $PLATFORM"
-        
-        # 如果平台是 all，编译所有设备
-        if [ "$PLATFORM" = "all" ]; then
-          TARGET="all"
+        if [ "$DEVICE" = "all" ]; then
           echo "target=all" >> $GITHUB_OUTPUT
-          echo "platform=all" >> $GITHUB_OUTPUT
-          echo "📦 编译所有平台的所有设备 (292个) / Building all devices"
-        # 如果设备为空或为 all，编译该平台的所有设备  
-        elif [ -z "$DEVICE" ] || [ "$DEVICE" = "all" ]; then
-          TARGET=""
-          # 获取该平台的所有设备
-          cd coreboot
-          DEVICES=$(find configs/$PLATFORM -name "*.uefi" -type f 2>/dev/null | sed "s|configs/$PLATFORM/config\.||; s|\.uefi||" | tr '\n' ' ')
-          TARGET="$DEVICES"
-          DEVICE_COUNT=$(echo $DEVICES | wc -w)
-          echo "target=$TARGET" >> $GITHUB_OUTPUT
-          echo "platform=$PLATFORM" >> $GITHUB_OUTPUT
-          echo "📦 编译平台 $PLATFORM 的所有设备 ($DEVICE_COUNT 个): $TARGET"
+          echo "device_name=all" >> $GITHUB_OUTPUT
+          echo "📦 编译所有设备 (292个) / Building all devices"
         else
-          # 编译指定设备
-          TARGET="$DEVICE"
-          echo "target=$TARGET" >> $GITHUB_OUTPUT
-          echo "platform=$PLATFORM" >> $GITHUB_OUTPUT
-          echo "📦 编译设备: $PLATFORM/$DEVICE"
+          echo "target=$DEVICE" >> $GITHUB_OUTPUT
+          echo "device_name=$DEVICE" >> $GITHUB_OUTPUT
+          echo "📦 编译设备 / Building device: $DEVICE"
         fi
 
     - name: 添加 PXE 支持配置 / Add PXE Support
       if: ${{ inputs.enable_pxe == true }}
       run: |
         cd coreboot
-        PLATFORM="${{ steps.device.outputs.platform }}"
-        TARGET="${{ steps.device.outputs.target }}"
+        DEVICE="${{ inputs.device }}"
         
-        # 如果是编译所有设备
-        if [ "$TARGET" = "all" ]; then
+        if [ "$DEVICE" = "all" ]; then
           echo "为所有设备添加 PXE 支持..."
           find configs -name "*.uefi" -type f | while read cfg; do
             if ! grep -q "CONFIG_EDK2_NETWORK_PXE_SUPPORT" "$cfg"; then
@@ -127,18 +78,19 @@ jobs:
             fi
           done
         else
-          # 为指定设备添加 PXE 支持
-          for DEVICE in $TARGET; do
-            CONFIG_FILE="configs/$PLATFORM/config.$DEVICE.uefi"
-            if [ -f "$CONFIG_FILE" ]; then
-              if ! grep -q "CONFIG_EDK2_NETWORK_PXE_SUPPORT" "$CONFIG_FILE"; then
-                echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> "$CONFIG_FILE"
-                echo "✅ 已为 $PLATFORM/$DEVICE 添加 PXE 支持"
-              else
-                echo "ℹ️  $PLATFORM/$DEVICE 已启用 PXE 支持"
-              fi
+          # 查找设备配置文件
+          CONFIG_FILE=$(find configs -name "config.$DEVICE.uefi" -type f | head -1)
+          if [ -f "$CONFIG_FILE" ]; then
+            if ! grep -q "CONFIG_EDK2_NETWORK_PXE_SUPPORT" "$CONFIG_FILE"; then
+              echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> "$CONFIG_FILE"
+              echo "✅ 已为 $DEVICE 添加 PXE 支持"
+            else
+              echo "ℹ️  $DEVICE 已启用 PXE 支持"
             fi
-          done
+          else
+            echo "⚠️ 未找到设备 $DEVICE 的配置文件"
+            exit 1
+          fi
         fi
 
     - name: 拉取 Coreboot SDK 容器 / Pull Coreboot SDK
@@ -173,14 +125,14 @@ jobs:
     - name: 上传固件 / Upload Firmware Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: coreboot-firmware-${{ steps.device.outputs.platform }}-${{ github.run_number }}
+        name: coreboot-firmware-${{ inputs.device }}-${{ github.run_number }}
         path: roms/*.rom
         retention-days: 30
 
     - name: 上传校验和 / Upload Checksums
       uses: actions/upload-artifact@v4
       with:
-        name: coreboot-checksums-${{ steps.device.outputs.platform }}-${{ github.run_number }}
+        name: coreboot-checksums-${{ inputs.device }}-${{ github.run_number }}
         path: roms/*.sha1
         retention-days: 30
 
@@ -188,16 +140,17 @@ jobs:
       if: ${{ inputs.release == true }}
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: firmware-${{ steps.device.outputs.platform }}-${{ github.run_number }}
-        name: Coreboot Firmware - ${{ inputs.platform }}
+        tag_name: firmware-${{ inputs.device }}-${{ github.run_number }}
+        name: Coreboot Firmware - ${{ inputs.device }}
         body: |
           ## Coreboot 固件编译 / Coreboot Firmware Build
           
-          **平台 / Platform:** ${{ inputs.platform }}
-          **设备 / Device:** ${{ inputs.device }}
+          **设备代号 / Device:** ${{ inputs.device }}
           **PXE 支持 / PXE Support:** ${{ inputs.enable_pxe }}
           **构建日期 / Build Date:** ${{ github.event.head_commit.timestamp }}
           **源码版本 / Source:** MrChromebox Coreboot
+          
+          > 查看设备型号对照：https://mrchromebox.tech/#devices
           
           ### 使用说明 / Instructions
           1. 下载对应设备的 `.rom` 文件
