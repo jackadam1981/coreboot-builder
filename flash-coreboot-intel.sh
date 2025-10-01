@@ -71,8 +71,10 @@ log_info "设备 MAC 地址 / Device MAC Address: $MAC_ADDR"
 DEVICE_DIR="device_${MAC_ADDR}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 WORK_DIR="${DEVICE_DIR}/flash_${TIMESTAMP}"
+READY_DIR="${DEVICE_DIR}/ready_roms"  # 存放处理好的ROM文件
 
 mkdir -p "$WORK_DIR"
+mkdir -p "$READY_DIR"
 cd "$WORK_DIR"
 
 log_info "工作目录 / Working directory: $(pwd)"
@@ -189,6 +191,15 @@ fi
 
 echo ""
 
+# 保存处理好的ROM（包含VPD和HWID）
+READY_ROM="ready_${MAC_ADDR}_${TIMESTAMP}.rom"
+READY_ROM_PATH="../ready_roms/$READY_ROM"
+cp coreboot.rom "$READY_ROM_PATH"
+log_info "✅ 已保存处理好的 ROM: $READY_ROM_PATH"
+log_info "此 ROM 可直接用于刷写，无需重复处理"
+
+echo ""
+
 # ========================================
 # 步骤 6: 刷写固件
 # ========================================
@@ -213,7 +224,12 @@ if [ $? -eq 0 ]; then
     log_info "✅ 固件刷写成功！/ Firmware flashed successfully!"
     log_info "=========================================="
     log_info "备份文件位置 / Backup location: $(pwd)/$BACKUP_FILE"
+    log_info "处理后ROM位置 / Ready ROM location: $READY_ROM_PATH"
     log_info "设备标识 / Device ID: MAC_$MAC_ADDR"
+    echo ""
+    log_info "💡 提示：处理后的ROM已包含此设备专属的VPD和HWID"
+    log_info "   - 可用于此设备的重复刷写（无需重新处理）"
+    log_info "   - ⚠️ 不能用于其他设备，即使是相同型号"
     log_info "请妥善保存备份文件以备不时之需"
     echo ""
     log_info "请重新启动计算机 / Please reboot your computer"
