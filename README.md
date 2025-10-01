@@ -28,7 +28,7 @@
 
 ## 🔧 使用方法
 
-### 方式一：GitHub Actions 手动触发（推荐）
+### GitHub Actions 手动触发
 
 1. **进入 Actions 页面**
    - 访问仓库的 `Actions` 标签页
@@ -48,64 +48,72 @@
    - 在 Actions 运行记录中下载 `coreboot-firmware-xxx` 文件
    - 如果创建了 Release，也可以在 Releases 页面下载
 
-### 方式二：修改配置自动触发
-
-1. Fork 本仓库
-2. 修改 `configs/` 目录下的配置文件
-3. 提交推送到 `main` 分支
-4. 自动触发构建
-
 ## 📁 项目结构
 
 ```
 coreboot-builder/
 ├── .github/
 │   └── workflows/
-│       └── build-coreboot.yml    # GitHub Actions 工作流
-├── configs/                       # 自定义设备配置
-│   └── cml/
-│       └── config.kaisa.uefi     # KAISA 配置（已启用 PXE）
-└── README.md                      # 项目说明
+│       └── build-coreboot.yml      # GitHub Actions 工作流
+├── coreboot_logo.bmp                # 自定义启动 Logo
+├── flash-coreboot-intel.sh          # Intel 设备刷写脚本
+├── FLASH_GUIDE.md                   # 刷写指南
+├── USAGE.md                         # 使用说明
+├── DEVICES.md                       # 设备列表
+└── README.md                        # 项目说明
 ```
 
 ## 🛠️ 自定义配置
 
-### 添加新设备配置
+### 自定义启动 Logo
 
-1. 在 `configs/` 目录下创建对应平台目录（如 `cml/`, `kbl/` 等）
-2. 添加配置文件，命名格式：`config.<设备代号>.uefi`
-3. 推送到仓库即可在构建时使用
+替换 `coreboot_logo.bmp` 文件即可：
+- 推荐尺寸：638 x 531 像素
+- 格式：BMP (32-bit)
+- 构建时会自动替换到固件中
 
-### 启用 PXE 支持
+### PXE 网络启动
 
-在设备配置文件末尾添加：
+通过 GitHub Actions 构建参数控制：
+- 勾选 `启用 PXE 网络启动` 选项
+- 构建时会自动添加 `CONFIG_EDK2_NETWORK_PXE_SUPPORT=y`
 
-```
-CONFIG_EDK2_NETWORK_PXE_SUPPORT=y
-```
+### 修改设备列表
 
-### 修改 GitHub Actions 工作流
-
-编辑 `.github/workflows/build-coreboot.yml` 可以：
-- 添加更多设备选项
-- 修改构建参数
-- 添加其他构建步骤
+编辑 `.github/workflows/build-coreboot.yml` 中的 `device` 选项可以：
+- 添加或删除设备选项
+- 修改设备显示名称
+- 调整设备排序
 
 ## 📝 刷写固件
 
 ⚠️ **警告**：刷写固件有风险，操作前请备份原固件！
 
-### 使用 Flashrom（Linux）
+### 使用自动化脚本（推荐 - Intel 设备）
+
+本项目提供了自动化刷写脚本 `flash-coreboot-intel.sh`：
 
 ```bash
-# 读取当前固件（备份）
-sudo flashrom -p internal -r backup.rom
+# 下载脚本
+wget https://raw.githubusercontent.com/jackadam1981/coreboot-builder/main/flash-coreboot-intel.sh
 
-# 刷写新固件
-sudo flashrom -p internal -w coreboot_edk2-kaisa-mrchromebox_YYYYMMDD.rom
+# 添加执行权限
+chmod +x flash-coreboot-intel.sh
+
+# 运行（将 coreboot.rom 替换为你的固件文件名）
+sudo ./flash-coreboot-intel.sh coreboot.rom
 ```
 
-### 使用 MrChromebox 脚本
+**功能特性**：
+- ✅ 自动下载必需工具（flashrom, cbfstool, gbb_utility）
+- ✅ 自动备份原固件
+- ✅ 自动提取并注入 VPD 和 HWID
+- ✅ 按 MAC 地址组织备份文件
+- ✅ 保留完整刷写历史
+
+详细说明请查看 [FLASH_GUIDE.md](FLASH_GUIDE.md)
+
+### 使用 MrChromebox 官方脚本
 
 ```bash
 curl -LO https://mrchromebox.tech/firmware-util.sh
