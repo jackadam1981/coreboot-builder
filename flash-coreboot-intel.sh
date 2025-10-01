@@ -31,19 +31,27 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # 检查参数
-if [ $# -ne 1 ]; then
-    echo "用法 / Usage: sudo $0 <coreboot.rom>"
-    echo "示例 / Example: sudo $0 coreboot_edk2-kaisa-mrchromebox_20251001.rom"
+if [ $# -lt 1 ]; then
+    echo "用法 / Usage: sudo $0 <coreboot.rom> [--use-ready]"
+    echo ""
+    echo "示例 / Examples:"
+    echo "  sudo $0 coreboot_edk2-kaisa-mrchromebox_20251001.rom"
+    echo "  sudo $0 --use-ready                # 使用最新的处理好的ROM"
+    echo "  sudo $0 ready_A1B2C3D4E5F6_20251001_120000.rom  # 使用指定的处理好的ROM"
     exit 1
 fi
 
 CUSTOM_ROM="$1"
+USE_READY_ROM=false
 
-# 获取ROM文件的绝对路径
-CUSTOM_ROM=$(realpath "$CUSTOM_ROM")
-
-# 检查 ROM 文件是否存在
-if [ ! -f "$CUSTOM_ROM" ]; then
+# 检查是否使用已处理的ROM
+if [ "$CUSTOM_ROM" = "--use-ready" ]; then
+    USE_READY_ROM=true
+    CUSTOM_ROM=""
+elif [ -f "$CUSTOM_ROM" ]; then
+    # 获取ROM文件的绝对路径
+    CUSTOM_ROM=$(realpath "$CUSTOM_ROM")
+else
     log_error "找不到 ROM 文件 / ROM file not found: $CUSTOM_ROM"
     exit 1
 fi
@@ -75,6 +83,20 @@ READY_DIR="${DEVICE_DIR}/ready_roms"  # 存放处理好的ROM文件
 
 mkdir -p "$WORK_DIR"
 mkdir -p "$READY_DIR"
+
+# 如果使用已处理的ROM
+if [ "$USE_READY_ROM" = true ]; then
+    # 查找最新的ready ROM
+    LATEST_READY=$(ls -t "$READY_DIR"/ready_${MAC_ADDR}_*.rom 2>/dev/null | head -1)
+    if [ -z "$LATEST_READY" ]; then
+        log_error "未找到此设备的已处理ROM / No ready ROM found for this device"
+        log_error "请先使用原始ROM进行首次刷写"
+        exit 1
+    fi
+    CUSTOM_ROM="$LATEST_READY"
+    log_info "使用已处理的ROM / Using ready ROM: $CUSTOM_ROM"
+fi
+
 cd "$WORK_DIR"
 
 log_info "工作目录 / Working directory: $(pwd)"
@@ -121,84 +143,94 @@ fi
 
 echo ""
 
-# ========================================
-# 步骤 2: 备份当前固件
-# ========================================
-BACKUP_FILE="backup_${TIMESTAMP}.rom"
-
-log_info "步骤 2/6: 备份当前固件 / Step 2/6: Backing up current firmware"
-log_info "设备目录 / Device directory: $DEVICE_DIR"
-log_warn "此步骤可能需要几分钟，请耐心等待 / This may take a few minutes, please wait"
-
-"$TOOLS_DIR/flashrom" -p internal -r "$BACKUP_FILE" --ifd -i bios
-log_info "备份完成: $BACKUP_FILE"
-
-echo ""
-
-# ========================================
-# 步骤 3: 提取 VPD
-# ========================================
-log_info "步骤 3/6: 从备份中提取 VPD / Step 3/6: Extracting VPD from backup"
-
-"$TOOLS_DIR/cbfstool" "$BACKUP_FILE" read -r RO_VPD -f vpd.bin
-if [ -f "vpd.bin" ]; then
-    log_info "VPD 提取完成: vpd.bin"
+# 判断是使用已处理的ROM还是处理新ROM
+if [ "$USE_READY_ROM" = true ]; then
+    # ========================================
+    # 使用已处理的ROM（快速刷写模式）
+    # ========================================
+    log_info "🚀 快速刷写模式：使用已处理的ROM"
+    log_info "跳过备份和VPD/HWID处理步骤"
+    echo ""
+    
+    # 直接复制ready ROM
+    cp "$CUSTOM_ROM" ./coreboot.rom
+    log_info "已准备ROM: $(basename $CUSTOM_ROM)"
 else
-    log_error "VPD 提取失败"
-    exit 1
+    # ========================================
+    # 完整处理流程
+    # ========================================
+    
+    # 步骤 2: 备份当前固件
+    BACKUP_FILE="backup_${TIMESTAMP}.rom"
+    
+    log_info "步骤 2/6: 备份当前固件 / Step 2/6: Backing up current firmware"
+    log_info "设备目录 / Device directory: $DEVICE_DIR"
+    log_warn "此步骤可能需要几分钟，请耐心等待 / This may take a few minutes, please wait"
+    
+    "$TOOLS_DIR/flashrom" -p internal -r "$BACKUP_FILE" --ifd -i bios
+    log_info "备份完成: $BACKUP_FILE"
+    
+    echo ""
+    
+    # 步骤 3: 提取 VPD
+    log_info "步骤 3/6: 从备份中提取 VPD / Step 3/6: Extracting VPD from backup"
+    
+    "$TOOLS_DIR/cbfstool" "$BACKUP_FILE" read -r RO_VPD -f vpd.bin
+    if [ -f "vpd.bin" ]; then
+        log_info "VPD 提取完成: vpd.bin"
+    else
+        log_error "VPD 提取失败"
+        exit 1
+    fi
+    
+    echo ""
+    
+    # 步骤 4: 准备自定义 ROM
+    log_info "步骤 4/6: 准备自定义 ROM / Step 4/6: Preparing custom ROM"
+    
+    # 复制自定义 ROM 到工作目录
+    cp "$CUSTOM_ROM" ./coreboot.rom
+    
+    # 注入 VPD
+    log_info "注入 VPD 到自定义 ROM..."
+    "$TOOLS_DIR/cbfstool" coreboot.rom write -r RO_VPD -f vpd.bin
+    log_info "VPD 注入完成"
+    
+    echo ""
+    
+    # 步骤 5: 提取并注入 HWID
+    log_info "步骤 5/6: 提取并注入 HWID / Step 5/6: Extracting and injecting HWID"
+    
+    # 尝试从固件实用程序脚本的固件中提取
+    if "$TOOLS_DIR/cbfstool" "$BACKUP_FILE" extract -n hwid -f hwid.txt 2>/dev/null; then
+        log_info "从固件实用程序脚本固件中提取 HWID"
+    else
+        # 从库存固件中提取
+        log_info "从库存固件中提取 HWID"
+        "$TOOLS_DIR/gbb_utility" "$BACKUP_FILE" --get --hwid > hwid.txt
+    fi
+    
+    if [ -f "hwid.txt" ] && [ -s "hwid.txt" ]; then
+        log_info "HWID: $(cat hwid.txt)"
+        "$TOOLS_DIR/cbfstool" coreboot.rom add -n hwid -f hwid.txt -t raw 2>/dev/null || \
+        "$TOOLS_DIR/cbfstool" coreboot.rom remove -n hwid 2>/dev/null && \
+        "$TOOLS_DIR/cbfstool" coreboot.rom add -n hwid -f hwid.txt -t raw
+        log_info "HWID 注入完成"
+    else
+        log_warn "HWID 提取失败或为空，跳过注入（某些设备可能不需要）"
+    fi
+    
+    echo ""
+    
+    # 保存处理好的ROM（包含VPD和HWID）
+    READY_ROM="ready_${MAC_ADDR}_${TIMESTAMP}.rom"
+    READY_ROM_PATH="../ready_roms/$READY_ROM"
+    cp coreboot.rom "$READY_ROM_PATH"
+    log_info "✅ 已保存处理好的 ROM: $READY_ROM_PATH"
+    log_info "此 ROM 可直接用于刷写，无需重复处理"
+    
+    echo ""
 fi
-
-echo ""
-
-# ========================================
-# 步骤 4: 准备自定义 ROM
-# ========================================
-log_info "步骤 4/6: 准备自定义 ROM / Step 4/6: Preparing custom ROM"
-
-# 复制自定义 ROM 到工作目录
-cp "$CUSTOM_ROM" ./coreboot.rom
-
-# 注入 VPD
-log_info "注入 VPD 到自定义 ROM..."
-"$TOOLS_DIR/cbfstool" coreboot.rom write -r RO_VPD -f vpd.bin
-log_info "VPD 注入完成"
-
-echo ""
-
-# ========================================
-# 步骤 5: 提取并注入 HWID
-# ========================================
-log_info "步骤 5/6: 提取并注入 HWID / Step 5/6: Extracting and injecting HWID"
-
-# 尝试从固件实用程序脚本的固件中提取
-if "$TOOLS_DIR/cbfstool" "$BACKUP_FILE" extract -n hwid -f hwid.txt 2>/dev/null; then
-    log_info "从固件实用程序脚本固件中提取 HWID"
-else
-    # 从库存固件中提取
-    log_info "从库存固件中提取 HWID"
-    "$TOOLS_DIR/gbb_utility" "$BACKUP_FILE" --get --hwid > hwid.txt
-fi
-
-if [ -f "hwid.txt" ] && [ -s "hwid.txt" ]; then
-    log_info "HWID: $(cat hwid.txt)"
-    "$TOOLS_DIR/cbfstool" coreboot.rom add -n hwid -f hwid.txt -t raw 2>/dev/null || \
-    "$TOOLS_DIR/cbfstool" coreboot.rom remove -n hwid 2>/dev/null && \
-    "$TOOLS_DIR/cbfstool" coreboot.rom add -n hwid -f hwid.txt -t raw
-    log_info "HWID 注入完成"
-else
-    log_warn "HWID 提取失败或为空，跳过注入（某些设备可能不需要）"
-fi
-
-echo ""
-
-# 保存处理好的ROM（包含VPD和HWID）
-READY_ROM="ready_${MAC_ADDR}_${TIMESTAMP}.rom"
-READY_ROM_PATH="../ready_roms/$READY_ROM"
-cp coreboot.rom "$READY_ROM_PATH"
-log_info "✅ 已保存处理好的 ROM: $READY_ROM_PATH"
-log_info "此 ROM 可直接用于刷写，无需重复处理"
-
-echo ""
 
 # ========================================
 # 步骤 6: 刷写固件
