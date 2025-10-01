@@ -57,7 +57,7 @@ jobs:
         fi
 
     - name: 添加 PXE 支持配置 / Add PXE Support
-      if: ${{ inputs.enable_pxe == true || github.event_name == 'push' }}
+      if: ${{ inputs.enable_pxe == true }}
       run: |
         cd coreboot
         # 为选中的设备添加 PXE 支持
@@ -65,14 +65,20 @@ jobs:
         if [ "$DEVICE" != "all" ]; then
           CONFIG_FILE=$(find configs -name "config.$DEVICE.uefi" -type f | head -1)
           if [ -f "$CONFIG_FILE" ]; then
-            echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> "$CONFIG_FILE"
-            echo "已为 $DEVICE 添加 PXE 支持 / Added PXE support for $DEVICE"
+            # 检查是否已存在 PXE 配置，避免重复添加
+            if ! grep -q "CONFIG_EDK2_NETWORK_PXE_SUPPORT" "$CONFIG_FILE"; then
+              echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> "$CONFIG_FILE"
+              echo "已为 $DEVICE 添加 PXE 支持 / Added PXE support for $DEVICE"
+            else
+              echo "$DEVICE 已启用 PXE 支持 / PXE already enabled for $DEVICE"
+            fi
           fi
         else
           # 为所有 UEFI 配置添加 PXE 支持
           find configs -name "*.uefi" -type f | while read cfg; do
             if ! grep -q "CONFIG_EDK2_NETWORK_PXE_SUPPORT" "$cfg"; then
               echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> "$cfg"
+              echo "已为 $(basename $cfg) 添加 PXE 支持"
             fi
           done
         fi
