@@ -296,7 +296,6 @@ on:
     branches:
       - main
     paths:
-      - 'configs/**'
       - '.github/workflows/**'
 
 permissions:
@@ -315,13 +314,6 @@ jobs:
         git clone https://github.com/mrchromebox/coreboot.git coreboot
         cd coreboot
         git submodule update --init --checkout --recursive
-
-    - name: 应用自定义配置 / Apply Custom Configs
-      run: |
-        # 如果存在自定义配置，复制到 coreboot 目录
-        if [ -d "configs" ]; then
-          cp -r configs/* coreboot/configs/ || true
-        fi
 
     - name: 提取设备代号 / Extract Device Codename
       id: extract
