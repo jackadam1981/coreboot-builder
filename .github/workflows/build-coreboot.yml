@@ -9,7 +9,7 @@ on:
         required: true
         type: choice
         default: 'all - 编译所有设备'
-          options:
+        options:
           - 'all - 编译所有设备'
           - 'ADVAN Chromebook 116J (kracko)'
           - 'AOpen Chromebase Commercial (sumo)'
