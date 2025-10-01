@@ -368,6 +368,14 @@ jobs:
             else
               echo "ℹ️  $DEVICE 已启用 PXE 支持"
             fi
+            
+            # 显示配置文件内容
+            echo ""
+            echo "📄 配置文件内容预览 / Config file preview:"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            cat "$CONFIG_FILE"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo ""
           else
             echo "⚠️ 未找到设备 $DEVICE 的配置文件"
             exit 1
