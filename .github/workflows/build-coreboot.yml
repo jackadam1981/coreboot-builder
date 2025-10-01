@@ -5,10 +5,281 @@ on:
   workflow_dispatch:
     inputs:
       device:
-        description: '设备代号 / Device Codename (如kaisa, 或all编译所有, 查看 https://mrchromebox.tech/#devices)'
+        description: '选择设备 / Select Device (查看 https://mrchromebox.tech/#devices 了解详情)'
         required: true
-        type: string
-        default: 'kaisa'
+        type: choice
+        default: 'all - 编译所有设备'
+          options:
+          - 'all - 编译所有设备'
+          - 'ADVAN Chromebook 116J (kracko)'
+          - 'AOpen Chromebase Commercial (sumo)'
+          - 'AOpen Chromebox Commercial (ninja)'
+          - 'ASUS Chromebook CR12 (anraggar)'
+          - 'ASUS Chromebook CR12 Flip (anraggar360)'
+          - 'ASUS Chromebook Plus CX34 (marasov)'
+          - 'ASUS Chromebox 5 (CN67) (kuldax)'
+          - 'ASUS Fanless Chromebox CF40 (taranza)'
+          - 'Acer C7/C710 Chromebook (parrot)'
+          - 'Acer C720/C720P Chromebook (peppy)'
+          - 'Acer C740 Chromebook (auron_paine)'
+          - 'Acer C910 Chromebook (CB5-571) (auron_yuna)'
+          - 'Acer Chromebase 24 (buddy)'
+          - 'Acer Chromebase 24I2 (karma)'
+          - 'Acer Chromebook 11 (C732) (astronaut)'
+          - 'Acer Chromebook 11 (CB3-111/131, C730, C730E, C735) (gnawty)'
+          - 'Acer Chromebook 11 (CB311-8H, CB311-8HT) (santa)'
+          - 'Acer Chromebook 11 N7 (C731) (relm)'
+          - 'Acer Chromebook 14 (CB3-431) (edgar)'
+          - 'Acer Chromebook 14 for Work (lars)'
+          - 'Acer Chromebook 15 (CB3-531) (banjo)'
+          - 'Acer Chromebook 15 (CB3-532) (banon)'
+          - 'Acer Chromebook 15 (CB315) (blue)'
+          - 'Acer Chromebook 15 (CB515-1H, CB515-1HT) (sand)'
+          - 'Acer Chromebook 311 (bobba)'
+          - 'Acer Chromebook 311 (peezer)'
+          - 'Acer Chromebook 311 (craaskana)'
+          - 'Acer Chromebook 311 (C721) (kasumi)'
+          - 'Acer Chromebook 314 (palutena)'
+          - 'Acer Chromebook 314 (C933, C933T, CB314-1H, CB314-1HT) (droid)'
+          - 'Acer Chromebook 314 (C936, C936T) (craasneto)'
+          - 'Acer Chromebook 314 [CB314-3H/3HT, C934/C934T] (magneto)'
+          - 'Acer Chromebook 315 (CB315-2H) (aleena)'
+          - 'Acer Chromebook 315 (CB315-3H, CB315-3HT) (blorb)'
+          - 'Acer Chromebook 315 (CB315-5H, CB315-5HT) (craaskino)'
+          - 'Acer Chromebook 315 [CB315-4H/4HT] (magma)'
+          - 'Acer Chromebook 317 [CB317-1H] (magpie)'
+          - 'Acer Chromebook 511 (C736, C736T, C736L, C736LT) (craaskvin)'
+          - 'Acer Chromebook 511 [C733/C734] (maglith)'
+          - 'Acer Chromebook 512 (C851/C851T) (sparky)'
+          - 'Acer Chromebook 512 [C852] (maglet)'
+          - 'Acer Chromebook 514 (CB514-1H, CB514-1HT) (epaulette)'
+          - 'Acer Chromebook 514 (CB514-1W, CB514-1WT) (volta)'
+          - 'Acer Chromebook 515 (CB515-1W, CB515-1WT) (volet)'
+          - 'Acer Chromebook 516 GE [CBG516-1H] (osiris)'
+          - 'Acer Chromebook 712 (C871) (kindred)'
+          - 'Acer Chromebook Plus 514 (CB514-3H, CB514-3HT) (markarth)'
+          - 'Acer Chromebook Plus 515 (CB515-2H, CB515-2HT) (omnigul)'
+          - 'Acer Chromebook R11 (C738T, CB5-132T) (cyan)'
+          - 'Acer Chromebook Spin 11 (CP311-1H, CP311-1HN) (lava)'
+          - 'Acer Chromebook Spin 11 (R751T) (reef)'
+          - 'Acer Chromebook Spin 15 (CP315) (bruce)'
+          - 'Acer Chromebook Spin 311 (CP311-2H, CP311-2HN) (bobba360)'
+          - 'Acer Chromebook Spin 311 (R721T) (kasumi360)'
+          - 'Acer Chromebook Spin 312 (CP312-1H, CP312-1HN) (craaskov)'
+          - 'Acer Chromebook Spin 314 [CP314-1H, CP314-1HN] (magister)'
+          - 'Acer Chromebook Spin 511 (R756T, R756LT) (craaskbowl)'
+          - 'Acer Chromebook Spin 511 [R753T] (magolor)'
+          - 'Acer Chromebook Spin 512 (R851TN) (sparky360)'
+          - 'Acer Chromebook Spin 512 (R856T, R856LT) (craask)'
+          - 'Acer Chromebook Spin 512 [R853TA/R853TNA] (maglia)'
+          - 'Acer Chromebook Spin 514 (CP514-1H, CP514-1W) (ezkinil)'
+          - 'Acer Chromebook Spin 514 (CP514-2H) (voema)'
+          - 'Acer Chromebook Spin 514 [CP514-3H, CP514-3HH, CP514-3WH] (dewatt)'
+          - 'Acer Chromebook Spin 713 (CP713-2W) (kled)'
+          - 'Acer Chromebook Spin 713 (CP713-3W) (voxel)'
+          - 'Acer Chromebook Spin 714 [CP714-1WN/2WN] (kano)'
+          - 'Acer Chromebook Vero 514 (CBV514-1H, CBV514-1HT) (volmar)'
+          - 'Acer Chromebook Vero 712 (CV872, CV872T) (zavala)'
+          - 'Acer Chromebox CXI (mccloud)'
+          - 'Acer Chromebox CXI2 (rikku)'
+          - 'Acer Chromebox CXI4 (kaisa)'
+          - 'Acer Chromebox CXI5 (moli)'
+          - 'Ascon Chromebook 11A (garg)'
+          - 'Asus Chromebook C200 (squawks)'
+          - 'Asus Chromebook C202S/C202SA (terra)'
+          - 'Asus Chromebook C223NA (babymega)'
+          - 'Asus Chromebook C300 (quawks)'
+          - 'Asus Chromebook C302CA (cave)'
+          - 'Asus Chromebook C423 (rabbid)'
+          - 'Asus Chromebook C424 (nospike)'
+          - 'Asus Chromebook C523NA (babytiger)'
+          - 'Asus Chromebook CM34 Flip (frostflow)'
+          - 'Asus Chromebook CR11 [CR1102C] (xivu)'
+          - 'Asus Chromebook CR11 [CR1102F] (xivu360)'
+          - 'Asus Chromebook CR1100CKA (storo)'
+          - 'Asus Chromebook CX1 (galtic)'
+          - 'Asus Chromebook CX1 CX1102 (galnat)'
+          - 'Asus Chromebook CX1400FKA (galtic360)'
+          - 'Asus Chromebook CX1500CKA (galith)'
+          - 'Asus Chromebook CX1500FKA (galith360)'
+          - 'Asus Chromebook CX1700CKA (gallop)'
+          - 'Asus Chromebook CX34 Flip (mithrax)'
+          - 'Asus Chromebook CX9 (CX9400) (drobit)'
+          - 'Asus Chromebook Flip C204 (apel)'
+          - 'Asus Chromebook Flip C214/C234 (ampton)'
+          - 'Asus Chromebook Flip C433/C434 (shyvana)'
+          - 'Asus Chromebook Flip C436FA (helios)'
+          - 'Asus Chromebook Flip CM1 (jelboz360)'
+          - 'Asus Chromebook Flip CM5 (woomax)'
+          - 'Asus Chromebook Flip CR1100FKA (storo360)'
+          - 'Asus Chromebook Flip CX1 CX1102 (galnat360)'
+          - 'Asus Chromebook Flip CX3 (collis)'
+          - 'Asus Chromebook Flip CX5 (CX5400) (copano)'
+          - 'Asus Chromebook Flip CX5 [CX5601] (felwinter)'
+          - 'Asus Chromebook Flip CX55 (delbin)'
+          - 'Asus Chromebox 2 (CN62) (guado)'
+          - 'Asus Chromebox 4 (duffy)'
+          - 'Asus Chromebox CN60 (panther)'
+          - 'Asus Fanless Chromebox (faffy)'
+          - 'Avocor Series One Board 65 (moonbuggy)'
+          - 'Avocor Series One Desk 27 (scout)'
+          - 'Axioo Chromebook 360 (garg360)'
+          - 'Axioo Chromebook P11 (pirette)'
+          - 'Axioo Chromebook P14 (pirika)'
+          - 'CTL Chromebook NL7 (blacktip)'
+          - 'CTL Chromebook NL72T (kracko360)'
+          - 'CTL Chromebook NL73 (quandiso)'
+          - 'CTL Chromebook NL73T (quandiso360)'
+          - 'CTL Chromebook NL81/NL81T (garfour)'
+          - 'CTL Chromebook VX11/VX11T (whitetip)'
+          - 'CTL Chromebook VX11/VX11T (foob)'
+          - 'CTL Chromebox CBx2 (wyvern)'
+          - 'CTL Chromebox CBx3 (lisbon)'
+          - 'CTL J5 Chromebook (wizpig)'
+          - 'CTL Meet Compute System GQE20C (intrepid)'
+          - 'DINATECH Gen1 Chromebook SG20JL1C (beadrix)'
+          - 'Dell Chromebook 11 (3120) (candy)'
+          - 'Dell Chromebook 11 (CB1C13) (wolf)'
+          - 'Dell Chromebook 11 3180/3189 (kefka)'
+          - 'Dell Chromebook 11 5190 (nasher)'
+          - 'Dell Chromebook 11 5190 2-in-1 (nasher360)'
+          - 'Dell Chromebook 13 3380 (asuka)'
+          - 'Dell Chromebook 13 7310 (lulu)'
+          - 'Dell Chromebook 3100 (fleex)'
+          - 'Dell Chromebook 3100 2-in-1 (grabbiter)'
+          - 'Dell Chromebook 3110 (cret)'
+          - 'Dell Chromebook 3110 2-in-1 (cret360)'
+          - 'Dell Chromebook 3120 (uldren)'
+          - 'Dell Chromebook 3120 2-in-1 (uldren360)'
+          - 'Dell Chromebook 3400 (orbatrix)'
+          - 'Dell Chromebox 3010 (tricky)'
+          - 'Dell Latitude 3445 Chromebook (whiterun)'
+          - 'Dell Latitude 5300 2-in-1 Chromebook Enterprise (drallion)'
+          - 'Dell Latitude 5400 Chromebook Enterprise (sarien)'
+          - 'Dell Latitude 5430 2-in-1 Chromebook (crota360)'
+          - 'Dell Latitude 5430 Chromebook (crota)'
+          - 'Dell Latitude 7410 Chromebook Enterprise (dratini)'
+          - 'FMV Chromebook 14F (chronicler)'
+          - 'Framework Laptop Chromebook Edition (banshee)'
+          - 'Gateway Chromebook 15 (pasara)'
+          - 'Google Chromebook Pixel (2013) (link)'
+          - 'Google Chromebook Pixel (2015) (samus)'
+          - 'Google Meet Series Two (constitution)'
+          - 'Google Pixel Slate (nocturne)'
+          - 'Google Pixelbook (2017) (eve)'
+          - 'Google Pixelbook Go (2019) (atlas)'
+          - 'HP Chromebase 21.5" (dooly)'
+          - 'HP Chromebook 11 G3/G4 (kip)'
+          - 'HP Chromebook 11 G5 (setzer)'
+          - 'HP Chromebook 11 G7 EE (mimrock)'
+          - 'HP Chromebook 11 G8 EE (vorticon)'
+          - 'HP Chromebook 11 G9 EE (drawlat)'
+          - 'HP Chromebook 11A G6 EE (barla)'
+          - 'HP Chromebook 13 G1 (chell)'
+          - 'HP Chromebook 14 (falco)'
+          - 'HP Chromebook 14 G6 (dorp)'
+          - 'HP Chromebook 14 G7 (drawman)'
+          - 'HP Chromebook 14A G5 (careena)'
+          - 'HP Chromebook 14a-na0 (blooglet)'
+          - 'HP Chromebook 14a-na1 (lantis)'
+          - 'HP Chromebook 14a-nd0 (dirinboz)'
+          - 'HP Chromebook 15a-na0 (landrid)'
+          - 'HP Chromebook 15a-nb0 (yaviks)'
+          - 'HP Chromebook Plus 14a (yahiko)'
+          - 'HP Chromebook Plus x360 (joxer)'
+          - 'HP Chromebook X2 (soraka)'
+          - 'HP Chromebook x360 11 G1 EE (snappy)'
+          - 'HP Chromebook x360 11 G2 EE (meep)'
+          - 'HP Chromebook x360 11 G3 EE (vortininja)'
+          - 'HP Chromebook x360 11 G4 EE (drawcia)'
+          - 'HP Chromebook x360 12b-ca0 (bloog)'
+          - 'HP Chromebook x360 14 (leona)'
+          - 'HP Chromebook x360 14a-ca0/14b-ca0 (blooguard)'
+          - 'HP Chromebook x360 14a-ca1 (landia)'
+          - 'HP Chromebook x360 14a-cb0 (gumboz)'
+          - 'HP Chromebook x360 14b-cb0 (madoo)'
+          - 'HP Chromebook x360 14c-ca0 (dragonair)'
+          - 'HP Chromebook x360 14c-cc0 (eldrid)'
+          - 'HP Chromebook x360 14c-cd0 (gimble)'
+          - 'HP Chromebox CB1 / G1 (zako)'
+          - 'HP Chromebox Enterprise G4 (gladios)'
+          - 'HP Chromebox G2 (fizz)'
+          - 'HP Chromebox G3 (noibat)'
+          - 'HP Dragonfly Pro Chromebook (vell)'
+          - 'HP Elite Dragonfly Chromebook (redrix)'
+          - 'HP Elite c1030 Chromebook (jinlon)'
+          - 'HP Elite c640 14 inch G3 Chromebook (anahera)'
+          - 'HP Elite c645 G2 Chromebook (nipperkin)'
+          - 'HP Fortis 11 inch G10 Chromebook (yavilla)'
+          - 'HP Fortis 14 G10 Chromebook (drawper)'
+          - 'HP Fortis 14 inch G11 Chromebook (yavijo)'
+          - 'HP Fortis x360 11 inch G5 Chromebook (yavilly)'
+          - 'HP Pavilion Chromebook 14 (butterfly)'
+          - 'HP Pro c640 G2 Chromebook (elemi)'
+          - 'HP Pro c645 Chromebook Enterprise (berknip)'
+          - 'Haier Chromebook G2 (heli)'
+          - 'LG Chromebase 22 (monroe)'
+          - 'Lenovo 100e Chromebook (robo)'
+          - 'Lenovo 100e Chromebook Gen 2 (phaser)'
+          - 'Lenovo 100e Chromebook Gen 2 AMD (treeya)'
+          - 'Lenovo 100e Chromebook Gen 3 (bookem)'
+          - 'Lenovo 100e Chromebook Gen 3 (vilboz)'
+          - 'Lenovo 100e Chromebook Gen 4 (pujjo1e)'
+          - 'Lenovo 14e Chromebook (S345) (liara)'
+          - 'Lenovo 14e Chromebook Gen 3 (pujjoteen)'
+          - 'Lenovo 300e Chromebook Gen 2 (phaser360)'
+          - 'Lenovo 300e Chromebook Gen 2 AMD (treeya360)'
+          - 'Lenovo 3i-15 Chromebook (blipper)'
+          - 'Lenovo 500e Chromebook (robo360)'
+          - 'Lenovo 500e Chromebook Gen 3 (boten)'
+          - 'Lenovo 500e Yoga Chromebook Gen 4 (pujjo)'
+          - 'Lenovo 5i Chromebook 16" (tarlo)'
+          - 'Lenovo 5i-14 Chromebook (lindar)'
+          - 'Lenovo Chromebook S340 (laser14)'
+          - 'Lenovo Flex 3i 15 / Ideapad Flex 3i Chromebook (beetley)'
+          - 'Lenovo Flex 3i Chromebook 12" (pujjoflex)'
+          - 'Lenovo Flex 3i-11 / IdeaPad Flex 3i Chromebook (botenflex)'
+          - 'Lenovo Flex 5i Chromebook / IdeaPad Flex 5i Chromebook (taeko)'
+          - 'Lenovo IdeaPad Flex 5i Chromebook (lillipup)'
+          - 'Lenovo IdeaPad Gaming Chromebook 16 (taniks)'
+          - 'Lenovo Ideapad 100S Chromebook (orco)'
+          - 'Lenovo Ideapad 3 Chromebook (lick)'
+          - 'Lenovo Ideapad Flex 5 Chromebook (akemi)'
+          - 'Lenovo Ideapad Slim 3i Chromebook (pujjoteen15w)'
+          - 'Lenovo N20/N20P Chromebook (clapper)'
+          - 'Lenovo N21 Chromebook (enguarde)'
+          - 'Lenovo N22/N23/N42 Chromebook (reks)'
+          - 'Lenovo ThinkCentre Chromebox (tidus)'
+          - 'Lenovo ThinkCentre M60q Chromebox (kinox)'
+          - 'Lenovo ThinkPad 11e/Yoga Chromebook (glimmer)'
+          - 'Lenovo ThinkPad 11e/Yoga Chromebook (G3) (ultima)'
+          - 'Lenovo ThinkPad C13 Yoga Chromebook (morphius)'
+          - 'Lenovo ThinkPad C14 Gen 1 Chromebook (primus)'
+          - 'Lenovo Thinkpad 11e/Yoga 11e (G4) (pyro)'
+          - 'Lenovo Thinkpad 13 Chromebook (sentry)'
+          - 'Lenovo Thinkpad X131e Chromebook (stout)'
+          - 'Meet Compute System - Series One (Intel 10th Gen) (genesis)'
+          - 'Meet Compute System - Series One (Lenovo) (endeavour)'
+          - 'NEC Chromebook Y2 (dood)'
+          - 'NEC Chromebook Y3 (metaknight)'
+          - 'Poin2 Chromebook 11P (foob360)'
+          - 'Samsung Chromebook 2 (XE500C12) (winky)'
+          - 'Samsung Chromebook 3 (celes)'
+          - 'Samsung Chromebook 4 (bluebird)'
+          - 'Samsung Chromebook 4+ (casta)'
+          - 'Samsung Chromebook Plus V2 (nautilus)'
+          - 'Samsung Chromebook Pro (caroline)'
+          - 'Samsung Chromebook Series 5 550 (lumpy)'
+          - 'Samsung Chromebox Series 3 (stumpy)'
+          - 'Samsung Galaxy Chromebook (kohaku)'
+          - 'Samsung Galaxy Chromebook 2 (nightfury)'
+          - 'Samsung Galaxy Chromebook 2 360 (bugzzy)'
+          - 'Samsung Galaxy Chromebook Go (sasuke)'
+          - 'Samsung Galaxy Chromebook Go 11 (sasukette)'
+          - 'Toshiba Chromebook 13 (CB30) (leon)'
+          - 'Toshiba Chromebook 2 (2014) (swanky)'
+          - 'Toshiba Chromebook 2 (2015) (gandof)'
+
       enable_pxe:
         description: '启用 PXE 网络启动 / Enable PXE Network Boot'
         required: true
@@ -20,7 +291,7 @@ on:
         type: boolean
         default: false
 
-  # 支持推送触发（可选）
+    # 支持推送触发（可选）
   push:
     branches:
       - main
@@ -49,10 +320,23 @@ jobs:
           cp -r configs/* coreboot/configs/ || true
         fi
 
+    - name: 提取设备代号 / Extract Device Codename
+      id: extract
+      run: |
+        SELECTED="${{ inputs.device }}"
+        if [[ "$SELECTED" == *"all"* ]]; then
+          CODENAME="all"
+        else
+          # 提取括号中的代号
+          CODENAME=$(echo "$SELECTED" | sed 's/.*(\(.*\))//')
+        fi
+        echo "codename=$CODENAME" >> $GITHUB_OUTPUT
+        echo "提取的代号: $CODENAME"
+
     - name: 确定目标设备 / Determine Target Device
       id: device
       run: |
-        DEVICE="${{ inputs.device }}"
+        DEVICE="${{ steps.extract.outputs.codename }}"
         
         if [ "$DEVICE" = "all" ]; then
           echo "target=all" >> $GITHUB_OUTPUT
@@ -68,7 +352,7 @@ jobs:
       if: ${{ inputs.enable_pxe == true }}
       run: |
         cd coreboot
-        DEVICE="${{ inputs.device }}"
+        DEVICE="${{ steps.extract.outputs.codename }}"
         
         if [ "$DEVICE" = "all" ]; then
           echo "为所有设备添加 PXE 支持..."
@@ -125,14 +409,14 @@ jobs:
     - name: 上传固件 / Upload Firmware Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: coreboot-firmware-${{ inputs.device }}-${{ github.run_number }}
+        name: coreboot-firmware-${{ steps.extract.outputs.codename }}-${{ github.run_number }}
         path: roms/*.rom
         retention-days: 30
 
     - name: 上传校验和 / Upload Checksums
       uses: actions/upload-artifact@v4
       with:
-        name: coreboot-checksums-${{ inputs.device }}-${{ github.run_number }}
+        name: coreboot-checksums-${{ steps.extract.outputs.codename }}-${{ github.run_number }}
         path: roms/*.sha1
         retention-days: 30
 
@@ -140,8 +424,8 @@ jobs:
       if: ${{ inputs.release == true }}
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: firmware-${{ inputs.device }}-${{ github.run_number }}
-        name: Coreboot Firmware - ${{ inputs.device }}
+        tag_name: firmware-${{ steps.extract.outputs.codename }}-${{ github.run_number }}
+        name: Coreboot Firmware - ${{ steps.extract.outputs.codename }}
         body: |
           ## Coreboot 固件编译 / Coreboot Firmware Build
           
