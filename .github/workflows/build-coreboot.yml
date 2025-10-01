@@ -297,6 +297,7 @@ on:
       - main
     paths:
       - '.github/workflows/**'
+      - 'coreboot_logo.bmp'
 
 permissions:
   contents: write
@@ -314,6 +315,15 @@ jobs:
         git clone https://github.com/mrchromebox/coreboot.git coreboot
         cd coreboot
         git submodule update --init --checkout --recursive
+
+    - name: 替换自定义 Logo / Replace Custom Logo
+      run: |
+        if [ -f "coreboot_logo.bmp" ]; then
+          cp coreboot_logo.bmp coreboot/Documentation/coreboot_logo.bmp
+          echo "✅ 已替换为自定义 Logo"
+        else
+          echo "ℹ️  使用默认 Logo"
+        fi
 
     - name: 提取设备代号 / Extract Device Codename
       id: extract
