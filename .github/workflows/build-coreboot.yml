@@ -1,29 +1,9 @@
 name: Build Coreboot Firmware
 
 on:
-  # 支持手动触发，可选择设备和选项
+  # 支持手动触发
   workflow_dispatch:
     inputs:
-      device:
-        description: '选择设备 / Select Device (iPXE 仅支持 kaisa)'
-        required: true
-        type: choice
-        default: 'Acer Chromebox CXI4 (kaisa)'
-        options:
-          - 'Acer Chromebox CXI4 (kaisa)'
-
-      enable_ipxe:
-        description: '启用 iPXE 网络启动 (仅 kaisa) / Enable iPXE (kaisa only)'
-        required: false
-        type: boolean
-        default: true
-      
-      enable_legacy:
-        description: '启用 Legacy SeaBIOS 模式 (推荐用于 iPXE) / Enable Legacy SeaBIOS Mode (recommended for iPXE)'
-        required: false
-        type: boolean
-        default: false
-      
       release:
         description: '创建 Release 发布 / Create Release'
         required: false
@@ -56,83 +36,27 @@ jobs:
           echo "ℹ️  使用默认 Logo"
         fi
 
-    - name: 提取设备代号 / Extract Device Codename
-      id: extract
-      run: |
-        SELECTED="${{ inputs.device }}"
-        if [[ "$SELECTED" == *"all"* ]]; then
-          CODENAME="all"
-        else
-          # 提取括号中的代号
-          CODENAME=$(echo "$SELECTED" | awk -F'[()]' '{print $(NF-1)}')
-        fi
-        echo "codename=$CODENAME" >> $GITHUB_OUTPUT
-        echo "提取的代号: $CODENAME"
-
-    - name: 确定目标设备 / Determine Target Device
-      id: device
-      run: |
-        DEVICE="${{ steps.extract.outputs.codename }}"
-        
-        if [ "$DEVICE" = "all" ]; then
-          echo "target=all" >> $GITHUB_OUTPUT
-          echo "device_name=all" >> $GITHUB_OUTPUT
-          echo "📦 编译所有设备 (292个) / Building all devices"
-        else
-          echo "target=$DEVICE" >> $GITHUB_OUTPUT
-          echo "device_name=$DEVICE" >> $GITHUB_OUTPUT
-          echo "📦 编译设备 / Building device: $DEVICE"
-        fi
-
     - name: 拉取 Coreboot SDK 容器 / Pull Coreboot SDK
       run: docker pull coreboot/coreboot-sdk:latest
+
+    - name: 添加 PXE 支持 / Add PXE Support
+      run: |
+        echo "📝 添加 PXE 配置到 kaisa 配置文件"
+        echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> coreboot/configs/cml/config.kaisa.uefi
+        cat coreboot/configs/cml/config.kaisa.uefi
 
     - name: 编译固件 / Build Firmware
       run: |
         mkdir -p roms
-        TARGET="${{ steps.extract.outputs.codename }}"
-        DEVICE="${{ steps.extract.outputs.codename }}"
+        echo "📦 使用 MrChromebox build-uefi.sh 编译 kaisa"
         
-        # 如果启用了 iPXE，使用自定义配置并直接 make
-        if [[ "${{ inputs.enable_ipxe }}" == "true" ]] && [ "$DEVICE" = "kaisa" ]; then
-          # 根据 Legacy 选项选择配置文件
-          if [[ "${{ inputs.enable_legacy }}" == "true" ]] && [ -f "config.kaisa-ipxe.legacy" ]; then
-            echo "🔧 使用 Legacy SeaBIOS + iPXE 自定义配置编译..."
-            CONFIG_FILE="config.kaisa-ipxe.legacy"
-            PAYLOAD_TYPE="seabios"
-          elif [ -f "config.kaisa-ipxe.uefi" ]; then
-            echo "🔧 使用 UEFI + iPXE 自定义配置编译..."
-            CONFIG_FILE="config.kaisa-ipxe.uefi"
-            PAYLOAD_TYPE="edk2"
-          else
-            echo "❌ 错误: 未找到自定义配置文件"
-            exit 1
-          fi
-          
-          cp "$CONFIG_FILE" coreboot/.config
-          
-          docker run --rm --user root \
-            -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
-            -v ${{ github.workspace }}/roms:/home/coreboot/roms \
-            -w /home/coreboot/coreboot \
-            coreboot/coreboot-sdk:latest \
-            bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
-                     echo 'CONFIG_LOCALVERSION=\"-ipxe\"' >> .config && \
-                     make olddefconfig && \
-                     make -j\$(nproc) && \
-                     cp ./build/coreboot.rom ../roms/coreboot_${PAYLOAD_TYPE}-${DEVICE}-mrchromebox_ipxe_\$(date +\"%Y%m%d\").rom && \
-                     cd ../roms && \
-                     sha1sum coreboot_${PAYLOAD_TYPE}-${DEVICE}-mrchromebox_ipxe_\$(date +\"%Y%m%d\").rom > coreboot_${PAYLOAD_TYPE}-${DEVICE}-mrchromebox_ipxe_\$(date +\"%Y%m%d\").rom.sha1"
-        else
-          # 使用标准的 build-uefi.sh 脚本
-          docker run --rm --user root \
-            -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
-            -v ${{ github.workspace }}/roms:/home/coreboot/roms \
-            -w /home/coreboot/coreboot \
-            coreboot/coreboot-sdk:latest \
-            bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
-                     ./build-uefi.sh $TARGET"
-        fi
+        docker run --rm --user root \
+          -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+          -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+          -w /home/coreboot/coreboot \
+          coreboot/coreboot-sdk:latest \
+          bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
+                   ./build-uefi.sh kaisa"
 
     - name: 列出编译产物 / List Build Artifacts
       run: |
@@ -142,14 +66,14 @@ jobs:
     - name: 上传固件 / Upload Firmware Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: coreboot-firmware-${{ steps.extract.outputs.codename }}-${{ github.run_number }}
+        name: coreboot-firmware-kaisa-${{ github.run_number }}
         path: roms/*.rom
         retention-days: 30
 
     - name: 上传校验和 / Upload Checksums
       uses: actions/upload-artifact@v4
       with:
-        name: coreboot-checksums-${{ steps.extract.outputs.codename }}-${{ github.run_number }}
+        name: coreboot-checksums-kaisa-${{ github.run_number }}
         path: roms/*.sha1
         retention-days: 30
 
@@ -157,33 +81,30 @@ jobs:
       if: ${{ inputs.release == true }}
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: firmware-${{ steps.extract.outputs.codename }}-${{ github.run_number }}
-        name: Coreboot Firmware - ${{ steps.extract.outputs.codename }}
+        tag_name: firmware-kaisa-${{ github.run_number }}
+        name: Coreboot Firmware - kaisa
         body: |
           ## Coreboot 固件编译 / Coreboot Firmware Build
           
-          **设备代号 / Device:** ${{ inputs.device }}
-          **iPXE 网络启动 / iPXE Support:** ${{ inputs.enable_ipxe }}
-          **Legacy SeaBIOS 模式 / Legacy Mode:** ${{ inputs.enable_legacy }}
+          **设备 / Device:** Acer Chromebox CXI4 (kaisa)
+          **Payload:** UEFI (EDK2/TianoCore)
+          **PXE 支持 / PXE Support:** ✅ Enabled (EDK2 Native)
           **构建日期 / Build Date:** ${{ github.run_id }}
-          **源码版本 / Source:** MrChromebox Coreboot
-          
-          > 查看设备型号对照：https://mrchromebox.tech/#devices
+          **源码 / Source:** MrChromebox Coreboot
           
           ### 使用说明 / Instructions
-          1. 下载对应设备的 `.rom` 文件
-          2. 使用 flashrom 或其他工具刷写固件
+          1. 下载 `.rom` 固件文件
+          2. 使用 flashrom 刷写固件：`flashrom -p internal -w coreboot_*.rom`
           3. 详细说明请参考项目 README
           
-          ### 固件类型说明 / Firmware Types
-          - **UEFI (EDK2)**: 现代 UEFI 固件，支持安全启动和 GPT 分区
-          - **Legacy (SeaBIOS)**: 传统 BIOS 模式，与 iPXE 兼容性更好
+          ### 固件特性 / Features
+          - ✅ UEFI 固件，支持 GPT 分区和现代操作系统
+          - ✅ EDK2 原生 PXE 网络启动支持
+          - ✅ 支持 Realtek 和 ASIX USB 网卡
+          - ✅ 已启用 `CONFIG_EDK2_NETWORK_PXE_SUPPORT=y`
           
-          ### iPXE 网络启动说明 / iPXE Network Boot
-          如果启用了 iPXE:
-          - ✅ 已集成 iPXE ROM (Realtek RTL8168 网卡)
-          - ✅ 已配置 Option ROM 加载
-          - ✅ 启动时会出现 PXE 网络启动选项
+          ### 网络启动说明 / Network Boot
+          启动时按 ESC 进入启动菜单，选择网络启动选项进行 PXE 启动。
           
           
         files: |
