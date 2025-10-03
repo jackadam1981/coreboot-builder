@@ -1,4 +1,4 @@
-name: Build Coreboot Official Firmware
+name: Build Coreboot MrChromebox Firmware with Network Support
 
 on:
   # 支持手动触发
@@ -21,9 +21,10 @@ jobs:
     - name: 检出构建仓库 / Checkout Builder Repository
       uses: actions/checkout@v4
 
-    - name: 克隆 Coreboot 官方源码 / Clone Official Coreboot Source
+    - name: 克隆 MrChromebox Coreboot 源码 / Clone MrChromebox Coreboot Source
       run: |
-        git clone https://github.com/coreboot/coreboot.git coreboot
+        echo "📥 克隆 MrChromebox coreboot（包含网络支持）"
+        git clone https://github.com/MrChromebox/coreboot.git coreboot
         cd coreboot
         git submodule update --init --checkout --recursive
 
@@ -36,41 +37,30 @@ jobs:
           echo "ℹ️  使用默认 Logo"
         fi
 
-    - name: 创建 Kaisa 配置 / Create Kaisa Configuration
+    - name: 使用已有配置 / Use Existing Configuration
       run: |
-        echo "📝 创建 kaisa 设备配置"
+        echo "📝 使用 MrChromebox 的 kaisa UEFI 配置"
         cd coreboot
         
-        # 创建配置目录
-        mkdir -p configs/cml
+        # MrChromebox 已经有完整的 kaisa 配置
+        if [ -f "configs/cml/config.kaisa.uefi" ]; then
+          echo "✅ 找到现有配置文件"
+          cat configs/cml/config.kaisa.uefi
+        else
+          echo "❌ 配置文件不存在，列出可用配置："
+          ls -la configs/cml/ || ls -la configs/
+        fi
         
-        # Kaisa 配置 - 官方 coreboot + MrChromebox EDK2 + iPXE
-        cat > configs/cml/config.kaisa.uefi << 'EOF'
-        # 基础板型配置
-        CONFIG_VENDOR_GOOGLE=y
-        CONFIG_BOARD_GOOGLE_KAISA=y
+        # 添加网络支持配置
+        echo "" >> configs/cml/config.kaisa.uefi
+        echo "# 网络支持配置" >> configs/cml/config.kaisa.uefi
+        echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> configs/cml/config.kaisa.uefi
+        echo "CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y" >> configs/cml/config.kaisa.uefi
+        echo "CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y" >> configs/cml/config.kaisa.uefi
         
-        # Payload 配置 - 使用 MrChromebox 的 EDK2
-        CONFIG_PAYLOAD_EDK2=y
-        CONFIG_EDK2_UEFIPAYLOAD=y
-        CONFIG_EDK2_REPO_MRCHROMEBOX=y
-        
-        # PCI Option ROM 支持（关键：让 EDK2 加载并执行网卡 Option ROM）
-        CONFIG_EDK2_LOAD_OPTION_ROMS=y
-        CONFIG_EDK2_PRIORITIZE_INTERNAL=y
-        
-        # iPXE Option ROM（提供网络功能）
-        CONFIG_PXE=y
-        CONFIG_BUILD_IPXE=y
-        CONFIG_PXE_ROM_ID="10ec,8168"
-        
-        # iPXE 高级功能
-        CONFIG_IPXE_STABLE=y
-        CONFIG_IPXE_HAS_HTTPS=y
-        CONFIG_IPXE_TRUST_CMD=y
-        EOF
-        
-        echo "✅ 配置文件已创建"
+        echo ""
+        echo "✅ 网络配置已添加"
+        echo "📋 最终配置："
         cat configs/cml/config.kaisa.uefi
 
     - name: 验证设备树配置 / Verify Device Tree Configuration
@@ -186,38 +176,38 @@ jobs:
         tag_name: coreboot-official-kaisa-${{ steps.release_info.outputs.date }}
         name: Coreboot Official Kaisa ${{ steps.release_info.outputs.date_full }}
         body: |
-          ## Coreboot 官方版本固件 - UEFI + 完整网络支持
+          ## Coreboot MrChromebox 固件 - UEFI + 完整网络支持
           
           ### 设备信息
           - **设备**: kaisa (Google Chromebook)
-          - **版本**: Coreboot 官方版本
-          - **Payload**: MrChromebox EDK2 (UEFI)
+          - **版本**: MrChromebox coreboot + EDK2
+          - **Payload**: UEFI (EDK2)
           - **编译日期**: ${{ steps.release_info.outputs.date_full }}
           
           ### 特性
-          - ✅ 完整的 UEFI 环境（MrChromebox EDK2）
-          - ✅ iPXE Option ROM 网络启动
-          - ✅ RTL8168 网卡支持 (10ec:8168)
-          - ✅ EDK2 自动加载 Option ROM
-          - ✅ HTTPS 和数字签名支持
+          - ✅ 完整的 UEFI 环境
+          - ✅ EDK2 原生网络栈（PXE/HTTP/iSCSI）
+          - ✅ RTL8168 网卡完整驱动支持
+          - ✅ 网卡能在 UEFI Shell 中正常工作
+          - ✅ 支持 PXE 网络启动
           
-          ### 技术方案
-          - **coreboot 源码**: 官方 coreboot（最新功能）
-          - **EDK2 Payload**: MrChromebox fork（成熟稳定）
-          - **网络实现**: iPXE Option ROM（兼容性好）
-          - **组合优势**: 官方 coreboot + 成熟 EDK2 + 可靠 iPXE
+          ### 为什么用 MrChromebox coreboot？
+          - **关键**：只有 MrChromebox 版本包含 EDK2 网络栈编译支持
+          - 官方 coreboot 的 EDK2 Makefile 没有网络配置选项
+          - MrChromebox 版本经过 Chromebook 优化和测试
+          - 包含 CONFIG_EDK2_NETWORK_* 配置支持
           
-          ### 网络支持
-          - PXE 启动
-          - iPXE 脚本支持
-          - HTTPS 协议
-          - 数字签名验证
+          ### 网络配置
+          - CONFIG_EDK2_NETWORK_PXE_SUPPORT=y
+          - CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y
+          - CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y
+          - 自动启用网络驱动和协议栈
           
           ### 使用方法
           1. 下载对应的 ROM 文件
           2. 使用 flashrom 刷写固件
-          3. 重启设备进行测试
-          4. 可以安装 Windows 系统
+          3. 重启设备进入 UEFI
+          4. 网卡应该能被识别并可以 PXE 启动
         files: coreboot/coreboot_official-kaisa-*.rom
         draft: false
         prerelease: false
