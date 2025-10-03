@@ -121,15 +121,31 @@ jobs:
           bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
                    cp configs/cml/config.kaisa.uefi .config && \
                    make olddefconfig && \
-                   make -j\$(nproc)"
+                   echo '开始编译...' && \
+                   make -j\$(nproc) 2>&1 | tee build.log && \
+                   echo '编译完成，检查结果...' && \
+                   ls -la build/ && \
+                   echo '检查 ROM 文件...' && \
+                   ls -la build/coreboot.rom*"
         
-        # 重命名输出文件
+        # 检查编译结果并显示日志
+        echo "🔍 检查编译结果..."
         if [ -f "coreboot/build/coreboot.rom" ]; then
           cp coreboot/build/coreboot.rom "coreboot_official-${DEVICE}-$(date +"%Y%m%d").rom"
           echo "✅ 固件编译成功: coreboot_official-${DEVICE}-$(date +"%Y%m%d").rom"
+          echo "📊 固件大小: $(ls -lh coreboot_official-${DEVICE}-$(date +"%Y%m%d").rom | awk '{print $5}')"
         else
           echo "❌ 固件编译失败"
-          ls -la coreboot/build/
+          echo "📋 编译日志最后50行："
+          if [ -f "coreboot/build.log" ]; then
+            tail -50 coreboot/build.log
+          else
+            echo "编译日志文件不存在"
+          fi
+          echo "📁 构建目录内容："
+          ls -la coreboot/build/ || echo "构建目录不存在"
+          echo "📁 当前目录内容："
+          ls -la coreboot/
           exit 1
         fi
 
@@ -139,6 +155,17 @@ jobs:
         name: coreboot-official-kaisa-firmware
         path: coreboot/coreboot_official-kaisa-*.rom
         retention-days: 30
+
+    - name: 上传编译日志 / Upload Build Logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coreboot-official-build-logs
+        path: |
+          coreboot/build.log
+          coreboot/.config
+          coreboot/configs/cml/config.kaisa.uefi
+        retention-days: 7
 
     - name: 创建发布 / Create Release
       if: github.event.inputs.release == 'true'
