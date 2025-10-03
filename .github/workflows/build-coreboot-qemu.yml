@@ -1,0 +1,165 @@
+name: Build Coreboot QEMU Test Firmware
+
+on:
+  # 支持手动触发
+  workflow_dispatch:
+    inputs:
+      release:
+        description: '创建 Release 发布 / Create Release'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 检出构建仓库 / Checkout Builder Repository
+      uses: actions/checkout@v4
+
+    - name: 克隆 Coreboot 官方源码 / Clone Official Coreboot Source
+      run: |
+        git clone https://github.com/coreboot/coreboot.git coreboot
+        cd coreboot
+        git submodule update --init --checkout --recursive
+
+    - name: 拉取 Coreboot SDK 容器 / Pull Coreboot SDK
+      run: docker pull coreboot/coreboot-sdk:latest
+
+    - name: 编译 Coreinfo Payload
+      run: |
+        echo "🔨 编译 Coreinfo Payload"
+        docker run --rm --user root \
+          -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+          -w /home/coreboot/coreboot \
+          coreboot/coreboot-sdk:latest \
+          bash -c "cd payloads/coreinfo && make"
+
+    - name: 创建 QEMU i440fx 配置 / Create QEMU Configuration
+      run: |
+        echo "📝 创建 QEMU i440fx 最小配置"
+        cd coreboot
+        
+        # 清理之前的配置
+        make distclean || true
+        
+        # 创建最小配置（按照教程）
+        cat > .config << 'EOF'
+        CONFIG_VENDOR_EMULATION=y
+        CONFIG_BOARD_EMULATION_QEMU_X86_I440FX=y
+        CONFIG_PAYLOAD_ELF=y
+        CONFIG_PAYLOAD_FILE="payloads/coreinfo/build/coreinfo.elf"
+        EOF
+        
+        echo "✅ 配置文件已创建"
+        cat .config
+
+    - name: 编译固件 / Build Firmware
+      run: |
+        echo "🔨 开始编译 QEMU i440fx 固件"
+        
+        # 使用 coreboot SDK 容器编译
+        docker run --rm --user root \
+          -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+          -w /home/coreboot/coreboot \
+          coreboot/coreboot-sdk:latest \
+          bash -c "set -e && \
+                   git config --global --add safe.directory /home/coreboot/coreboot && \
+                   echo '📋 运行 olddefconfig...' && \
+                   make olddefconfig && \
+                   echo '📋 保存并显示最终配置...' && \
+                   make savedefconfig && \
+                   cat defconfig && \
+                   echo '' && \
+                   echo '🔨 开始编译 coreboot...' && \
+                   make -j\$(nproc) 2>&1 | tee build.log && \
+                   echo '✅ 编译完成' && \
+                   echo '📁 检查构建目录...' && \
+                   ls -lh build/"
+        
+        # 检查编译结果
+        echo ""
+        echo "🔍 检查编译结果..."
+        
+        if [ -f "coreboot/build/coreboot.rom" ]; then
+          cp coreboot/build/coreboot.rom "coreboot_qemu_i440fx-$(date +"%Y%m%d").rom"
+          echo "✅ 固件编译成功: coreboot_qemu_i440fx-$(date +"%Y%m%d").rom"
+          echo "📊 固件大小: $(ls -lh coreboot_qemu_i440fx-$(date +"%Y%m%d").rom | awk '{print $5}')"
+          
+          # 使用 cbfstool 查看固件内容
+          echo "📦 固件内容："
+          coreboot/build/cbfstool coreboot_qemu_i440fx-$(date +"%Y%m%d").rom print || true
+        else
+          echo "❌ 固件 ROM 文件不存在"
+          echo "📁 构建目录内容："
+          ls -laR coreboot/build/ 2>/dev/null || echo "构建目录不存在"
+          
+          echo ""
+          echo "📋 编译日志最后 100 行："
+          if [ -f "coreboot/build.log" ]; then
+            tail -100 coreboot/build.log
+          else
+            echo "编译日志文件不存在"
+          fi
+          
+          echo ""
+          echo "📋 查找所有错误信息："
+          if [ -f "coreboot/build.log" ]; then
+            grep -i "error\|failed\|fatal" coreboot/build.log | tail -50 || echo "未找到错误关键词"
+          fi
+          
+          exit 1
+        fi
+
+    - name: 上传固件 / Upload Firmware
+      uses: actions/upload-artifact@v4
+      with:
+        name: coreboot-qemu-firmware
+        path: coreboot_qemu_i440fx-*.rom
+        retention-days: 30
+
+    - name: 上传编译日志 / Upload Build Logs
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coreboot-qemu-build-logs
+        path: |
+          coreboot/build.log
+          coreboot/.config
+          coreboot/defconfig
+        retention-days: 7
+
+    - name: 创建发布 / Create Release
+      if: github.event.inputs.release == 'true'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: coreboot-qemu-$(date +"%Y%m%d")
+        name: Coreboot QEMU Test $(date +"%Y-%m-%d")
+        body: |
+          ## Coreboot QEMU i440fx 测试固件
+          
+          ### 固件信息
+          - **目标**: QEMU i440fx 虚拟机
+          - **Payload**: Coreinfo (测试工具)
+          - **编译日期**: $(date +"%Y-%m-%d")
+          
+          ### 用途
+          这是一个最小化的测试固件，用于验证 coreboot 编译环境。
+          
+          ### 测试方法
+          ```bash
+          qemu-system-x86_64 -bios coreboot_qemu_i440fx-*.rom
+          ```
+          
+          ### 特性
+          - ✅ 最小化配置
+          - ✅ Coreinfo Payload
+          - ✅ QEMU 虚拟机兼容
+        files: coreboot_qemu_i440fx-*.rom
+        draft: false
+        prerelease: false
+
