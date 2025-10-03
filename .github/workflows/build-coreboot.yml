@@ -57,6 +57,39 @@ jobs:
     - name: 拉取 Coreboot SDK 容器 / Pull Coreboot SDK
       run: docker pull coreboot/coreboot-sdk:latest
 
+    - name: 准备 iPXE 配置 / Prepare iPXE Configuration
+      run: |
+        echo "📝 创建 iPXE 嵌入式脚本"
+        cat > ipxe_embed.ipxe << 'EOF'
+        #!ipxe
+        # iPXE 嵌入式启动脚本
+        echo iPXE 网络启动环境已就绪
+        echo 按 Ctrl+B 进入 iPXE shell
+        autoboot || shell
+        EOF
+        
+        echo "✅ iPXE 配置已创建"
+        cat ipxe_embed.ipxe
+    
+    - name: 编译 iPXE EFI 应用 / Build iPXE EFI Application
+      run: |
+        echo "📦 编译 iPXE EFI 应用"
+        
+        # 先确保 iPXE 源码已下载
+        docker run --rm --user root \
+          -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+          -v ${{ github.workspace }}:/workspace \
+          -w /home/coreboot/coreboot \
+          coreboot/coreboot-sdk:latest \
+          bash -c "git clone https://github.com/ipxe/ipxe.git ipxe_build && \
+                   cd ipxe_build/src && \
+                   cp /workspace/ipxe_embed.ipxe . && \
+                   make bin-x86_64-efi/ipxe.efi EMBED=ipxe_embed.ipxe && \
+                   cp bin-x86_64-efi/ipxe.efi /workspace/ipxe_x64.efi"
+        
+        echo "✅ iPXE EFI 已编译"
+        ls -lh ipxe_x64.efi
+
     - name: 编译固件 / Build Firmware
       run: |
         mkdir -p roms
@@ -69,6 +102,40 @@ jobs:
           coreboot/coreboot-sdk:latest \
           bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
                    ./build-uefi.sh kaisa"
+    
+    - name: 集成 iPXE 到固件 / Integrate iPXE into Firmware
+      run: |
+        echo "📦 将 iPXE EFI 集成到固件 CBFS"
+        
+        # 找到生成的 ROM 文件
+        ROM_FILE=$(ls roms/coreboot_*.rom | head -1)
+        ROM_BASENAME=$(basename "$ROM_FILE")
+        
+        if [ -z "$ROM_FILE" ]; then
+          echo "❌ 未找到 ROM 文件"
+          ls -la roms/
+          exit 1
+        fi
+        
+        echo "📋 ROM 文件: $ROM_FILE"
+        echo "📋 文件大小: $(ls -lh "$ROM_FILE" | awk '{print $5}')"
+        
+        # 备份原始固件
+        cp "$ROM_FILE" "${ROM_FILE}.backup"
+        
+        # 使用 cbfstool 添加 iPXE 到 CBFS
+        echo "🔧 使用 cbfstool 添加 iPXE..."
+        coreboot/build/cbfstool "$ROM_FILE" add -f ipxe_x64.efi -n efi/boot/bootx64.efi -t raw -c lzma
+        
+        echo "✅ iPXE 已集成到固件"
+        echo "📦 验证 CBFS 内容："
+        coreboot/build/cbfstool "$ROM_FILE" print | grep -E "ipxe|bootx64" || echo "iPXE 条目："
+        coreboot/build/cbfstool "$ROM_FILE" print
+        
+        echo ""
+        echo "📊 固件大小对比："
+        echo "原始: $(ls -lh "${ROM_FILE}.backup" | awk '{print $5}')"
+        echo "集成后: $(ls -lh "$ROM_FILE" | awk '{print $5}')"
 
     - name: 列出编译产物 / List Build Artifacts
       run: |
