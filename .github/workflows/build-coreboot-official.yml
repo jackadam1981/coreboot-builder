@@ -74,90 +74,54 @@ jobs:
 
     - name: 编译固件 / Build Firmware
       run: |
-        echo "🔨 开始编译 coreboot 官方版本固件"
+        echo "🔨 使用 MrChromebox build-uefi.sh 编译 kaisa"
         
-        # 创建输出目录
         mkdir -p roms
         
-        # 设置设备名称
-        DEVICE="kaisa"
-        
-        echo "📝 检查配置文件..."
-        cat coreboot/configs/cml/config.kaisa.uefi
-        
-        echo ""
-        echo "🐳 使用 coreboot SDK 容器编译..."
-        
-        # 使用 coreboot SDK 容器编译
+        # 使用 MrChromebox 的编译脚本
         docker run --rm --user root \
           -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
           -v ${{ github.workspace }}/roms:/home/coreboot/roms \
           -w /home/coreboot/coreboot \
           coreboot/coreboot-sdk:latest \
-          bash -c "set -e && \
-                   git config --global --add safe.directory /home/coreboot/coreboot && \
-                   echo '📋 应用配置文件...' && \
-                   cp configs/cml/config.kaisa.uefi .config && \
-                   echo '📋 运行 olddefconfig...' && \
-                   make olddefconfig && \
-                   echo '📋 显示最终配置中的关键选项...' && \
-                   grep -E 'CONFIG_(VENDOR|BOARD|PAYLOAD|EDK2|PXE|VBOOT|CHROMEOS)' .config || true && \
-                   echo '🔨 开始编译 coreboot...' && \
-                   make -j\$(nproc) 2>&1 | tee build.log || (echo '❌ 编译失败，退出码:' \$?; exit 1) && \
-                   echo '✅ 编译完成' && \
-                   echo '📁 检查构建目录...' && \
-                   ls -la build/ && \
-                   echo '📁 查找 ROM 文件...' && \
-                   find build/ -name '*.rom' -o -name 'coreboot.rom' || echo '未找到 ROM 文件'"
+          bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
+                   ./build-uefi.sh kaisa"
+    
+    - name: 列出编译产物 / List Build Artifacts
+      run: |
+        echo "=== 编译完成的固件 ==="
+        ls -lh roms/
         
-        # 检查编译结果
         echo ""
-        echo "🔍 检查编译结果..."
-        
-        if [ -f "coreboot/build/coreboot.rom" ]; then
-          cp coreboot/build/coreboot.rom "coreboot_official-${DEVICE}-$(date +"%Y%m%d").rom"
-          echo "✅ 固件编译成功: coreboot_official-${DEVICE}-$(date +"%Y%m%d").rom"
-          echo "📊 固件大小: $(ls -lh coreboot_official-${DEVICE}-$(date +"%Y%m%d").rom | awk '{print $5}')"
-          
-          # 使用 cbfstool 查看固件内容
-          echo "📦 固件内容："
-          coreboot/build/cbfstool coreboot_official-${DEVICE}-$(date +"%Y%m%d").rom print || true
-        else
-          echo "❌ 固件 ROM 文件不存在"
-          echo "📁 构建目录内容："
-          ls -laR coreboot/build/ 2>/dev/null || echo "构建目录不存在"
-          
-          echo ""
-          echo "📋 编译日志最后 100 行："
-          if [ -f "coreboot/build.log" ]; then
-            tail -100 coreboot/build.log
-          else
-            echo "编译日志文件不存在"
+        echo "📦 固件详情："
+        for rom in roms/*.rom; do
+          if [ -f "$rom" ]; then
+            echo "文件: $rom"
+            echo "大小: $(ls -lh "$rom" | awk '{print $5}')"
+            echo "---"
           fi
-          
-          echo ""
-          echo "📋 查找所有错误信息："
-          if [ -f "coreboot/build.log" ]; then
-            grep -i "error\|failed\|fatal" coreboot/build.log | tail -50 || echo "未找到错误关键词"
-          fi
-          
-          exit 1
-        fi
+        done
 
     - name: 上传固件 / Upload Firmware
       uses: actions/upload-artifact@v4
       with:
-        name: coreboot-official-kaisa-firmware
-        path: coreboot/coreboot_official-kaisa-*.rom
+        name: coreboot-mrchromebox-kaisa-firmware
+        path: roms/*.rom
         retention-days: 30
 
+    - name: 上传校验和 / Upload Checksums
+      uses: actions/upload-artifact@v4
+      with:
+        name: coreboot-mrchromebox-kaisa-checksums
+        path: roms/*.sha1
+        retention-days: 30
+        
     - name: 上传编译日志 / Upload Build Logs
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: coreboot-official-build-logs
+        name: coreboot-mrchromebox-build-logs
         path: |
-          coreboot/build.log
           coreboot/.config
           coreboot/configs/cml/config.kaisa.uefi
         retention-days: 7
@@ -208,6 +172,8 @@ jobs:
           2. 使用 flashrom 刷写固件
           3. 重启设备进入 UEFI
           4. 网卡应该能被识别并可以 PXE 启动
-        files: coreboot/coreboot_official-kaisa-*.rom
+        files: |
+          roms/*.rom
+          roms/*.sha1
         draft: false
         prerelease: false
