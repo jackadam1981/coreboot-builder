@@ -36,14 +36,26 @@ jobs:
           echo "ℹ️  使用默认 Logo"
         fi
 
-    - name: 拉取 Coreboot SDK 容器 / Pull Coreboot SDK
-      run: docker pull coreboot/coreboot-sdk:latest
-
     - name: 添加 PXE 支持 / Add PXE Support
       run: |
-        echo "📝 添加 PXE 配置到 kaisa 配置文件"
+        echo "📝 添加 PXE 和网络栈配置到 kaisa 配置文件"
+        # 基础 PXE 支持
         echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> coreboot/configs/cml/config.kaisa.uefi
+        # PCI 网卡驱动支持
+        echo "CONFIG_EDK2_LOAD_OPTION_ROMS=y" >> coreboot/configs/cml/config.kaisa.uefi
+        echo "CONFIG_EDK2_PRIORITIZE_INTERNAL=y" >> coreboot/configs/cml/config.kaisa.uefi
         cat coreboot/configs/cml/config.kaisa.uefi
+
+    - name: 验证设备树配置 / Verify Device Tree Configuration
+      run: |
+        echo "📋 验证现有 RTL8111H 网卡配置："
+        cd coreboot
+        echo "pcie_rp7 配置（RTL8111H 以太网网卡）："
+        grep -A 10 -B 2 "device ref pcie_rp7" src/mainboard/google/puff/variants/kaisa/overridetree.cb
+        echo "✅ RTL8111H 网卡已在 pcie_rp7 中正确配置"
+
+    - name: 拉取 Coreboot SDK 容器 / Pull Coreboot SDK
+      run: docker pull coreboot/coreboot-sdk:latest
 
     - name: 编译固件 / Build Firmware
       run: |
