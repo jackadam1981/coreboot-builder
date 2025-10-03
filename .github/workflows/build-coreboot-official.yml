@@ -44,31 +44,30 @@ jobs:
         # 创建配置目录
         mkdir -p configs/cml
         
-        # Kaisa 配置 - 使用 MrChromebox EDK2（带网络支持）
+        # Kaisa 配置 - 官方 coreboot + MrChromebox EDK2 + iPXE
         cat > configs/cml/config.kaisa.uefi << 'EOF'
         # 基础板型配置
         CONFIG_VENDOR_GOOGLE=y
         CONFIG_BOARD_GOOGLE_KAISA=y
         
-        # Payload 配置 - 使用 MrChromebox 的 EDK2（包含网络支持）
+        # Payload 配置 - 使用 MrChromebox 的 EDK2
         CONFIG_PAYLOAD_EDK2=y
         CONFIG_EDK2_UEFIPAYLOAD=y
         CONFIG_EDK2_REPO_MRCHROMEBOX=y
         
-        # EDK2 网络支持（MrChromebox fork 特有）
-        CONFIG_EDK2_NETWORK_PXE_SUPPORT=y
-        CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y
-        CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y
-        CONFIG_EDK2_NETWORK_ALL_DEVICES=y
-        
-        # PCI Option ROM 支持（加载网卡 ROM）
+        # PCI Option ROM 支持（关键：让 EDK2 加载并执行网卡 Option ROM）
         CONFIG_EDK2_LOAD_OPTION_ROMS=y
         CONFIG_EDK2_PRIORITIZE_INTERNAL=y
         
-        # 网络支持 - iPXE Option ROM
+        # iPXE Option ROM（提供网络功能）
         CONFIG_PXE=y
         CONFIG_BUILD_IPXE=y
         CONFIG_PXE_ROM_ID="10ec,8168"
+        
+        # iPXE 高级功能
+        CONFIG_IPXE_STABLE=y
+        CONFIG_IPXE_HAS_HTTPS=y
+        CONFIG_IPXE_TRUST_CMD=y
         EOF
         
         echo "✅ 配置文件已创建"
@@ -196,18 +195,17 @@ jobs:
           - **编译日期**: ${{ steps.release_info.outputs.date_full }}
           
           ### 特性
-          - ✅ 完整的 UEFI 环境
-          - ✅ EDK2 原生网络栈支持（PXE/iSCSI/HTTP）
-          - ✅ iPXE Option ROM 支持
-          - ✅ RTL8168 网卡完整驱动
-          - ✅ 所有网络设备自动初始化
-          - ✅ UEFI Shell 网络命令可用
+          - ✅ 完整的 UEFI 环境（MrChromebox EDK2）
+          - ✅ iPXE Option ROM 网络启动
+          - ✅ RTL8168 网卡支持 (10ec:8168)
+          - ✅ EDK2 自动加载 Option ROM
+          - ✅ HTTPS 和数字签名支持
           
-          ### 为什么使用 MrChromebox EDK2？
-          - 包含完整的网络栈配置选项
-          - 支持 PXE、iSCSI、HTTP Boot
-          - 自动加载和执行 Option ROM
-          - 网卡能在 UEFI Shell 中正确工作
+          ### 技术方案
+          - **coreboot 源码**: 官方 coreboot（最新功能）
+          - **EDK2 Payload**: MrChromebox fork（成熟稳定）
+          - **网络实现**: iPXE Option ROM（兼容性好）
+          - **组合优势**: 官方 coreboot + 成熟 EDK2 + 可靠 iPXE
           
           ### 网络支持
           - PXE 启动
