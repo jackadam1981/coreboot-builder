@@ -133,19 +133,26 @@ jobs:
           coreboot/defconfig
         retention-days: 7
 
+    - name: 准备发布信息 / Prepare Release Info
+      if: github.event.inputs.release == 'true'
+      id: release_info
+      run: |
+        echo "date=$(date +"%Y%m%d")" >> $GITHUB_OUTPUT
+        echo "date_full=$(date +"%Y-%m-%d")" >> $GITHUB_OUTPUT
+    
     - name: 创建发布 / Create Release
       if: github.event.inputs.release == 'true'
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: coreboot-qemu-$(date +"%Y%m%d")
-        name: Coreboot QEMU Test $(date +"%Y-%m-%d")
+        tag_name: coreboot-qemu-${{ steps.release_info.outputs.date }}
+        name: Coreboot QEMU Test ${{ steps.release_info.outputs.date_full }}
         body: |
           ## Coreboot QEMU i440fx 测试固件
           
           ### 固件信息
           - **目标**: QEMU i440fx 虚拟机
           - **Payload**: Coreinfo (测试工具)
-          - **编译日期**: $(date +"%Y-%m-%d")
+          - **编译日期**: ${{ steps.release_info.outputs.date_full }}
           
           ### 用途
           这是一个最小化的测试固件，用于验证 coreboot 编译环境。

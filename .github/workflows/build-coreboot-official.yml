@@ -193,12 +193,19 @@ jobs:
           coreboot/configs/cml/config.kaisa.uefi
         retention-days: 7
 
+    - name: 准备发布信息 / Prepare Release Info
+      if: github.event.inputs.release == 'true'
+      id: release_info
+      run: |
+        echo "date=$(date +"%Y%m%d")" >> $GITHUB_OUTPUT
+        echo "date_full=$(date +"%Y-%m-%d")" >> $GITHUB_OUTPUT
+    
     - name: 创建发布 / Create Release
       if: github.event.inputs.release == 'true'
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: coreboot-official-kaisa-$(date +"%Y%m%d")
-        name: Coreboot Official Kaisa $(date +"%Y-%m-%d")
+        tag_name: coreboot-official-kaisa-${{ steps.release_info.outputs.date }}
+        name: Coreboot Official Kaisa ${{ steps.release_info.outputs.date_full }}
         body: |
           ## Coreboot 官方版本固件 - Windows 兼容版
           
@@ -206,7 +213,7 @@ jobs:
           - **设备**: kaisa (Google Chromebook)
           - **版本**: Coreboot 官方版本
           - **目标系统**: Windows 兼容
-          - **编译日期**: $(date +"%Y-%m-%d")
+          - **编译日期**: ${{ steps.release_info.outputs.date_full }}
           
           ### 特性
           - ✅ UEFI Payload (EDK2 官方版本)
