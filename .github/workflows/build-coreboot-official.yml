@@ -1,0 +1,184 @@
+name: Build Coreboot Official Firmware
+
+on:
+  # 支持手动触发
+  workflow_dispatch:
+    inputs:
+      release:
+        description: '创建 Release 发布 / Create Release'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 检出构建仓库 / Checkout Builder Repository
+      uses: actions/checkout@v4
+
+    - name: 克隆 Coreboot 官方源码 / Clone Official Coreboot Source
+      run: |
+        git clone https://github.com/coreboot/coreboot.git coreboot
+        cd coreboot
+        git submodule update --init --checkout --recursive
+
+    - name: 替换自定义 Logo / Replace Custom Logo
+      run: |
+        if [ -f "coreboot_logo.bmp" ]; then
+          cp coreboot_logo.bmp coreboot/Documentation/coreboot_logo.bmp
+          echo "✅ 已替换为自定义 Logo"
+        else
+          echo "ℹ️  使用默认 Logo"
+        fi
+
+    - name: 创建 Kaisa 配置 / Create Kaisa Configuration
+      run: |
+        echo "📝 创建 kaisa 设备配置"
+        cd coreboot
+        
+        # 创建配置目录
+        mkdir -p configs/cml
+        
+        # Windows 兼容的 Kaisa 配置
+        cat > configs/cml/config.kaisa.uefi << 'EOF'
+        # Google Kaisa Chromebook 配置 - Windows 兼容版本
+        CONFIG_VENDOR_GOOGLE=y
+        CONFIG_BOARD_GOOGLE_KAISA=y
+        CONFIG_NO_GFX_INIT=y
+        
+        # Payload 配置 - 使用官方 EDK2
+        CONFIG_PAYLOAD_EDK2=y
+        CONFIG_EDK2_UEFIPAYLOAD=y
+        CONFIG_EDK2_REPO_OFFICIAL=y
+        
+        # 网络支持配置 - 使用 iPXE
+        CONFIG_PXE=y
+        CONFIG_BUILD_IPXE=y
+        CONFIG_PXE_ROM_ID="10ec,8168"
+        CONFIG_IPXE_STABLE=y
+        CONFIG_IPXE_SERIAL_CONSOLE=y
+        CONFIG_IPXE_NO_PROMPT=y
+        CONFIG_IPXE_HAS_HTTPS=y
+        CONFIG_IPXE_TRUST_CMD=y
+        
+        # Windows 兼容配置
+        CONFIG_CONSOLE_SERIAL=y
+        CONFIG_DRIVERS_UART_8250MEM=y
+        CONFIG_CONSOLE_POST=y
+        CONFIG_BOARD_ROMSIZE_KB_32768=y
+        CONFIG_VBOOT=n
+        CONFIG_CHROMEOS=n
+        CONFIG_VBOOT_MOCK_SECDATA=n
+        
+        # 禁用 Chrome OS 特有功能
+        CONFIG_SMMSTORE_V2=n
+        CONFIG_TPM_GOOGLE_CR50=n
+        CONFIG_TPM_CR50=n
+        CONFIG_EC_GOOGLE_CHROMEEC=n
+        CONFIG_HAVE_IFD_BIN=n
+        CONFIG_HAVE_ME_BIN=n
+        CONFIG_DO_NOT_TOUCH_DESCRIPTOR_REGION=n
+        
+        # Windows 启动优化
+        CONFIG_USE_LEGACY_8254_TIMER=y
+        CONFIG_UEFI_2_4_BINDING=y
+        CONFIG_EDK2_BOOT_TIMEOUT=5
+        EOF
+        
+        echo "✅ 配置文件已创建"
+        cat configs/cml/config.kaisa.uefi
+
+    - name: 验证设备树配置 / Verify Device Tree Configuration
+      run: |
+        echo "📋 验证现有 RTL8111H 网卡配置："
+        cd coreboot
+        grep -A 15 -B 2 "device ref pcie_rp7" src/mainboard/google/puff/variants/kaisa/overridetree.cb
+
+    - name: 拉取 Coreboot SDK 容器 / Pull Coreboot SDK
+      run: docker pull coreboot/coreboot-sdk:latest
+
+    - name: 编译固件 / Build Firmware
+      run: |
+        echo "🔨 开始编译 coreboot 官方版本固件"
+        
+        # 创建输出目录
+        mkdir -p roms
+        
+        # 设置设备名称
+        DEVICE="kaisa"
+        
+        # 使用 coreboot SDK 容器编译
+        docker run --rm --user root \
+          -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+          -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+          -w /home/coreboot/coreboot \
+          coreboot/coreboot-sdk:latest \
+          bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
+                   cp configs/cml/config.kaisa.uefi .config && \
+                   make olddefconfig && \
+                   make -j\$(nproc)"
+        
+        # 重命名输出文件
+        if [ -f "coreboot/build/coreboot.rom" ]; then
+          cp coreboot/build/coreboot.rom "coreboot_official-${DEVICE}-$(date +"%Y%m%d").rom"
+          echo "✅ 固件编译成功: coreboot_official-${DEVICE}-$(date +"%Y%m%d").rom"
+        else
+          echo "❌ 固件编译失败"
+          ls -la coreboot/build/
+          exit 1
+        fi
+
+    - name: 上传固件 / Upload Firmware
+      uses: actions/upload-artifact@v4
+      with:
+        name: coreboot-official-kaisa-firmware
+        path: coreboot/coreboot_official-kaisa-*.rom
+        retention-days: 30
+
+    - name: 创建发布 / Create Release
+      if: github.event.inputs.release == 'true'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: coreboot-official-kaisa-$(date +"%Y%m%d")
+        name: Coreboot Official Kaisa $(date +"%Y-%m-%d")
+        body: |
+          ## Coreboot 官方版本固件 - Windows 兼容版
+          
+          ### 设备信息
+          - **设备**: kaisa (Google Chromebook)
+          - **版本**: Coreboot 官方版本
+          - **目标系统**: Windows 兼容
+          - **编译日期**: $(date +"%Y-%m-%d")
+          
+          ### 特性
+          - ✅ UEFI Payload (EDK2 官方版本)
+          - ✅ iPXE 网络启动支持
+          - ✅ RTL8168 网卡支持 (PCI ID: 10ec,8168)
+          - ✅ HTTPS 和 TRUST 命令支持
+          - ✅ Windows 兼容性优化
+          
+          ### Windows 兼容性
+          - 禁用 Chrome OS 特有功能
+          - 启用 UEFI 2.4 绑定
+          - 优化启动时间
+          - 支持标准 Windows 启动
+          
+          ### 网络支持
+          - PXE 启动
+          - iPXE 脚本支持
+          - HTTPS 协议
+          - 数字签名验证
+          
+          ### 使用方法
+          1. 下载对应的 ROM 文件
+          2. 使用 flashrom 刷写固件
+          3. 重启设备进行测试
+          4. 可以安装 Windows 系统
+        files: coreboot/coreboot_official-kaisa-*.rom
+        draft: false
+        prerelease: false
