@@ -66,25 +66,26 @@ jobs:
         CONFIG_IPXE_HAS_HTTPS=y
         CONFIG_IPXE_TRUST_CMD=y
         
-        # Windows 兼容配置
+        # 基础配置
         CONFIG_CONSOLE_SERIAL=y
         CONFIG_DRIVERS_UART_8250MEM=y
         CONFIG_CONSOLE_POST=y
         CONFIG_BOARD_ROMSIZE_KB_32768=y
-        CONFIG_VBOOT=n
-        CONFIG_CHROMEOS=n
-        CONFIG_VBOOT_MOCK_SECDATA=n
         
-        # 禁用 Chrome OS 特有功能
-        CONFIG_SMMSTORE_V2=n
-        CONFIG_TPM_GOOGLE_CR50=n
-        CONFIG_TPM_CR50=n
-        CONFIG_EC_GOOGLE_CHROMEEC=n
-        CONFIG_HAVE_IFD_BIN=n
-        CONFIG_HAVE_ME_BIN=n
-        CONFIG_DO_NOT_TOUCH_DESCRIPTOR_REGION=n
+        # 禁用 Chrome OS 特有功能（使用正确的 Kconfig 语法）
+        # CONFIG_VBOOT is not set
+        # CONFIG_CHROMEOS is not set
+        # CONFIG_VBOOT_MOCK_SECDATA is not set
+        # CONFIG_SMMSTORE_V2 is not set
+        # CONFIG_TPM_GOOGLE_CR50 is not set
+        # CONFIG_TPM_CR50 is not set
         
-        # Windows 启动优化
+        # 禁用需要 blob 文件的功能
+        # CONFIG_HAVE_IFD_BIN is not set
+        # CONFIG_HAVE_ME_BIN is not set
+        # CONFIG_DO_NOT_TOUCH_DESCRIPTOR_REGION is not set
+        
+        # 启用兼容性选项
         CONFIG_USE_LEGACY_8254_TIMER=y
         CONFIG_UEFI_2_4_BINDING=y
         CONFIG_EDK2_BOOT_TIMEOUT=5
@@ -112,40 +113,65 @@ jobs:
         # 设置设备名称
         DEVICE="kaisa"
         
+        echo "📝 检查配置文件..."
+        cat coreboot/configs/cml/config.kaisa.uefi
+        
+        echo ""
+        echo "🐳 使用 coreboot SDK 容器编译..."
+        
         # 使用 coreboot SDK 容器编译
         docker run --rm --user root \
           -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
           -v ${{ github.workspace }}/roms:/home/coreboot/roms \
           -w /home/coreboot/coreboot \
           coreboot/coreboot-sdk:latest \
-          bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
+          bash -c "set -e && \
+                   git config --global --add safe.directory /home/coreboot/coreboot && \
+                   echo '📋 应用配置文件...' && \
                    cp configs/cml/config.kaisa.uefi .config && \
+                   echo '📋 运行 olddefconfig...' && \
                    make olddefconfig && \
-                   echo '开始编译...' && \
-                   make -j\$(nproc) 2>&1 | tee build.log && \
-                   echo '编译完成，检查结果...' && \
+                   echo '📋 显示最终配置中的关键选项...' && \
+                   grep -E 'CONFIG_(VENDOR|BOARD|PAYLOAD|EDK2|PXE|VBOOT|CHROMEOS)' .config || true && \
+                   echo '🔨 开始编译 coreboot...' && \
+                   make -j\$(nproc) 2>&1 | tee build.log || (echo '❌ 编译失败，退出码:' \$?; exit 1) && \
+                   echo '✅ 编译完成' && \
+                   echo '📁 检查构建目录...' && \
                    ls -la build/ && \
-                   echo '检查 ROM 文件...' && \
-                   ls -la build/coreboot.rom*"
+                   echo '📁 查找 ROM 文件...' && \
+                   find build/ -name '*.rom' -o -name 'coreboot.rom' || echo '未找到 ROM 文件'"
         
-        # 检查编译结果并显示日志
+        # 检查编译结果
+        echo ""
         echo "🔍 检查编译结果..."
+        
         if [ -f "coreboot/build/coreboot.rom" ]; then
           cp coreboot/build/coreboot.rom "coreboot_official-${DEVICE}-$(date +"%Y%m%d").rom"
           echo "✅ 固件编译成功: coreboot_official-${DEVICE}-$(date +"%Y%m%d").rom"
           echo "📊 固件大小: $(ls -lh coreboot_official-${DEVICE}-$(date +"%Y%m%d").rom | awk '{print $5}')"
+          
+          # 使用 cbfstool 查看固件内容
+          echo "📦 固件内容："
+          coreboot/build/cbfstool coreboot_official-${DEVICE}-$(date +"%Y%m%d").rom print || true
         else
-          echo "❌ 固件编译失败"
-          echo "📋 编译日志最后50行："
+          echo "❌ 固件 ROM 文件不存在"
+          echo "📁 构建目录内容："
+          ls -laR coreboot/build/ 2>/dev/null || echo "构建目录不存在"
+          
+          echo ""
+          echo "📋 编译日志最后 100 行："
           if [ -f "coreboot/build.log" ]; then
-            tail -50 coreboot/build.log
+            tail -100 coreboot/build.log
           else
             echo "编译日志文件不存在"
           fi
-          echo "📁 构建目录内容："
-          ls -la coreboot/build/ || echo "构建目录不存在"
-          echo "📁 当前目录内容："
-          ls -la coreboot/
+          
+          echo ""
+          echo "📋 查找所有错误信息："
+          if [ -f "coreboot/build.log" ]; then
+            grep -i "error\|failed\|fatal" coreboot/build.log | tail -50 || echo "未找到错误关键词"
+          fi
+          
           exit 1
         fi
 
