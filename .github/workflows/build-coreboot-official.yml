@@ -44,51 +44,21 @@ jobs:
         # 创建配置目录
         mkdir -p configs/cml
         
-        # Windows 兼容的 Kaisa 配置
+        # 最小化 Kaisa 配置（参考 QEMU 成功案例）
         cat > configs/cml/config.kaisa.uefi << 'EOF'
-        # Google Kaisa Chromebook 配置 - Windows 兼容版本
+        # 基础板型配置
         CONFIG_VENDOR_GOOGLE=y
         CONFIG_BOARD_GOOGLE_KAISA=y
-        CONFIG_NO_GFX_INIT=y
         
-        # Payload 配置 - 使用官方 EDK2
+        # Payload 配置 - 使用 EDK2 UEFI
         CONFIG_PAYLOAD_EDK2=y
         CONFIG_EDK2_UEFIPAYLOAD=y
         CONFIG_EDK2_REPO_OFFICIAL=y
         
-        # 网络支持配置 - 使用 iPXE
+        # 网络支持 - iPXE
         CONFIG_PXE=y
         CONFIG_BUILD_IPXE=y
         CONFIG_PXE_ROM_ID="10ec,8168"
-        CONFIG_IPXE_STABLE=y
-        CONFIG_IPXE_SERIAL_CONSOLE=y
-        CONFIG_IPXE_NO_PROMPT=y
-        CONFIG_IPXE_HAS_HTTPS=y
-        CONFIG_IPXE_TRUST_CMD=y
-        
-        # 基础配置
-        CONFIG_CONSOLE_SERIAL=y
-        CONFIG_DRIVERS_UART_8250MEM=y
-        CONFIG_CONSOLE_POST=y
-        CONFIG_BOARD_ROMSIZE_KB_32768=y
-        
-        # 禁用 Chrome OS 特有功能（使用正确的 Kconfig 语法）
-        # CONFIG_VBOOT is not set
-        # CONFIG_CHROMEOS is not set
-        # CONFIG_VBOOT_MOCK_SECDATA is not set
-        # CONFIG_SMMSTORE_V2 is not set
-        # CONFIG_TPM_GOOGLE_CR50 is not set
-        # CONFIG_TPM_CR50 is not set
-        
-        # 禁用需要 blob 文件的功能
-        # CONFIG_HAVE_IFD_BIN is not set
-        # CONFIG_HAVE_ME_BIN is not set
-        # CONFIG_DO_NOT_TOUCH_DESCRIPTOR_REGION is not set
-        
-        # 启用兼容性选项
-        CONFIG_USE_LEGACY_8254_TIMER=y
-        CONFIG_UEFI_2_4_BINDING=y
-        CONFIG_EDK2_BOOT_TIMEOUT=5
         EOF
         
         echo "✅ 配置文件已创建"
