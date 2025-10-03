@@ -44,18 +44,28 @@ jobs:
         # 创建配置目录
         mkdir -p configs/cml
         
-        # 最小化 Kaisa 配置（参考 QEMU 成功案例）
+        # Kaisa 配置 - 使用 MrChromebox EDK2（带网络支持）
         cat > configs/cml/config.kaisa.uefi << 'EOF'
         # 基础板型配置
         CONFIG_VENDOR_GOOGLE=y
         CONFIG_BOARD_GOOGLE_KAISA=y
         
-        # Payload 配置 - 使用 EDK2 UEFI
+        # Payload 配置 - 使用 MrChromebox 的 EDK2（包含网络支持）
         CONFIG_PAYLOAD_EDK2=y
         CONFIG_EDK2_UEFIPAYLOAD=y
-        CONFIG_EDK2_REPO_OFFICIAL=y
+        CONFIG_EDK2_REPO_MRCHROMEBOX=y
         
-        # 网络支持 - iPXE
+        # EDK2 网络支持（MrChromebox fork 特有）
+        CONFIG_EDK2_NETWORK_PXE_SUPPORT=y
+        CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y
+        CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y
+        CONFIG_EDK2_NETWORK_ALL_DEVICES=y
+        
+        # PCI Option ROM 支持（加载网卡 ROM）
+        CONFIG_EDK2_LOAD_OPTION_ROMS=y
+        CONFIG_EDK2_PRIORITIZE_INTERNAL=y
+        
+        # 网络支持 - iPXE Option ROM
         CONFIG_PXE=y
         CONFIG_BUILD_IPXE=y
         CONFIG_PXE_ROM_ID="10ec,8168"
@@ -177,26 +187,27 @@ jobs:
         tag_name: coreboot-official-kaisa-${{ steps.release_info.outputs.date }}
         name: Coreboot Official Kaisa ${{ steps.release_info.outputs.date_full }}
         body: |
-          ## Coreboot 官方版本固件 - Windows 兼容版
+          ## Coreboot 官方版本固件 - UEFI + 完整网络支持
           
           ### 设备信息
           - **设备**: kaisa (Google Chromebook)
           - **版本**: Coreboot 官方版本
-          - **目标系统**: Windows 兼容
+          - **Payload**: MrChromebox EDK2 (UEFI)
           - **编译日期**: ${{ steps.release_info.outputs.date_full }}
           
           ### 特性
-          - ✅ UEFI Payload (EDK2 官方版本)
-          - ✅ iPXE 网络启动支持
-          - ✅ RTL8168 网卡支持 (PCI ID: 10ec,8168)
-          - ✅ HTTPS 和 TRUST 命令支持
-          - ✅ Windows 兼容性优化
+          - ✅ 完整的 UEFI 环境
+          - ✅ EDK2 原生网络栈支持（PXE/iSCSI/HTTP）
+          - ✅ iPXE Option ROM 支持
+          - ✅ RTL8168 网卡完整驱动
+          - ✅ 所有网络设备自动初始化
+          - ✅ UEFI Shell 网络命令可用
           
-          ### Windows 兼容性
-          - 禁用 Chrome OS 特有功能
-          - 启用 UEFI 2.4 绑定
-          - 优化启动时间
-          - 支持标准 Windows 启动
+          ### 为什么使用 MrChromebox EDK2？
+          - 包含完整的网络栈配置选项
+          - 支持 PXE、iSCSI、HTTP Boot
+          - 自动加载和执行 Option ROM
+          - 网卡能在 UEFI Shell 中正确工作
           
           ### 网络支持
           - PXE 启动
