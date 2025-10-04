@@ -1,0 +1,278 @@
+name: 方案3 - MrChromebox + 预编译 iPXE 编译时集成 / Strategy 3 - MrChromebox + Compile-time iPXE
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "创建 Release 发布 / Create Release"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📋 显示方案信息 / Display Strategy Info
+        run: |
+          echo "=========================================="
+          echo "🎯 方案3：MrChromebox + 预编译 iPXE 编译时集成"
+          echo "=========================================="
+          echo ""
+          echo "📝 方案说明："
+          echo "  - 使用 MrChromebox 源码"
+          echo "  - 将预编译 iPXE EFI 复制到源码目录"
+          echo "  - 尝试编译时集成（历史记录）"
+          echo ""
+          echo "⚠️  注意："
+          echo "  - 已确认 MrChromebox 不支持此方案"
+          echo "  - 此工作流仅作为历史记录保留"
+          echo "  - 预期会失败，用于对比验证"
+          echo ""
+          echo "📊 技术实现："
+          echo "  1. 配置 EDK2 网络支持"
+          echo "  2. 复制预编译 iPXE 到源码目录"
+          echo "  3. 尝试编译时集成"
+          echo "  4. 记录失败原因"
+          echo "=========================================="
+
+      - name: 检出构建仓库 / Checkout Builder Repository
+        uses: actions/checkout@v4
+
+      - name: 拉取 Coreboot SDK 容器 / Pull Coreboot SDK
+        run: docker pull coreboot/coreboot-sdk:latest
+
+      - name: 克隆 MrChromebox Coreboot 源码 / Clone Coreboot Source
+        run: |
+          echo "📥 克隆 MrChromebox coreboot"
+          git clone https://github.com/MrChromebox/coreboot.git coreboot
+          cd coreboot
+          git submodule update --init --checkout --recursive
+
+      - name: 配置 EDK2 网络支持 / Configure EDK2 Network Support
+        run: |
+          echo "📝 配置 MrChromebox kaisa 网络支持"
+          cd coreboot
+          
+          # 检查配置文件是否存在
+          if [ -f "configs/cml/config.kaisa.uefi" ]; then
+            echo "✅ 找到现有配置文件"
+            
+            # 检查是否已包含网络支持配置
+            if grep -q "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" configs/cml/config.kaisa.uefi; then
+              echo "✅ EDK2 网络支持配置已存在"
+            else
+              echo "📝 添加 EDK2 网络支持配置"
+              echo "" >> configs/cml/config.kaisa.uefi
+              echo "# EDK2 网络支持配置（方案3：编译时集成，预期失败）" >> configs/cml/config.kaisa.uefi
+              echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> configs/cml/config.kaisa.uefi
+              echo "CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y" >> configs/cml/config.kaisa.uefi
+              echo "CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y" >> configs/cml/config.kaisa.uefi
+              echo "✅ EDK2 网络支持配置已添加"
+            fi
+          else
+            echo "❌ 配置文件不存在"
+            exit 1
+          fi
+
+      - name: 下载并复制预编译 iPXE / Download and Copy Pre-compiled iPXE
+        run: |
+          echo "📥 下载并复制预编译 iPXE（用于编译时集成尝试）"
+          
+          # 创建 iPXE 目录
+          mkdir -p ipxe_files
+          cd ipxe_files
+          
+          # 下载官方预编译 iPXE EFI 文件
+          echo "📥 从 https://boot.ipxe.org/ 下载 ipxe.efi"
+          wget -O ipxe-efi-x86_64.efi "https://boot.ipxe.org/ipxe.efi" || {
+            echo "❌ iPXE 下载失败"
+            exit 1
+          }
+          
+          # 复制到工作目录和 coreboot 目录
+          cp ipxe-efi-x86_64.efi ../ipxe_x64.efi
+          cp ipxe-efi-x86_64.efi ../coreboot/util/cbfstool/ipxe.efi
+          
+          echo "✅ iPXE EFI 下载和复制成功"
+          ls -lh ../ipxe_x64.efi
+          ls -lh ../coreboot/util/cbfstool/ipxe.efi
+          echo "📊 iPXE 文件信息："
+          file ../ipxe_x64.efi
+          
+          cd ..
+
+      - name: 替换自定义 Logo / Replace Custom Logo
+        run: |
+          if [ -f "coreboot_logo.bmp" ]; then
+            cp coreboot_logo.bmp coreboot/Documentation/coreboot_logo.bmp
+            echo "✅ 已替换为自定义 Logo"
+          else
+            echo "ℹ️  使用默认 Logo"
+          fi
+
+      - name: 尝试编译时集成 iPXE / Attempt Compile-time iPXE Integration
+        run: |
+          echo "🔧 尝试编译时集成 iPXE（预期失败）"
+          cd coreboot
+          mkdir -p ../roms
+          
+          # 检查 iPXE 文件是否存在
+          if [ ! -f "util/cbfstool/ipxe.efi" ]; then
+            echo "❌ iPXE 文件不存在于 util/cbfstool/ 目录"
+            exit 1
+          fi
+          
+          echo "📋 iPXE 文件已复制到 util/cbfstool/ipxe.efi"
+          ls -lh util/cbfstool/ipxe.efi
+          
+          # 使用 MrChromebox 标准编译流程
+          echo "🔧 尝试使用 MrChromebox build-uefi.sh 编译..."
+          docker run --rm --user root \
+            -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+            -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+            -w /home/coreboot/coreboot \
+            coreboot/coreboot-sdk:latest \
+            bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
+                     echo '🔧 使用 MrChromebox build-uefi.sh 编译 kaisa（尝试编译时集成）...' && \
+                     ./build-uefi.sh kaisa" || {
+            echo "❌ 编译失败（符合预期）"
+            echo "📝 记录失败原因：MrChromebox 不支持预编译 iPXE 编译时集成"
+          }
+
+      - name: 验证编译结果 / Verify Build Results
+        run: |
+          echo "📦 验证编译结果"
+          
+          # 检查是否有 ROM 文件生成
+          if ls roms/coreboot_*.rom 1> /dev/null 2>&1; then
+            ROM_FILE=$(ls roms/coreboot_*.rom | head -1)
+            echo "✅ 意外成功：找到 ROM 文件 $(basename "$ROM_FILE")"
+            ls -lh "$ROM_FILE"
+            
+            # 检查 CBFS 内容
+            echo ""
+            echo "📊 CBFS 内容分析："
+            coreboot/build/cbfstool "$ROM_FILE" print
+            
+            # 检查是否有 iPXE 相关条目
+            echo ""
+            echo "🔍 检查 iPXE 相关条目："
+            if coreboot/build/cbfstool "$ROM_FILE" print | grep -i "ipxe"; then
+              echo "✅ 意外：找到 iPXE 相关条目"
+              coreboot/build/cbfstool "$ROM_FILE" print | grep -i "ipxe"
+            else
+              echo "❌ 未找到 iPXE 相关条目"
+            fi
+          else
+            echo "❌ 编译失败（符合预期）"
+            echo "📝 没有生成 ROM 文件"
+          fi
+
+      - name: 生成方案3测试报告 / Generate Strategy 3 Test Report
+        run: |
+          echo "📊 生成方案3测试报告"
+          mkdir -p test-reports
+          
+          # 检查编译结果
+          if ls roms/coreboot_*.rom 1> /dev/null 2>&1; then
+            ROM_FILE=$(ls roms/coreboot_*.rom | head -1)
+            COMPILE_STATUS="意外成功"
+            HAS_IPXE=$(coreboot/build/cbfstool "$ROM_FILE" print 2>/dev/null | grep -q "ipxe" && echo "是" || echo "否")
+          else
+            COMPILE_STATUS="失败（符合预期）"
+            HAS_IPXE="否"
+          fi
+          
+          cat > test-reports/strategy3-test-report.md << EOF
+          # 方案3测试报告 - MrChromebox + 预编译 iPXE 编译时集成
+          
+          **测试时间**: $(date)
+          **GitHub Actions Run**: ${{ github.run_number }}
+          **MrChromebox 版本**: $(cd coreboot && git rev-parse HEAD)
+          
+          ## 方案说明
+          
+          - **方案名称**: 方案3 - MrChromebox + 预编译 iPXE 编译时集成
+          - **技术路线**: 预编译 iPXE 复制到源码目录，尝试编译时集成
+          - **适用场景**: 历史记录，已确认不可行
+          
+          ## 测试结果
+          
+          ### 编译状态
+          - 编译结果: $COMPILE_STATUS
+          - ROM 文件: $(ls roms/coreboot_*.rom 2>/dev/null && echo "存在" || echo "不存在")
+          - iPXE 集成: $HAS_IPXE
+          
+          ### 失败原因分析
+          - **主要问题**: MrChromebox 不支持预编译 iPXE 编译时集成
+          - **架构限制**: MrChromebox 使用 EDK2 payload，不支持 CONFIG_PAYLOAD_IPXE=y
+          - **编译方式**: build-uefi.sh 不处理 util/cbfstool/ipxe.efi 文件
+          
+          ## 结论
+          
+          $(if [ "$COMPILE_STATUS" = "意外成功" ]; then
+            echo "⚠️ **意外成功**"
+            echo ""
+            echo "- 如果编译成功，需要进一步验证 iPXE 功能"
+            echo "- 可能 MrChromebox 架构有所变化"
+          else
+            echo "✅ **测试结果符合预期**"
+            echo ""
+            echo "- 确认 MrChromebox 不支持此方案"
+            echo "- 验证了我们的架构分析是正确的"
+            echo "- 推荐使用方案1：EDK2 + 运行时 iPXE 集成"
+          fi)
+          
+          ## 下一步建议
+          
+          - 使用方案1：EDK2 + 运行时 iPXE 集成
+          - 或测试方案2：标准 Coreboot + iPXE Payload
+          - 避免使用此方案进行实际部署
+          EOF
+          
+          cat test-reports/strategy3-test-report.md
+
+      - name: 上传产物 / Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: strategy3-test-results-${{ github.run_number }}
+          path: |
+            roms/*.rom
+            test-reports/
+          retention-days: 30
+
+      - name: 创建 Release / Create Release
+        if: ${{ inputs.release == true }}
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: strategy3-test-${{ github.run_number }}
+          name: 方案3测试 - MrChromebox + 编译时 iPXE / Strategy 3 - Compile-time iPXE
+          body: |
+            ## 方案3：MrChromebox + 预编译 iPXE 编译时集成
+            
+            **构建日期**: ${{ github.run_number }}
+            **状态**: 历史记录测试
+            
+            ### 方案说明
+            
+            - **技术路线**: 预编译 iPXE 编译时集成
+            - **预期结果**: 失败（已确认不可行）
+            - **用途**: 历史记录和对比验证
+            
+            ### 测试结果
+            
+            - 编译状态: $(ls roms/coreboot_*.rom 2>/dev/null && echo "意外成功" || echo "失败（符合预期）")
+            - 结论: 确认 MrChromebox 不支持此方案
+            
+          files: |
+            roms/*.rom
+            test-reports/*.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

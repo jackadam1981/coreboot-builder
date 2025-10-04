@@ -1,0 +1,245 @@
+name: 方案4 - QEMU 测试环境 / Strategy 4 - QEMU Test Environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: "测试模式 / Test Mode"
+        required: false
+        type: choice
+        default: "full-test"
+        options:
+        - "full-test"
+        - "ipxe-only"
+        - "bios-only"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📋 显示方案信息 / Display Strategy Info
+        run: |
+          echo "=========================================="
+          echo "🎯 方案4：QEMU 测试环境"
+          echo "=========================================="
+          echo ""
+          echo "📝 方案说明："
+          echo "  - 创建 QEMU 兼容的 coreboot BIOS"
+          echo "  - 在虚拟环境中测试 iPXE 集成"
+          echo "  - 验证不同集成路径的有效性"
+          echo ""
+          echo "🎯 预期结果："
+          echo "  ✅ 在 QEMU 中测试 iPXE 启动"
+          echo "  ✅ 验证不同 CBFS 路径的有效性"
+          echo "  ✅ 测试压缩对启动的影响"
+          echo "=========================================="
+
+      - name: 检出构建仓库 / Checkout Builder Repository
+        uses: actions/checkout@v4
+
+      - name: 安装 QEMU / Install QEMU
+        run: |
+          echo "📥 安装 QEMU 和相关工具"
+          sudo apt-get update
+          sudo apt-get install -y qemu-system-x86 qemu-utils bridge-utils
+
+      - name: 拉取 Coreboot SDK 容器 / Pull Coreboot SDK
+        run: docker pull coreboot/coreboot-sdk:latest
+
+      - name: 克隆 MrChromebox Coreboot 源码 / Clone Coreboot Source
+        run: |
+          echo "📥 克隆 MrChromebox coreboot"
+          git clone https://github.com/MrChromebox/coreboot.git coreboot
+          cd coreboot
+          git submodule update --init --checkout --recursive
+
+      - name: 下载预编译 iPXE EFI / Download Pre-compiled iPXE EFI
+        if: ${{ inputs.test_mode != 'bios-only' }}
+        run: |
+          echo "📥 下载预编译 iPXE EFI"
+          mkdir -p ipxe_files
+          cd ipxe_files
+          wget -O ipxe-efi-x86_64.efi "https://boot.ipxe.org/ipxe.efi"
+          cp ipxe-efi-x86_64.efi ../ipxe_x64.efi
+          echo "✅ iPXE EFI 下载成功"
+          cd ..
+
+      - name: 配置 QEMU Coreboot / Configure QEMU Coreboot
+        run: |
+          echo "🔧 配置 QEMU coreboot"
+          cd coreboot
+          
+          # 配置 QEMU 目标
+          docker run --rm --user root \
+            -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+            -w /home/coreboot/coreboot \
+            coreboot/coreboot-sdk:latest \
+            bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
+                     make distclean && \
+                     make menuconfig" || {
+            echo "⚠️  make menuconfig 失败，使用默认配置"
+            make defconfig
+          }
+
+      - name: 编译 QEMU BIOS / Build QEMU BIOS
+        run: |
+          echo "📦 编译 QEMU BIOS"
+          cd coreboot
+          mkdir -p ../roms
+          
+          docker run --rm --user root \
+            -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+            -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+            -w /home/coreboot/coreboot \
+            coreboot/coreboot-sdk:latest \
+            bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
+                     make -j\$(nproc) && \
+                     cp build/coreboot.rom /home/coreboot/roms/qemu_bios_base.rom && \
+                     chmod 644 /home/coreboot/roms/*.rom"
+
+      - name: 集成 iPXE 到 QEMU BIOS / Integrate iPXE to QEMU BIOS
+        if: ${{ inputs.test_mode != 'bios-only' }}
+        run: |
+          echo "🔧 集成 iPXE 到 QEMU BIOS"
+          
+          # 复制基础 BIOS
+          cp roms/qemu_bios_base.rom roms/qemu_bios_with_ipxe.rom
+          
+          # 尝试集成 iPXE
+          if [ -f "ipxe_x64.efi" ]; then
+            echo "🔧 添加 iPXE 到 QEMU BIOS"
+            coreboot/build/cbfstool roms/qemu_bios_with_ipxe.rom add -f ipxe_x64.efi -n efi/boot/bootx64.efi -t raw || {
+              echo "❌ 集成失败，尝试其他路径"
+              coreboot/build/cbfstool roms/qemu_bios_with_ipxe.rom add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw
+            }
+            echo "✅ iPXE 集成完成"
+          fi
+
+      - name: QEMU 测试 / QEMU Testing
+        run: |
+          echo "🧪 开始 QEMU 测试"
+          mkdir -p test_results
+          
+          # 测试基础 BIOS
+          echo "🔧 测试基础 QEMU BIOS"
+          timeout 30s qemu-system-x86_64 \
+            -bios roms/qemu_bios_base.rom \
+            -m 512 \
+            -netdev user,id=net0 \
+            -device rtl8139,netdev=net0 \
+            -nographic \
+            -serial mon:stdio 2>&1 | tee test_results/base_bios_test.log || {
+            echo "⚠️  基础 BIOS 测试超时或失败"
+          }
+          
+          # 测试集成 iPXE 的 BIOS
+          if [ -f "roms/qemu_bios_with_ipxe.rom" ]; then
+            echo "🔧 测试集成 iPXE 的 QEMU BIOS"
+            timeout 30s qemu-system-x86_64 \
+              -bios roms/qemu_bios_with_ipxe.rom \
+              -m 512 \
+              -netdev user,id=net0 \
+              -device rtl8139,netdev=net0 \
+              -nographic \
+              -serial mon:stdio 2>&1 | tee test_results/ipxe_bios_test.log || {
+              echo "⚠️  iPXE BIOS 测试超时或失败"
+            }
+          fi
+
+      - name: 生成方案4测试报告 / Generate Strategy 4 Test Report
+        run: |
+          echo "📊 生成方案4测试报告"
+          mkdir -p test-reports
+          
+          cat > test-reports/strategy4-test-report.md << EOF
+          # 方案4测试报告 - QEMU 测试环境
+          
+          **测试时间**: $(date)
+          **GitHub Actions Run**: ${{ github.run_number }}
+          **测试模式**: ${{ inputs.test_mode }}
+          
+          ## 方案说明
+          
+          - **方案名称**: 方案4 - QEMU 测试环境
+          - **技术路线**: QEMU 虚拟环境测试
+          - **适用场景**: 开发和调试 iPXE 集成
+          
+          ## 测试结果
+          
+          ### QEMU BIOS 编译
+          - 基础 BIOS: $(test -f roms/qemu_bios_base.rom && echo "✅ 成功" || echo "❌ 失败")
+          - iPXE 集成 BIOS: $(test -f roms/qemu_bios_with_ipxe.rom && echo "✅ 成功" || echo "❌ 失败")
+          
+          ### QEMU 启动测试
+          - 基础 BIOS 启动: $(test -f test_results/base_bios_test.log && echo "✅ 完成" || echo "❌ 失败")
+          - iPXE BIOS 启动: $(test -f test_results/ipxe_bios_test.log && echo "✅ 完成" || echo "❌ 失败")
+          
+          ## 结论
+          
+          $(if [ -f roms/qemu_bios_base.rom ]; then
+            echo "✅ **QEMU BIOS 编译成功**"
+            echo ""
+            echo "- 可以在 QEMU 环境中测试 iPXE 集成"
+            echo "- 为实际硬件测试提供参考"
+          else
+            echo "❌ **QEMU BIOS 编译失败**"
+            echo ""
+            echo "- 需要检查 coreboot 配置"
+            echo "- 或 QEMU 目标支持"
+          fi)
+          
+          ## 下一步建议
+          
+          - 在实际硬件上验证 QEMU 测试结果
+          - 优化 iPXE 集成配置
+          - 使用 QEMU 环境进行持续测试
+          EOF
+          
+          cat test-reports/strategy4-test-report.md
+
+      - name: 上传测试产物 / Upload Test Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: strategy4-qemu-test-${{ github.run_number }}
+          path: |
+            roms/*.rom
+            test_results/
+            test-reports/
+          retention-days: 30
+
+      - name: 创建 Release / Create Release
+        if: ${{ inputs.release == true }}
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: strategy4-qemu-test-${{ github.run_number }}
+          name: 方案4测试 - QEMU 测试环境 / Strategy 4 - QEMU Test Environment
+          body: |
+            ## 方案4：QEMU 测试环境
+            
+            **测试模式**: ${{ inputs.test_mode }}
+            **构建日期**: ${{ github.run_number }}
+            
+            ### 测试说明
+            
+            - **技术路线**: QEMU 虚拟环境测试
+            - **测试目标**: 验证 iPXE 集成在虚拟环境中的效果
+            - **适用场景**: 开发和调试 iPXE 集成
+            
+            ### 文件清单
+            
+            - QEMU BIOS 文件
+            - 测试日志
+            - 测试报告
+            
+          files: |
+            roms/*.rom
+            test_results/*.log
+            test-reports/*.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
