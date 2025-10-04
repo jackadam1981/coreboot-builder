@@ -88,9 +88,12 @@ jobs:
         # 创建 iPXE 嵌入式脚本（支持自定义 WDS 服务器配置）
         cat > ipxe_embed.ipxe << EOF
         #!ipxe
-        dhcp
-        autoboot
-        shell
+        echo ========================================
+        echo iPXE 网络启动环境
+        echo ========================================
+        echo.
+        dhcp || echo DHCP 失败，尝试手动配置网络
+        autoboot || shell
         EOF
         
         # 编译 iPXE（添加硬件兼容性支持）
@@ -182,8 +185,8 @@ jobs:
         # 根据官方文档，使用正确的路径和类型
         echo "🔧 添加 iPXE 到 CBFS（使用官方推荐方式）..."
         
-        # 官方推荐：只添加到 efi/ipxe.efi 路径，类型为 raw（不压缩）
-        coreboot/build/cbfstool "$INTEGRATED_ROM" add -f ipxe_x64.efi -n efi/ipxe.efi -t raw
+        # 官方推荐：添加到 efi/ipxe/ipxe.efi 路径，使用 LZMA 压缩
+        coreboot/build/cbfstool "$INTEGRATED_ROM" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw -c lzma
         
         # 替换原始文件
         mv "$INTEGRATED_ROM" "$ROM_FILE"
