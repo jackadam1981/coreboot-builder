@@ -160,16 +160,16 @@ jobs:
                    cp bin-x86_64-efi/ipxe.efi /workspace/ipxe_x64.efi && \
                    echo '✅ iPXE EFI 编译成功' && \
                    echo '🔧 编译 iPXE ISO（支持所有网卡）...' && \
-                   echo '📥 下载 isolinux.bin...' && \
+                   echo '📥 下载 isolinux.bin 到 iPXE 源码目录...' && \
                    wget -O isolinux.bin https://mirrors.aliyun.com/centos/7/os/x86_64/isolinux/isolinux.bin && \
+                   ls -la isolinux.bin && \
                    make bin/ipxe.iso \
                      EMBED=ipxe_embed.ipxe \
                      NO_WERROR=1 \
                      ENABLE_HTTP_BOOT=y \
                      ENABLE_HTTPS=y \
                      ENABLE_DHCP=y \
-                     ENABLE_PXE=y \
-                     ISOLINUX_BIN=isolinux.bin && \
+                     ENABLE_PXE=y && \
                    cp bin/ipxe.iso /workspace/ipxe_boot.iso && \
                    echo '✅ iPXE ISO 编译成功'"
         
