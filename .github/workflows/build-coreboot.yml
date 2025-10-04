@@ -38,7 +38,14 @@ jobs:
         cd coreboot
         git submodule update --init --checkout --recursive
 
-    # Logo 替换步骤已移除，为 iPXE 集成节省 CBFS 空间
+    - name: 替换自定义 Logo / Replace Custom Logo
+      run: |
+        if [ -f "coreboot_logo.bmp" ]; then
+          cp coreboot_logo.bmp coreboot/Documentation/coreboot_logo.bmp
+          echo "✅ 已替换为自定义 Logo"
+        else
+          echo "ℹ️  使用默认 Logo"
+        fi
 
     - name: 配置网络支持 / Configure Network Support
       run: |
@@ -63,13 +70,7 @@ jobs:
         echo "📋 最终配置："
         cat configs/cml/config.kaisa.uefi
 
-    - name: 验证设备树配置 / Verify Device Tree Configuration
-      run: |
-        echo "📋 验证现有 RTL8111H 网卡配置："
-        cd coreboot
-        echo "pcie_rp7 配置（RTL8111H 以太网网卡）："
-        grep -A 10 -B 2 "device ref pcie_rp7" src/mainboard/google/puff/variants/kaisa/overridetree.cb
-        echo "✅ RTL8111H 网卡已在 pcie_rp7 中正确配置"
+    # 设备树验证步骤已移除，简化构建流程
 
     - name: 拉取 Coreboot SDK 容器 / Pull Coreboot SDK
       run: docker pull coreboot/coreboot-sdk:latest
