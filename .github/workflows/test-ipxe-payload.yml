@@ -1,0 +1,144 @@
+name: 测试 iPXE Payload 支持 / Test iPXE Payload Support
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: '测试模式 / Test Mode'
+        required: false
+        type: choice
+        default: 'payload-test'
+        options:
+        - 'payload-test'
+        - 'menuconfig-check'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 检出构建仓库 / Checkout Builder Repository
+      uses: actions/checkout@v4
+
+    - name: 拉取 Coreboot SDK 容器 / Pull Coreboot SDK
+      run: docker pull coreboot/coreboot-sdk:latest
+
+    - name: 克隆 MrChromebox Coreboot 源码 / Clone Coreboot Source
+      run: |
+        echo "📥 克隆 MrChromebox coreboot"
+        git clone https://github.com/MrChromebox/coreboot.git coreboot
+        cd coreboot
+        git submodule update --init --checkout --recursive
+
+    - name: 检查 iPXE Payload 支持 / Check iPXE Payload Support
+      run: |
+        echo "🔍 检查 MrChromebox 是否支持 iPXE payload"
+        cd coreboot
+        
+        # 检查配置文件中是否有 iPXE payload 选项
+        echo "📋 检查 Kconfig 文件中的 iPXE 选项..."
+        if grep -r "CONFIG_PAYLOAD_IPXE" . --include="*.kconfig*" --include="Kconfig*"; then
+          echo "✅ 找到 CONFIG_PAYLOAD_IPXE 配置选项"
+        else
+          echo "❌ 未找到 CONFIG_PAYLOAD_IPXE 配置选项"
+        fi
+        
+        # 检查 payload 目录结构
+        echo ""
+        echo "📋 检查 payload 目录结构..."
+        if [ -d "payloads" ]; then
+          echo "✅ 找到 payloads 目录"
+          ls -la payloads/
+          if [ -d "payloads/ipxe" ]; then
+            echo "✅ 找到 iPXE payload 目录"
+            ls -la payloads/ipxe/
+          else
+            echo "❌ 未找到 iPXE payload 目录"
+          fi
+        else
+          echo "❌ 未找到 payloads 目录"
+        fi
+        
+        # 检查 make menuconfig 中的 payload 选项
+        echo ""
+        echo "📋 检查 menuconfig 中的 payload 选项..."
+        if [ -f "payloads/Kconfig" ]; then
+          echo "✅ 找到 payloads/Kconfig 文件"
+          grep -A 10 -B 10 "ipxe\|IPXE" payloads/Kconfig || echo "❌ payloads/Kconfig 中未找到 iPXE 相关配置"
+        else
+          echo "❌ 未找到 payloads/Kconfig 文件"
+        fi
+
+    - name: 尝试配置 iPXE Payload / Try Configure iPXE Payload
+      if: ${{ inputs.test_mode == 'payload-test' }}
+      run: |
+        echo "🔧 尝试配置 iPXE payload"
+        cd coreboot
+        
+        # 检查是否有 iPXE 源码
+        if [ ! -d "payloads/ipxe" ]; then
+          echo "📥 克隆 iPXE 源码到 payloads 目录"
+          git clone https://github.com/ipxe/ipxe.git payloads/ipxe
+        fi
+        
+        # 尝试配置 iPXE payload
+        echo "🔧 尝试配置 iPXE payload..."
+        docker run --rm --user root \
+          -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+          -w /home/coreboot/coreboot \
+          coreboot/coreboot-sdk:latest \
+          bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
+                   make distclean && \
+                   make menuconfig -j\$(nproc)" || {
+          echo "❌ make menuconfig 失败，可能不支持 iPXE payload"
+        }
+
+    - name: 检查 menuconfig 选项 / Check Menuconfig Options
+      if: ${{ inputs.test_mode == 'menuconfig-check' }}
+      run: |
+        echo "🔍 检查 menuconfig 中的 payload 选项"
+        cd coreboot
+        
+        # 尝试运行 menuconfig 并检查选项
+        docker run --rm --user root \
+          -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+          -w /home/coreboot/coreboot \
+          coreboot/coreboot-sdk:latest \
+          bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
+                   make distclean && \
+                   echo 'n' | make menuconfig 2>&1 | grep -i payload || echo '❌ 未找到 payload 相关选项'"
+
+    - name: 生成测试报告 / Generate Test Report
+      run: |
+        echo "📊 生成 iPXE Payload 支持测试报告"
+        mkdir -p test-reports
+        
+        cat > test-reports/ipxe-payload-test-report.md << EOF
+        # iPXE Payload 支持测试报告
+        
+        **测试时间**: $(date)
+        **测试模式**: ${{ inputs.test_mode }}
+        **MrChromebox 版本**: $(cd coreboot && git rev-parse HEAD)
+        
+        ## 测试结果
+        
+        ### 配置文件检查
+        - CONFIG_PAYLOAD_IPXE 选项: $(grep -r "CONFIG_PAYLOAD_IPXE" coreboot --include="*.kconfig*" --include="Kconfig*" > /dev/null && echo "✅ 存在" || echo "❌ 不存在")
+        - payloads 目录: $(test -d coreboot/payloads && echo "✅ 存在" || echo "❌ 不存在")
+        - iPXE payload 目录: $(test -d coreboot/payloads/ipxe && echo "✅ 存在" || echo "❌ 不存在")
+        
+        ### 结论
+        $(if [ -d coreboot/payloads/ipxe ]; then echo "✅ MrChromebox 可能支持 iPXE payload"; else echo "❌ MrChromebox 不支持 iPXE payload"; fi)
+        
+        ## 建议
+        $(if [ -d coreboot/payloads/ipxe ]; then echo "- 可以尝试使用方案2：标准 Coreboot + iPXE Payload"; else echo "- 建议使用方案1：EDK2 + 运行时 iPXE 集成"; fi)
+        EOF
+        
+        cat test-reports/ipxe-payload-test-report.md
+
+    - name: 上传测试报告 / Upload Test Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: ipxe-payload-test-report-${{ github.run_number }}
+        path: test-reports/
+        retention-days: 30

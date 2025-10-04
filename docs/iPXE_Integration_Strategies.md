@@ -58,9 +58,9 @@ make menuconfig -> Payload -> iPXE
 - 最佳的网络启动性能
 
 ### **测试状态**
-- ❌ 不适用于 MrChromebox
-- 📝 需要标准 coreboot 源码
-- 💡 可作为备选方案
+- ⏳ 待验证 - 需要测试 MrChromebox 是否支持
+- 📝 MrChromebox 基于标准 coreboot，可能支持 iPXE payload
+- 💡 如果支持，这是最佳的集成方案
 
 ---
 
@@ -182,14 +182,14 @@ efi/ipxe/ipxe.efi     # iPXE 专用路径
 
 ### **高优先级**
 1. **方案1** - MrChromebox EDK2 + 运行时 iPXE 集成（当前方案）
-2. **方案5** - 纯 EDK2 网络启动（基础验证）
+2. **方案2** - 标准 Coreboot + iPXE Payload（最佳方案，待验证）
+3. **方案5** - 纯 EDK2 网络启动（基础验证）
 
 ### **中优先级**
-3. **方案4** - QEMU 测试环境（开发测试）
-4. **方案6** - 多路径 iPXE 集成（优化测试）
+4. **方案4** - QEMU 测试环境（开发测试）
+5. **方案6** - 多路径 iPXE 集成（优化测试）
 
 ### **低优先级**
-5. **方案2** - 标准 Coreboot + iPXE Payload（备选方案）
 6. **方案3** - MrChromebox + 预编译 iPXE 编译时集成（已确认不支持）
 
 ---
@@ -198,6 +198,7 @@ efi/ipxe/ipxe.efi     # iPXE 专用路径
 
 ### **阶段1：基础功能验证**
 - [ ] 测试方案1：EDK2 + 运行时 iPXE 集成
+- [ ] 测试方案2：验证 MrChromebox 是否支持 iPXE payload
 - [ ] 测试方案5：纯 EDK2 网络启动
 - [ ] 验证固件编译成功
 - [ ] 检查启动菜单显示
