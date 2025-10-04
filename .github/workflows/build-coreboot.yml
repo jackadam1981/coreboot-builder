@@ -111,7 +111,8 @@ jobs:
           -w /home/coreboot/coreboot \
           coreboot/coreboot-sdk:latest \
           bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
-                   ./build-uefi.sh kaisa"
+                   ./build-uefi.sh kaisa && \
+                   chmod 644 /home/coreboot/roms/*.rom"
     
     - name: 集成 iPXE 到固件 / Integrate iPXE into Firmware
       run: |
@@ -140,6 +141,9 @@ jobs:
         
         # 使用 cbfstool 添加 iPXE 到 CBFS
         echo "🔧 将 iPXE 添加到 CBFS..."
+        
+        # 确保有写权限
+        chmod 644 "$ROM_FILE"
         
         # 添加为 EFI 应用程序
         coreboot/build/cbfstool "$ROM_FILE" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw -c lzma
