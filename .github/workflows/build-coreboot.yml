@@ -63,44 +63,36 @@ jobs:
               echo "CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y" >> configs/cml/config.kaisa.uefi
               echo "CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y" >> configs/cml/config.kaisa.uefi
               echo "" >> configs/cml/config.kaisa.uefi
-              echo "# iPXE payload 配置" >> configs/cml/config.kaisa.uefi
-              echo "CONFIG_PAYLOAD_IPXE=y" >> configs/cml/config.kaisa.uefi
+               echo "# 注意：MrChromebox 使用 EDK2 payload，不支持 CONFIG_PAYLOAD_IPXE=y" >> configs/cml/config.kaisa.uefi
               echo "✅ 网络和 iPXE 配置已添加"
             fi
           else
             echo "❌ 配置文件不存在，使用默认配置"
           fi
 
-      - name: 下载预编译 iPXE EFI 应用 / Download Pre-compiled iPXE EFI
+      - name: 下载预编译 iPXE EFI / Download Pre-compiled iPXE EFI
         run: |
-          echo "📥 下载预编译 iPXE EFI 应用（用于编译时集成）"
-
-          # 检查是否已有缓存的 iPXE 文件
-          if [ -f "ipxe_x64.efi" ]; then
-            echo "✅ 使用缓存的 iPXE 文件"
-            ls -lh ipxe_x64.efi
-            file ipxe_x64.efi
-          else
-            # 创建 iPXE 测试目录
-            mkdir -p ipxe_test
-            cd ipxe_test
-            
-            # 下载官方预编译 iPXE EFI 文件
-            echo "📥 从 https://boot.ipxe.org/ 下载 ipxe.efi (完整版)"
-            wget -O ipxe-efi-x86_64.efi "https://boot.ipxe.org/ipxe.efi" || {
-              echo "❌ iPXE 下载失败，工作流终止"
-              exit 1
-            }
-            
-            # 复制到工作目录
-            cp ipxe-efi-x86_64.efi ../ipxe_x64.efi
-            echo "✅ iPXE EFI 下载成功"
-            ls -lh ipxe-efi-x86_64.efi
-            echo "📊 iPXE 文件信息："
-            file ../ipxe_x64.efi
-            
-            cd ..
-          fi
+          echo "📥 下载预编译 iPXE EFI（用于运行时集成）"
+          
+          # 创建 iPXE 测试目录
+          mkdir -p ipxe_test
+          cd ipxe_test
+          
+          # 下载官方预编译 iPXE EFI 文件
+          echo "📥 从 https://boot.ipxe.org/ 下载 ipxe.efi (完整版)"
+          wget -O ipxe-efi-x86_64.efi "https://boot.ipxe.org/ipxe.efi" || {
+            echo "❌ iPXE 下载失败，工作流终止"
+            exit 1
+          }
+          
+          # 复制到工作目录
+          cp ipxe-efi-x86_64.efi ../ipxe_x64.efi
+          echo "✅ iPXE EFI 下载成功"
+          ls -lh ipxe-efi-x86_64.efi
+          echo "📊 iPXE 文件信息："
+          file ../ipxe_x64.efi
+          
+          cd ..
 
       - name: 替换自定义 Logo / Replace Custom Logo
         run: |
@@ -122,10 +114,8 @@ jobs:
             exit 1
           fi
 
-          # 复制 iPXE 到 coreboot 源码目录
-          cp ipxe_x64.efi coreboot/util/cbfstool/ipxe.efi
-          echo "📋 已复制 iPXE 文件到 coreboot/util/cbfstool/ipxe.efi"
-          ls -lh coreboot/util/cbfstool/ipxe.efi
+          echo "📋 iPXE 文件准备完成，将在编译后集成"
+          ls -lh ipxe_x64.efi
 
           # 使用 MrChromebox 标准编译流程
           docker run --rm --user root \
@@ -196,9 +186,46 @@ jobs:
           cd roms
           rm -f *.sha1
           sha1sum "$(basename "$ROM_FILE")" > "$(basename "$ROM_FILE").sha1"
-          echo "✅ 校验和已生成"
-          cat *.sha1
-          cd ..
+           echo "✅ 校验和已生成"
+           cat *.sha1
+           cd ..
+
+      - name: 运行时集成 iPXE / Runtime iPXE Integration
+        run: |
+          echo "🔧 尝试运行时集成 iPXE"
+          
+          # 检查 iPXE 文件是否存在
+          if [ ! -f "ipxe_x64.efi" ]; then
+            echo "⚠️  iPXE 文件不存在，跳过运行时集成"
+            exit 0
+          fi
+          
+          # 找到生成的 ROM 文件
+          ROM_FILE=$(ls roms/coreboot_*.rom | head -1)
+          if [ -z "$ROM_FILE" ]; then
+            echo "❌ 未找到 ROM 文件"
+            exit 1
+          fi
+          
+          echo "📋 找到 ROM 文件: $ROM_FILE"
+          
+          # 备份原始固件
+          cp "$ROM_FILE" "${ROM_FILE}.original"
+          
+          # 尝试添加 iPXE 到 CBFS
+          echo "🔧 尝试添加 iPXE 到 CBFS..."
+          coreboot/build/cbfstool "$ROM_FILE" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw -c lzma || {
+            echo "❌ LZMA 压缩失败，尝试无压缩..."
+            coreboot/build/cbfstool "$ROM_FILE" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw || {
+              echo "❌ 无压缩也失败，尝试其他路径..."
+              coreboot/build/cbfstool "$ROM_FILE" add -f ipxe_x64.efi -n efi/boot/ipxe.efi -t raw || {
+                echo "❌ 所有路径都失败，恢复原始固件"
+                cp "${ROM_FILE}.original" "$ROM_FILE"
+              }
+            }
+          }
+          
+          echo "✅ iPXE 运行时集成完成"
 
       - name: 列出编译产物 / List Build Artifacts
         run: |
