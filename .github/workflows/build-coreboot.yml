@@ -188,13 +188,16 @@ jobs:
         echo ""
         echo "🔧 添加 iPXE 到 CBFS（使用 LZMA 压缩）..."
         
-        # 尝试使用不同的路径和压缩方式
-        echo "🔧 尝试方案1：efi/boot/ipxe.efi（无压缩）"
-        coreboot/build/cbfstool "$INTEGRATED_ROM" add -f ipxe_x64.efi -n efi/boot/ipxe.efi -t raw || {
-          echo "❌ 方案1失败，尝试方案2：efi/ipxe/ipxe.efi（LZ4压缩）"
-          coreboot/build/cbfstool "$INTEGRATED_ROM" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw -c lz4 || {
-            echo "❌ 方案2失败，尝试方案3：efi/ipxe/ipxe.efi（LZMA压缩）"
-            coreboot/build/cbfstool "$INTEGRATED_ROM" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw -c lzma
+        # 尝试多种路径确保 iPXE 出现在启动菜单中
+        echo "🔧 尝试方案1：efi/boot/bootx64.efi（标准启动文件）"
+        coreboot/build/cbfstool "$INTEGRATED_ROM" add -f ipxe_x64.efi -n efi/boot/bootx64.efi -t raw || {
+          echo "❌ 方案1失败，尝试方案2：efi/boot/ipxe.efi（无压缩）"
+          coreboot/build/cbfstool "$INTEGRATED_ROM" add -f ipxe_x64.efi -n efi/boot/ipxe.efi -t raw || {
+            echo "❌ 方案2失败，尝试方案3：efi/ipxe/ipxe.efi（无压缩）"
+            coreboot/build/cbfstool "$INTEGRATED_ROM" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw || {
+              echo "❌ 方案3失败，尝试方案4：efi/ipxe/ipxe.efi（LZMA压缩）"
+              coreboot/build/cbfstool "$INTEGRATED_ROM" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw -c lzma
+            }
           }
         }
         
@@ -219,6 +222,14 @@ jobs:
         echo ""
         echo "=== 查找 EFI 相关条目 ==="
         coreboot/build/cbfstool "$ROM_FILE" print | grep -i efi || echo "❌ 未找到 EFI 条目"
+        
+        echo ""
+        echo "=== 查找 boot 相关条目 ==="
+        coreboot/build/cbfstool "$ROM_FILE" print | grep -i boot || echo "❌ 未找到 boot 条目"
+        
+        echo ""
+        echo "=== 检查 EFI 应用程序类型 ==="
+        coreboot/build/cbfstool "$ROM_FILE" print | grep -E "(efi|boot)" | head -10
         
         echo ""
         echo "=== 检查 iPXE 文件大小 ==="
