@@ -81,12 +81,9 @@ jobs:
         # 创建 iPXE 嵌入式脚本（支持自定义 WDS 服务器配置）
         cat > ipxe_embed.ipxe << EOF
         #!ipxe
-        echo ========================================
-        echo iPXE 网络启动环境
-        echo ========================================
-        echo.
-        dhcp || echo DHCP 失败，尝试手动配置网络
-        autoboot || shell
+        dhcp
+        autoboot
+        shell
         EOF
         
         # 编译 iPXE（添加硬件兼容性支持）
