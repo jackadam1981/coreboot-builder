@@ -58,7 +58,8 @@ make menuconfig -> Payload -> iPXE
 - 最佳的网络启动性能
 
 ### **测试状态**
-- ⏳ 待验证 - 需要测试 MrChromebox 是否支持
+- ✅ 工作流已创建：`2-strategy-standard-ipxe-payload.yml`
+- ⏳ 待测试 - 需要验证 MrChromebox 是否支持 iPXE payload
 - 📝 MrChromebox 基于标准 coreboot，可能支持 iPXE payload
 - 💡 如果支持，这是最佳的集成方案
 
@@ -85,8 +86,9 @@ cp ipxe_x64.efi coreboot/util/cbfstool/ipxe.efi
 - 启动时直接执行 iPXE
 
 ### **测试状态**
+- ✅ 工作流已创建：`3-strategy-mrchromebox-compiletime-ipxe.yml`
 - ❌ MrChromebox 不支持 CONFIG_PAYLOAD_IPXE=y
-- 📝 已尝试，失败
+- 📝 历史记录测试，用于对比验证
 - 💡 不适合 MrChromebox 架构
 
 ---
@@ -113,9 +115,10 @@ cbfstool qemu_bios.rom add -f ipxe.efi -n efi/boot/bootx64.efi
 - 测试压缩对启动的影响
 
 ### **测试状态**
-- ✅ 工作流已实现（test-ipxe-qemu.yml）
+- ✅ 工作流已创建：`4-strategy-qemu-test-environment.yml`
 - ⏳ 待测试
 - 📝 测试要点：QEMU PXE 启动、不同路径测试
+- 🔧 支持多种测试模式：full-test, ipxe-only, bios-only
 
 ---
 
@@ -142,8 +145,10 @@ CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y
 - 功能相对简单但稳定
 
 ### **测试状态**
+- ✅ 工作流已创建：`5-strategy-pure-edk2-network.yml`
 - ⏳ 待测试
 - 📝 测试要点：EDK2 PXE 功能、网络启动能力
+- 🎯 作为方案1的对比基准
 
 ---
 
@@ -172,9 +177,11 @@ efi/ipxe/ipxe.efi     # iPXE 专用路径
 - 提高 iPXE 在启动菜单中的可见性
 
 ### **测试状态**
-- ✅ 工作流已实现（多路径尝试）
+- ✅ 工作流已创建：`6-strategy-multipath-ipxe-integration.yml`
 - ⏳ 待测试
 - 📝 测试要点：不同路径的启动成功率
+- 🔧 自动生成最佳集成方式推荐
+- 📊 详细的 CSV 测试结果报告
 
 ---
 
