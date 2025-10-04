@@ -29,8 +29,7 @@
 - `coreboot_kaisa_without_ipxe.rom` - 原始版本
 
 **iPXE 启动文件：**
-- `ipxe_x64.efi` - iPXE EFI 应用程序
-- `ipxe_boot.iso` - iPXE ISO 镜像（兼容 Ventoy）
+- `ipxe_x64.efi` - iPXE EFI 应用程序（支持 DHCP 自动 PXE 引导）
 
 ### 3. 刷写固件
 
@@ -72,9 +71,9 @@ iPXE 会自动尝试以下服务器地址：
 
 刷写集成版本固件后，启动菜单会显示 iPXE 选项，无需外部设备。
 
-### 启动优盘
+### DHCP 自动引导
 
-使用 `ipxe_boot.iso` 制作启动优盘，兼容 Ventoy，支持各种网卡和网络环境。
+配置 DHCP 服务器，iPXE 会自动通过 PXE 引导 WDS。
 
 ### 手动加载
 

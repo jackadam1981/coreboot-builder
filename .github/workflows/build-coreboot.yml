@@ -158,22 +158,9 @@ jobs:
                      ENABLE_PXE=y \
                      ENABLE_REALTEK=y && \
                    cp bin-x86_64-efi/ipxe.efi /workspace/ipxe_x64.efi && \
-                   echo '✅ iPXE EFI 编译成功' && \
-                   echo '🔧 编译 iPXE ISO（支持所有网卡）...' && \
-                   echo '📥 下载 isolinux.bin 到 iPXE 源码目录...' && \
-                   wget -O isolinux.bin https://mirrors.aliyun.com/centos/7/os/x86_64/isolinux/isolinux.bin && \
-                   ls -la isolinux.bin && \
-                   make bin/ipxe.iso \
-                     EMBED=ipxe_embed.ipxe \
-                     NO_WERROR=1 \
-                     ENABLE_HTTP_BOOT=y \
-                     ENABLE_HTTPS=y \
-                     ENABLE_DHCP=y \
-                     ENABLE_PXE=y && \
-                   cp bin/ipxe.iso /workspace/ipxe_boot.iso && \
-                   echo '✅ iPXE ISO 编译成功'"
+                   echo '✅ iPXE EFI 编译成功'"
         
-        ls -lh ipxe_x64.efi ipxe_boot.iso || echo "❌ iPXE 编译失败"
+        ls -lh ipxe_x64.efi || echo "❌ iPXE 编译失败"
         
         # 验证 iPXE EFI 文件
         if [ -f "ipxe_x64.efi" ]; then
@@ -198,22 +185,6 @@ jobs:
           echo "❌ iPXE EFI 文件不存在"
         fi
         
-        # 验证 iPXE ISO 文件
-        if [ -f "ipxe_boot.iso" ]; then
-          echo ""
-          echo "✅ iPXE ISO 文件已生成"
-          file ipxe_boot.iso
-          echo "ISO 文件大小: $(ls -lh ipxe_boot.iso | awk '{print $5}')"
-          
-          echo ""
-          echo "🔍 检查 ISO 文件中的网卡驱动支持："
-          # 检查 ISO 文件中的驱动字符串
-          strings ipxe_boot.iso | grep -i "rtl816" && echo "✅ 包含 RTL816 系列驱动" || echo "❌ 未找到 RTL816 驱动"
-          strings ipxe_boot.iso | grep -i "e1000" && echo "✅ 包含 E1000 驱动" || echo "❌ 未找到 E1000 驱动"
-          strings ipxe_boot.iso | grep -i "broadcom" && echo "✅ 包含 Broadcom 驱动" || echo "❌ 未找到 Broadcom 驱动"
-        else
-          echo "❌ iPXE ISO 文件不存在"
-        fi
 
     - name: 编译固件 / Build Firmware
       run: |
@@ -347,7 +318,6 @@ jobs:
         name: ipxe-boot-files-${{ github.run_number }}
         path: |
           ipxe_x64.efi
-          ipxe_boot.iso
         retention-days: 30
 
     - name: 上传校验和 / Upload Checksums
@@ -421,47 +391,29 @@ jobs:
           - `coreboot_kaisa_without_ipxe.rom.sha1` - 原始版本校验和
           
           **iPXE 启动文件 / iPXE Boot Files:**
-          - `ipxe_x64.efi` - iPXE EFI 应用程序（RTL8168 优化，可手动加载）
-          - `ipxe_boot.iso` - iPXE ISO 镜像（支持所有网卡，兼容 Ventoy）
+          - `ipxe_x64.efi` - iPXE EFI 应用程序（RTL8168 优化，支持 DHCP 自动 PXE 引导）
           
           ### iPXE 文件说明 / iPXE Files Description
           
           **ipxe_x64.efi**：
           - 专门为 RTL8111H/RTL8168 网卡优化
           - 文件较小，适合固件集成
+          - 支持 DHCP 自动 PXE 引导 WDS
           - 可在 UEFI Shell 中手动加载
-          
-          **ipxe_boot.iso**：
-          - 包含所有主流网卡驱动支持
-          - 支持 Intel、Realtek、Broadcom、Marvell 等
           - 智能 WDS 服务器自动发现
-          - 支持 DHCP 配置和手动配置
-          - 兼容 Ventoy，可直接复制到 Ventoy 分区使用
           
           ### WDS 服务器配置 / WDS Server Configuration
           
-          iPXE 启动文件支持多种 WDS 服务器配置方式：
+          iPXE 支持 DHCP 自动 PXE 引导 WDS：
           
-          1. **DHCP 自动配置**（推荐）
-             - 在 DHCP 服务器中设置 option 66 (next-server) 和 option 67 (filename)
-             - iPXE 会自动使用这些信息连接 WDS 服务器
-             - 标准 WDS 启动文件：`boot/x64/wdsmgfw.efi` (UEFI) 或 `boot/x64/wdsnbp.com` (BIOS)
+          **DHCP 自动配置**（推荐方式）
+          - 在 DHCP 服务器中设置 option 66 (next-server) 和 option 67 (filename)
+          - iPXE 会自动使用这些信息连接 WDS 服务器
+          - 标准 WDS 启动文件：`boot/x64/wdsmgfw.efi` (UEFI) 或 `boot/x64/wdsnbp.com` (BIOS)
           
-          2. **工作流自定义配置**
-             - 运行工作流时可指定 WDS 服务器地址和启动文件
-             - iPXE 会优先尝试自定义的 WDS 服务器
-          
-          3. **自动发现**
-             - 尝试网关地址作为 WDS 服务器
-             - 尝试私有地址段的服务器地址：
-               - 192.168.0.10, 192.168.1.10, 192.168.10.10
-               - 10.0.0.10, 10.0.1.10, 10.0.10.10
-               - 172.16.0.10
-             - 优先支持 UEFI 启动文件：bootmgr.efi, bootx64.efi
-          
-          4. **手动配置**
-             - 失败时进入 iPXE shell
-             - 可手动设置服务器地址和启动文件
+          **自动发现备用方案**
+          - 如果 DHCP 未配置，iPXE 会自动尝试常见地址
+          - 支持私有地址段扫描：192.168.x.10, 10.0.x.10, 172.16.0.10
           
           
         files: |
