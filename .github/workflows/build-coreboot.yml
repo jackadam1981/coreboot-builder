@@ -187,8 +187,15 @@ jobs:
         echo ""
         echo "🔧 添加 iPXE 到 CBFS（使用 LZMA 压缩）..."
         
-        # 使用 LZMA 压缩以适配 CBFS 空间限制
-        coreboot/build/cbfstool "$INTEGRATED_ROM" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw -c lzma
+        # 尝试使用不同的路径和压缩方式
+        echo "🔧 尝试方案1：efi/boot/ipxe.efi（无压缩）"
+        coreboot/build/cbfstool "$INTEGRATED_ROM" add -f ipxe_x64.efi -n efi/boot/ipxe.efi -t raw || {
+          echo "❌ 方案1失败，尝试方案2：efi/ipxe/ipxe.efi（LZ4压缩）"
+          coreboot/build/cbfstool "$INTEGRATED_ROM" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw -c lz4 || {
+            echo "❌ 方案2失败，尝试方案3：efi/ipxe/ipxe.efi（LZMA压缩）"
+            coreboot/build/cbfstool "$INTEGRATED_ROM" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw -c lzma
+          }
+        }
         
         # 显示集成后的 CBFS 空间信息
         echo ""
