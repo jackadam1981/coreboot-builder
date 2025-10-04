@@ -137,9 +137,9 @@ jobs:
             coreboot/coreboot-sdk:latest \
             bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
                      make distclean && \
-                     # 直接复制我们的 defconfig 作为 .config \
+                     # 直接复制我们的 defconfig 作为 .config
                      cp defconfig .config && \
-                     # 运行 olddefconfig 来补全缺失的配置项 \
+                     # 运行 olddefconfig 来补全缺失的配置项
                      make olddefconfig && \
                      echo '✅ 最终配置生成完成'"
 
