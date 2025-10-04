@@ -203,19 +203,29 @@ jobs:
           ### 固件说明 / Firmware Description
           本次构建包含**两个版本**的固件：
           
-          1. **coreboot_*.rom** - 集成了 iPXE 的完整固件 ⭐**推荐**
+          1. **coreboot_edk2-kaisa-mrchromebox_*.rom** - 集成了 iPXE 的完整固件 ⭐**推荐**
              - 包含 iPXE EFI 应用在 CBFS 中
              - 启动菜单会显示 iPXE 选项
              - 无需 U 盘即可网络启动
+             - 文件大小：约 16MB（包含 iPXE）
           
           2. **coreboot_kaisa_without_ipxe.rom** - 不含 iPXE 的原始固件
              - 仅包含 EDK2 原生网络栈
-             - 需要外部 iPXE 文件
+             - 需要外部 iPXE 文件（U 盘加载）
+             - 文件大小：约 15MB（不含 iPXE）
+             - 适合需要更小固件或自定义 iPXE 的用户
           
           ### 使用说明 / Instructions
-          1. 下载 `coreboot_*.rom` 固件（包含 iPXE）
-          2. 使用 flashrom 刷写：`flashrom -p internal -w coreboot_*.rom`
+          
+          **推荐使用集成 iPXE 版本：**
+          1. 下载 `coreboot_edk2-kaisa-mrchromebox_*.rom`
+          2. 使用 flashrom 刷写：`flashrom -p internal -w coreboot_edk2-kaisa-mrchromebox_*.rom`
           3. 重启后在 UEFI 启动菜单选择 iPXE
+          
+          **或者使用原始版本 + 手动 iPXE：**
+          1. 下载 `coreboot_kaisa_without_ipxe.rom`
+          2. 使用 flashrom 刷写：`flashrom -p internal -w coreboot_kaisa_without_ipxe.rom`
+          3. 准备 iPXE U 盘，启动时加载 `ipxe.efi`
           
           ### 固件特性 / Features
           - ✅ 完整 UEFI 环境（MrChromebox EDK2）
@@ -230,9 +240,14 @@ jobs:
           3. 自动进入 iPXE 网络启动环境
           4. 支持 DHCP、HTTP、HTTPS 等协议
           
+          ### 文件清单 / File List
+          - `coreboot_edk2-kaisa-mrchromebox_YYYYMMDD.rom` - 集成 iPXE 版本（推荐）
+          - `coreboot_kaisa_without_ipxe.rom` - 原始版本
+          - `*.sha1` - 校验和文件
+          
           
         files: |
-          roms/*.rom
+          roms/coreboot_*.rom
           roms/*.sha1
         draft: false
         prerelease: false
