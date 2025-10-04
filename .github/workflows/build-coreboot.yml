@@ -88,54 +88,19 @@ jobs:
         # 创建 iPXE 嵌入式脚本（支持自定义 WDS 服务器配置）
         cat > ipxe_embed.ipxe << EOF
         #!ipxe
-        echo ========================================
-        echo iPXE Network Boot Environment
-        echo WDS Server Auto-Detection
-        echo ========================================
-        echo.
-        echo Initializing network interface...
-        dhcp net0 || dhcp || echo Network init failed
-        echo.
-        echo Network configured successfully
-        echo IP: ${ip} Gateway: ${gateway} DNS: ${dns}
-        echo.
-        echo Detecting WDS server configuration...
+        echo iPXE Network Boot - WDS Auto-Detection
+        dhcp net0 || dhcp
         
-        # 检查 DHCP 是否提供了 WDS 服务器信息
-        isset ${next-server} && echo Next server: ${next-server}
-        isset ${filename} && echo Boot file: ${filename}
-        
-        # 如果 DHCP 提供了完整的启动信息，直接使用
-        isset ${next-server} && isset ${filename} && {
-          echo Using DHCP provided WDS server...
-          chain tftp://${next-server}/${filename}
+        # 优先使用 DHCP 提供的 WDS 信息
+        isset \${next-server} && isset \${filename} && {
+          chain tftp://\${next-server}/\${filename}
         }
         
-        # 否则尝试自动发现 WDS 服务器
-        echo DHCP WDS info not found, trying auto-discovery...
-        
-        # 尝试自定义 WDS 服务器（如果用户指定了）
-        ${{ inputs.wds_server && inputs.wds_boot_file && format('chain tftp://{0}/{1} || ', inputs.wds_server, inputs.wds_boot_file) || '' }}chain tftp://${gateway}/boot/x64/wdsmgfw.efi || \
-        chain tftp://${gateway}/boot/x64/wdsnbp.com || \
+        # 自动发现 WDS 服务器
+        ${{ inputs.wds_server && inputs.wds_boot_file && format('chain tftp://{0}/{1} || ', inputs.wds_server, inputs.wds_boot_file) || '' }}chain tftp://\${gateway}/boot/x64/wdsmgfw.efi || \
         chain tftp://192.168.0.10/boot/x64/wdsmgfw.efi || \
-        chain tftp://192.168.0.10/boot/x64/wdsnbp.com || \
-        chain tftp://192.168.1.10/boot/x64/wdsmgfw.efi || \
-        chain tftp://192.168.1.10/boot/x64/wdsnbp.com || \
-        chain tftp://192.168.10.10/boot/x64/wdsmgfw.efi || \
-        chain tftp://192.168.10.10/boot/x64/wdsnbp.com || \
-        chain tftp://10.0.0.10/boot/x64/wdsmgfw.efi || \
-        chain tftp://10.0.0.10/boot/x64/wdsnbp.com || \
-        chain tftp://10.0.1.10/boot/x64/wdsmgfw.efi || \
-        chain tftp://10.0.1.10/boot/x64/wdsnbp.com || \
-        chain tftp://10.0.10.10/boot/x64/wdsmgfw.efi || \
-        chain tftp://10.0.10.10/boot/x64/wdsnbp.com || \
-        chain tftp://172.16.0.10/boot/x64/wdsmgfw.efi || \
-        chain tftp://172.16.0.10/boot/x64/wdsnbp.com || {
-          echo All WDS servers failed, entering shell
-          echo You can manually configure WDS server:
-          echo   set next-server <WDS_IP>
-          echo   chain tftp://\${next-server}/boot/x64/wdsmgfw.efi
-          echo   # or try: chain tftp://\${next-server}/boot/x64/wdsnbp.com
+        chain tftp://10.0.0.10/boot/x64/wdsmgfw.efi || {
+          echo WDS server not found, entering shell
           shell
         }
         EOF
@@ -148,12 +113,10 @@ jobs:
           bash -c "git clone https://github.com/ipxe/ipxe.git ipxe_src && \
                    cd ipxe_src/src && \
                    cp /workspace/ipxe_embed.ipxe . && \
-                   echo '🔧 编译 iPXE EFI（启用网络驱动支持）...' && \
+                   echo '🔧 编译 iPXE EFI（精简版，适合固件集成）...' && \
                    make bin-x86_64-efi/ipxe.efi \
                      EMBED=ipxe_embed.ipxe \
                      NO_WERROR=1 \
-                     ENABLE_HTTP_BOOT=y \
-                     ENABLE_HTTPS=y \
                      ENABLE_DHCP=y \
                      ENABLE_PXE=y \
                      ENABLE_REALTEK=y && \
