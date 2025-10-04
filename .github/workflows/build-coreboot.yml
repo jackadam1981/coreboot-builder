@@ -101,6 +101,8 @@ jobs:
         cp ipxe-efi-x86_64.efi ../ipxe_x64.efi
         echo "✅ iPXE EFI 下载成功"
         ls -lh ipxe-efi-x86_64.efi
+        echo "📊 iPXE 文件信息："
+        file ../ipxe_x64.efi
         
         cd ..
         
@@ -110,9 +112,16 @@ jobs:
         mkdir -p roms
         echo "📦 编译固件 with 编译时 iPXE 集成"
         
+        # 检查 iPXE 文件是否存在
+        if [ ! -f "ipxe_x64.efi" ]; then
+          echo "❌ iPXE 文件不存在，无法集成"
+          exit 1
+        fi
+        
         # 复制 iPXE 到 coreboot 源码目录
         cp ipxe_x64.efi coreboot/util/cbfstool/ipxe.efi
         echo "📋 已复制 iPXE 文件到 coreboot/util/cbfstool/ipxe.efi"
+        ls -lh coreboot/util/cbfstool/ipxe.efi
         
         # 使用 MrChromebox 标准编译流程
         docker run --rm --user root \
