@@ -129,7 +129,7 @@ jobs:
           echo "🔧 生成最终的 .config 文件"
           cd coreboot
           
-          # 使用 defconfig 生成最终的 .config
+          # 直接使用我们的 defconfig 作为基础配置
           docker run --rm --user root \
             -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
             -v ${{ github.workspace }}/ipxe_files:/home/coreboot/ipxe_files \
@@ -137,7 +137,10 @@ jobs:
             coreboot/coreboot-sdk:latest \
             bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
                      make distclean && \
-                     make defconfig && \
+                     # 直接复制我们的 defconfig 作为 .config \
+                     cp defconfig .config && \
+                     # 运行 olddefconfig 来补全缺失的配置项 \
+                     make olddefconfig && \
                      echo '✅ 最终配置生成完成'"
 
       - name: 验证配置 / Verify Configuration
