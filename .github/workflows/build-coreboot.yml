@@ -161,6 +161,12 @@ jobs:
         echo "📋 ROM 文件: $ROM_FILE"
         echo "📋 iPXE 文件: ipxe_x64.efi ($(ls -lh ipxe_x64.efi | awk '{print $5}'))"
         
+        # 显示 iPXE 文件详细信息
+        echo ""
+        echo "📊 iPXE 文件详细信息："
+        ls -la ipxe_x64.efi
+        file ipxe_x64.efi
+        
         # 备份原始固件
         cp "$ROM_FILE" "${ROM_FILE}.original"
         cp "$ROM_FILE" "roms/coreboot_kaisa_without_ipxe.rom"
@@ -172,11 +178,22 @@ jobs:
         # 使用 cbfstool 添加 iPXE 到新文件
         echo "🔧 将 iPXE 添加到新固件文件：$INTEGRATED_ROM"
         
-        # 根据官方文档，使用正确的路径和类型
-        echo "🔧 添加 iPXE 到 CBFS（使用官方推荐方式）..."
+        # 显示集成前的 CBFS 空间信息
+        echo ""
+        echo "📊 集成前 CBFS 空间信息："
+        coreboot/build/cbfstool "$INTEGRATED_ROM" print | head -20
         
-        # 官方推荐：添加到 efi/ipxe/ipxe.efi 路径，不压缩（按 iPXE 官方建议）
-        coreboot/build/cbfstool "$INTEGRATED_ROM" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw
+        # 根据官方文档，使用正确的路径和类型
+        echo ""
+        echo "🔧 添加 iPXE 到 CBFS（使用 LZMA 压缩）..."
+        
+        # 使用 LZMA 压缩以适配 CBFS 空间限制
+        coreboot/build/cbfstool "$INTEGRATED_ROM" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw -c lzma
+        
+        # 显示集成后的 CBFS 空间信息
+        echo ""
+        echo "📊 集成后 CBFS 空间信息："
+        coreboot/build/cbfstool "$INTEGRATED_ROM" print | head -20
         
         # 替换原始文件
         mv "$INTEGRATED_ROM" "$ROM_FILE"
