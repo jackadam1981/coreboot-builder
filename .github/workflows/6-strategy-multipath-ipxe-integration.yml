@@ -155,15 +155,17 @@ jobs:
           # 创建测试结果目录
           mkdir -p integration_tests
           
-          # 定义测试路径和压缩方式
-          declare -a PATHS=("efi/boot/bootx64.efi" "efi/boot/ipxe.efi" "efi/ipxe/ipxe.efi" "efi/tools/ipxe.efi")
-          declare -a COMPRESSIONS=("none" "lzma")
+          # 使用优化的集成策略：单一推荐路径，按压缩优先级测试
+          declare -a PATHS=("efi/ipxe/ipxe.efi")  # coreboot 推荐路径
+          declare -a COMPRESSIONS=("none" "lz4" "lzma")  # 按优先级排序：无压缩 > LZ4 > LZMA
           
           # 测试结果记录
           echo "路径,压缩方式,集成结果,文件大小,CBFS条目" > integration_tests/test_results.csv
           
           echo ""
-          echo "🧪 开始多路径集成测试..."
+          echo "🧪 开始优化的 iPXE 集成测试..."
+          echo "📋 测试策略：单一推荐路径 efi/ipxe/ipxe.efi"
+          echo "📋 压缩优先级：无压缩 > LZ4 > LZMA"
           
           # 测试每个路径和压缩方式的组合
           for path in "${PATHS[@]}"; do
@@ -175,11 +177,13 @@ jobs:
               TEST_ROM="${ROM_FILE%.*}_${path//\//_}_${compression}.rom"
               cp "$ROM_FILE" "$TEST_ROM"
               
-              # 尝试集成
+              # 尝试集成（支持三种压缩方式）
               if [ "$compression" = "lzma" ]; then
                 COMPRESS_FLAG="-c lzma"
+              elif [ "$compression" = "lz4" ]; then
+                COMPRESS_FLAG="-c lz4"
               else
-                COMPRESS_FLAG=""
+                COMPRESS_FLAG=""  # 无压缩
               fi
               
               # 执行集成命令

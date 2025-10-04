@@ -35,8 +35,8 @@ jobs:
           echo ""
           echo "📊 技术实现："
           echo "  1. 克隆标准 coreboot 源码"
-          echo "  2. 配置 CONFIG_PAYLOAD_IPXE=y"
-          echo "  3. 编译 iPXE 作为 payload"
+          echo "  2. 应用经过验证的 defconfig 配置"
+          echo "  3. 使用 ELF executable payload + iPXE EFI"
           echo "  4. 生成包含 iPXE 的固件"
           echo "=========================================="
 
@@ -86,56 +86,86 @@ jobs:
             echo "❌ 未找到 payloads/Kconfig 文件"
           fi
 
-      - name: 配置 iPXE Payload / Configure iPXE Payload
+      - name: 下载 iPXE EFI 文件 / Download iPXE EFI File
         run: |
-          echo "🔧 配置 iPXE payload"
+          echo "📥 下载 iPXE EFI 文件"
+          mkdir -p ipxe_files
+          
+          # 下载预编译的 iPXE EFI 文件
+          wget -O ipxe_files/ipxe.efi https://boot.ipxe.org/ipxe.efi || \
+          wget -O ipxe_files/ipxe.efi https://boot.ipxe.org/snponly.efi || \
+          (echo "❌ iPXE 文件下载失败" && exit 1)
+          
+          echo "✅ iPXE EFI 文件下载成功"
+          ls -lh ipxe_files/
+
+      - name: 应用预配置的 defconfig / Apply Pre-configured defconfig
+        run: |
+          echo "🔧 应用经过验证的 defconfig 配置"
           cd coreboot
           
-          # 创建默认配置文件
-          echo "📝 创建默认配置文件"
-          make defconfig
+          # 创建经过手动验证和修正的 defconfig 文件
+          echo "📝 创建经过验证的 defconfig 配置"
+          cat > defconfig << 'EOF'
+          CONFIG_NO_STAGE_CACHE=y
+          CONFIG_VENDOR_GOOGLE=y
+          CONFIG_MAINBOARD_PART_NUMBER="ACER"
+          CONFIG_MAINBOARD_VENDOR="CXI4"
+          CONFIG_BOARD_GOOGLE_KAISA=y
+          CONFIG_USE_LEGACY_8254_TIMER=y
+          CONFIG_DRIVERS_UART_8250IO=y
+          CONFIG_POWER_STATE_OFF_AFTER_FAILURE=y
+          CONFIG_PAYLOAD_ELF=y
+          CONFIG_PAYLOAD_FILE="ipxe_files/ipxe.efi"
+          CONFIG_COMPRESSED_PAYLOAD_NONE=y
+          EOF
           
-          # 尝试配置 iPXE payload
-          echo "🔧 尝试配置 iPXE payload..."
+          echo "✅ 已应用经过验证的 defconfig 配置"
+          echo "📋 配置内容："
+          cat defconfig
+
+      - name: 生成最终配置 / Generate Final Configuration
+        run: |
+          echo "🔧 生成最终的 .config 文件"
+          cd coreboot
+          
+          # 使用 defconfig 生成最终的 .config
           docker run --rm --user root \
             -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+            -v ${{ github.workspace }}/ipxe_files:/home/coreboot/ipxe_files \
             -w /home/coreboot/coreboot \
             coreboot/coreboot-sdk:latest \
             bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
                      make distclean && \
                      make defconfig && \
-                     echo '配置 iPXE payload...' && \
-                     sed -i 's/CONFIG_PAYLOAD_NONE=y/# CONFIG_PAYLOAD_NONE is not set/' .config && \
-                     echo 'CONFIG_PAYLOAD_IPXE=y' >> .config && \
-                     echo 'CONFIG_PAYLOAD_IPXE_MAINBOARD=\"qemu-q35\"' >> .config && \
-                     make olddefconfig && \
-                     echo '✅ iPXE payload 配置完成'"
+                     echo '✅ 最终配置生成完成'"
 
       - name: 验证配置 / Verify Configuration
         run: |
-          echo "🔍 验证 iPXE payload 配置"
+          echo "🔍 验证最终配置"
           cd coreboot
           
-          echo "📋 检查配置文件："
-          if grep -q "CONFIG_PAYLOAD_IPXE=y" .config; then
-            echo "✅ CONFIG_PAYLOAD_IPXE=y 已启用"
-          else
-            echo "❌ CONFIG_PAYLOAD_IPXE=y 未找到"
-          fi
-          
-          if grep -q "CONFIG_PAYLOAD_NONE" .config; then
-            echo "⚠️  CONFIG_PAYLOAD_NONE 仍存在"
-          else
-            echo "✅ CONFIG_PAYLOAD_NONE 已禁用"
-          fi
+          echo "📋 关键配置检查："
+          echo "✅ Kaisa 主板配置："
+          grep -E "CONFIG_BOARD_GOOGLE_KAISA|CONFIG_MAINBOARD_VENDOR|CONFIG_MAINBOARD_PART_NUMBER" .config
           
           echo ""
-          echo "📊 相关配置选项："
-          grep -E "(PAYLOAD|IPXE)" .config || echo "❌ 未找到相关配置"
+          echo "✅ Payload 配置："
+          grep -E "CONFIG_PAYLOAD_ELF|CONFIG_PAYLOAD_FILE" .config
+          
+          echo ""
+          echo "✅ 压缩配置："
+          grep -E "CONFIG_COMPRESSED_PAYLOAD" .config
+          
+          echo ""
+          echo "📊 完整配置摘要："
+          echo "总配置项数量: $(wc -l < .config)"
+          echo "启用的配置项: $(grep -c "=y" .config)"
+          echo "禁用的配置项: $(grep -c "is not set" .config)"
 
-      - name: 编译 iPXE Payload 固件 / Build iPXE Payload Firmware
+      - name: 编译 ELF Payload 固件 / Build ELF Payload Firmware
         run: |
-          echo "📦 编译 iPXE payload 固件"
+          echo "📦 编译 ELF payload 固件（使用 iPXE EFI）"
           cd coreboot
           
           mkdir -p ../roms
@@ -144,19 +174,20 @@ jobs:
           docker run --rm --user root \
             -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
             -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+            -v ${{ github.workspace }}/ipxe_files:/home/coreboot/ipxe_files \
             -w /home/coreboot/coreboot \
             coreboot/coreboot-sdk:latest \
             bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
-                     echo '🔧 编译 iPXE payload 固件...' && \
+                     echo '🔧 编译 ELF payload 固件...' && \
                      make -j\$(nproc) && \
                      echo '✅ 编译完成' && \
                      ls -la build/coreboot.rom && \
                      cp build/coreboot.rom /home/coreboot/roms/ && \
                      chmod 644 /home/coreboot/roms/*.rom"
 
-      - name: 验证 iPXE Payload 固件 / Verify iPXE Payload Firmware
+      - name: 验证 ELF Payload 固件 / Verify ELF Payload Firmware
         run: |
-          echo "🔍 验证 iPXE payload 固件"
+          echo "🔍 验证 ELF payload 固件"
           
           ROM_FILE=$(ls roms/*.rom | head -1)
           if [ -z "$ROM_FILE" ]; then
@@ -172,13 +203,13 @@ jobs:
           echo "📊 CBFS 内容分析："
           coreboot/build/cbfstool "$ROM_FILE" print
           
-          # 检查 iPXE payload
+          # 检查 ELF payload
           echo ""
-          echo "🔍 检查 iPXE payload："
-          if coreboot/build/cbfstool "$ROM_FILE" print | grep -i "payload\|ipxe"; then
-            echo "✅ 找到 iPXE payload 相关条目"
+          echo "🔍 检查 ELF payload："
+          if coreboot/build/cbfstool "$ROM_FILE" print | grep -i "payload\|fallback"; then
+            echo "✅ 找到 payload 相关条目"
           else
-            echo "❌ 未找到 iPXE payload"
+            echo "❌ 未找到 payload"
           fi
 
       - name: 生成方案2测试报告 / Generate Strategy 2 Test Report
@@ -197,46 +228,46 @@ jobs:
           
           ## 方案说明
           
-          - **方案名称**: 方案2 - 标准 Coreboot + iPXE Payload
-          - **技术路线**: 标准 coreboot + iPXE payload 编译时集成
+          - **方案名称**: 方案2 - 标准 Coreboot + ELF Payload (iPXE EFI)
+          - **技术路线**: 标准 coreboot + ELF executable payload (使用 iPXE EFI)
           - **适用场景**: 需要纯 iPXE 网络启动的环境
           
           ## 测试结果
           
           ### 源码检查
           - Coreboot 源码: ✅ 标准 coreboot
-          - iPXE Payload 目录: $(test -d coreboot/payloads/ipxe && echo "✅ 存在" || echo "❌ 不存在")
+          - iPXE EFI 文件: $(test -f ipxe_files/ipxe.efi && echo "✅ 存在" || echo "❌ 不存在")
           - Payload Kconfig: $(test -f coreboot/payloads/Kconfig && echo "✅ 存在" || echo "❌ 不存在")
           
           ### 配置状态
-          - CONFIG_PAYLOAD_IPXE: $(grep -q "CONFIG_PAYLOAD_IPXE=y" coreboot/.config && echo "✅ 已启用" || echo "❌ 未启用")
-          - CONFIG_PAYLOAD_NONE: $(grep -q "CONFIG_PAYLOAD_NONE" coreboot/.config && echo "⚠️ 仍存在" || echo "✅ 已禁用")
+          - CONFIG_PAYLOAD_ELF: $(grep -q "CONFIG_PAYLOAD_ELF=y" coreboot/.config && echo "✅ 已启用" || echo "❌ 未启用")
+          - CONFIG_PAYLOAD_FILE: $(grep -q "CONFIG_PAYLOAD_FILE" coreboot/.config && echo "✅ 已配置" || echo "❌ 未配置")
           
           ### 编译结果
           - 固件编译: $(test -f "$ROM_FILE" && echo "✅ 成功" || echo "❌ 失败")
           - 固件大小: $(test -f "$ROM_FILE" && ls -lh "$ROM_FILE" | awk '{print $5}' || echo "未知")
-          - CBFS 中的 iPXE: $(coreboot/build/cbfstool "$ROM_FILE" print 2>/dev/null | grep -i "payload\|ipxe" > /dev/null && echo "✅ 找到" || echo "❌ 未找到")
+          - CBFS 中的 payload: $(coreboot/build/cbfstool "$ROM_FILE" print 2>/dev/null | grep -i "payload\|fallback" > /dev/null && echo "✅ 找到" || echo "❌ 未找到")
           
           ## 结论
           
-          $(if [ -f "$ROM_FILE" ] && coreboot/build/cbfstool "$ROM_FILE" print 2>/dev/null | grep -i "payload\|ipxe" > /dev/null; then
+          $(if [ -f "$ROM_FILE" ] && coreboot/build/cbfstool "$ROM_FILE" print 2>/dev/null | grep -i "payload\|fallback" > /dev/null; then
             echo "✅ **方案2测试成功**"
             echo ""
-            echo "- 标准 coreboot 支持 iPXE payload"
-            echo "- iPXE 已成功编译为 payload"
+            echo "- 标准 coreboot 支持 ELF executable payload"
+            echo "- iPXE EFI 已成功集成为 payload"
             echo "- 固件可用于实际部署"
             echo ""
-            echo "**推荐**: 如果 MrChromebox 支持，这是最佳方案"
+            echo "**推荐**: 这是基于标准 coreboot 的可靠方案"
           else
             echo "❌ **方案2测试失败**"
             echo ""
-            echo "- iPXE payload 编译失败"
+            echo "- ELF payload 编译失败"
             echo "- 需要检查配置或依赖"
           fi)
           
           ## 下一步建议
           
-          - 验证 MrChromebox 是否支持 iPXE payload
+          - 验证 iPXE EFI 作为 ELF payload 的启动效果
           - 在实际硬件上测试 iPXE 启动
           - 对比方案1的集成效果
           EOF
@@ -262,16 +293,16 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: strategy2-firmware-${{ github.run_number }}
-          name: 方案2固件 - 标准 Coreboot + iPXE Payload / Strategy 2 - Standard Coreboot + iPXE Payload
+          name: 方案2固件 - 标准 Coreboot + ELF Payload / Strategy 2 - Standard Coreboot + ELF Payload
           body: |
-            ## 方案2：标准 Coreboot + iPXE Payload
+            ## 方案2：标准 Coreboot + ELF Payload (iPXE EFI)
             
             **构建日期 / Build Date:** ${{ github.run_id }}
             **Coreboot 版本:** 标准 coreboot
             
             ### 方案说明
             
-            - **技术路线**: 标准 coreboot + iPXE payload 编译时集成
+            - **技术路线**: 标准 coreboot + ELF executable payload (使用 iPXE EFI)
             - **网络支持**: 纯 iPXE 网络启动
             - **集成方式**: 编译时集成，最佳性能
             

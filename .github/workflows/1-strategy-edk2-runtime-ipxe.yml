@@ -180,37 +180,59 @@ jobs:
           
           echo "📋 ROM 文件: $ROM_FILE"
           
-          # 备份原始固件
-          cp "$ROM_FILE" "${ROM_FILE}.original"
-          echo "✅ 已备份原始固件"
-          
-          # 尝试多种集成方式
-          echo ""
-          echo "🔧 尝试集成方式1：efi/ipxe/ipxe.efi（LZMA 压缩）"
-          if coreboot/build/cbfstool "$ROM_FILE" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw -c lzma 2>&1; then
-            echo "✅ 方式1成功：LZMA 压缩集成"
-          else
-            echo "❌ 方式1失败，尝试方式2..."
-            
-            echo "🔧 尝试集成方式2：efi/ipxe/ipxe.efi（无压缩）"
-            if coreboot/build/cbfstool "$ROM_FILE" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw 2>&1; then
-              echo "✅ 方式2成功：无压缩集成"
-            else
-              echo "❌ 方式2失败，尝试方式3..."
+          # 在 Docker 容器内进行 iPXE 集成（解决权限问题）
+          echo "🔧 在 Docker 容器内进行 iPXE 集成..."
+          docker run --rm --user root \
+            -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+            -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+            -v ${{ github.workspace }}/ipxe_x64.efi:/home/coreboot/ipxe_x64.efi \
+            -w /home/coreboot \
+            coreboot/coreboot-sdk:latest \
+            bash -c "
+              # 备份原始固件
+              cp roms/$(basename \"$ROM_FILE\") roms/$(basename \"$ROM_FILE\").original
+              echo '✅ 已备份原始固件'
               
-              echo "🔧 尝试集成方式3：efi/boot/ipxe.efi（无压缩）"
-              if coreboot/build/cbfstool "$ROM_FILE" add -f ipxe_x64.efi -n efi/boot/ipxe.efi -t raw 2>&1; then
-                echo "✅ 方式3成功：备用路径集成"
+              # 使用优化的集成策略：单一推荐路径，按压缩优先级尝试
+              echo ''
+              echo '🔧 使用优化的 iPXE 集成策略'
+              echo '📋 集成路径：efi/ipxe/ipxe.efi（coreboot 推荐路径）'
+              echo '📋 压缩优先级：无压缩 > LZ4 > LZMA'
+              
+              # 方式1：无压缩（最佳性能）
+              echo ''
+              echo '🔧 尝试方式1：efi/ipxe/ipxe.efi（无压缩，最佳性能）'
+              if coreboot/build/cbfstool \"roms/$(basename \"$ROM_FILE\")\" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw 2>&1; then
+                echo '✅ 方式1成功：无压缩集成（最佳性能）'
               else
-                echo "❌ 所有集成方式失败，恢复原始固件"
-                cp "${ROM_FILE}.original" "$ROM_FILE"
-                exit 1
+                echo '❌ 方式1失败，尝试方式2...'
+                
+                # 方式2：LZ4 压缩（低压缩，平衡性能和大小）
+                echo '🔧 尝试方式2：efi/ipxe/ipxe.efi（LZ4 压缩，平衡性能）'
+                if coreboot/build/cbfstool \"roms/$(basename \"$ROM_FILE\")\" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw -c lz4 2>&1; then
+                  echo '✅ 方式2成功：LZ4 压缩集成（平衡性能）'
+                else
+                  echo '❌ 方式2失败，尝试方式3...'
+                  
+                  # 方式3：LZMA 压缩（高压缩，最小大小）
+                  echo '🔧 尝试方式3：efi/ipxe/ipxe.efi（LZMA 压缩，最小大小）'
+                  if coreboot/build/cbfstool \"roms/$(basename \"$ROM_FILE\")\" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw -c lzma 2>&1; then
+                    echo '✅ 方式3成功：LZMA 压缩集成（最小大小）'
+                  else
+                    echo '❌ 所有集成方式失败，恢复原始固件'
+                    cp \"roms/$(basename \"$ROM_FILE\").original\" \"roms/$(basename \"$ROM_FILE\")\"
+                    exit 1
+                  fi
+                fi
               fi
-            fi
-          fi
-          
-          echo ""
-          echo "✅ iPXE 运行时集成完成"
+              
+              echo ''
+              echo '✅ iPXE 运行时集成完成'
+              
+              # 设置正确的文件权限
+              chmod 644 roms/*.rom
+              chown 1001:1001 roms/*.rom || true
+            "
 
       - name: 验证 iPXE 集成 / Verify iPXE Integration
         run: |
@@ -219,31 +241,45 @@ jobs:
           # 找到 ROM 文件
           ROM_FILE=$(ls roms/coreboot_*.rom | head -1)
           
-          # 检查 iPXE 是否已集成
-          echo ""
-          echo "📋 检查 iPXE 文件："
-          if coreboot/build/cbfstool "$ROM_FILE" print | grep -i "ipxe"; then
-            echo "✅ iPXE 已成功集成到固件中"
-            coreboot/build/cbfstool "$ROM_FILE" print | grep -i "ipxe"
-          else
-            echo "❌ 未找到 iPXE 文件"
-            exit 1
-          fi
-          
-          # 显示完整 CBFS 内容
-          echo ""
-          echo "📊 完整 CBFS 内容："
-          coreboot/build/cbfstool "$ROM_FILE" print
-          
-          # 生成校验和
-          echo ""
-          echo "🔐 生成固件校验和..."
-          cd roms
-          rm -f *.sha1
-          sha1sum "$(basename "$ROM_FILE")" > "$(basename "$ROM_FILE").sha1"
-          echo "✅ 校验和已生成："
-          cat *.sha1
-          cd ..
+          # 在 Docker 容器内验证 iPXE 集成
+          echo "🔧 在 Docker 容器内验证 iPXE 集成..."
+          docker run --rm --user root \
+            -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+            -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+            -w /home/coreboot \
+            coreboot/coreboot-sdk:latest \
+            bash -c "
+              # 检查 iPXE 是否已集成
+              echo ''
+              echo '📋 检查 iPXE 文件：'
+              if coreboot/build/cbfstool \"roms/$(basename \"$ROM_FILE\")\" print | grep -i 'ipxe'; then
+                echo '✅ iPXE 已成功集成到固件中'
+                coreboot/build/cbfstool \"roms/$(basename \"$ROM_FILE\")\" print | grep -i 'ipxe'
+              else
+                echo '❌ 未找到 iPXE 文件'
+                exit 1
+              fi
+              
+              # 显示完整 CBFS 内容
+              echo ''
+              echo '📊 完整 CBFS 内容：'
+              coreboot/build/cbfstool \"roms/$(basename \"$ROM_FILE\")\" print
+              
+              # 生成校验和
+              echo ''
+              echo '🔐 生成固件校验和...'
+              cd roms
+              rm -f *.sha1
+              sha1sum \"$(basename \"$ROM_FILE\")\" > \"$(basename \"$ROM_FILE\").sha1\"
+              echo '✅ 校验和已生成：'
+              cat *.sha1
+              cd ..
+              
+              # 设置正确的文件权限
+              chmod 644 roms/*.rom
+              chmod 644 roms/*.sha1
+              chown 1001:1001 roms/* || true
+            "
 
       - name: 生成方案1测试报告 / Generate Strategy 1 Test Report
         run: |
