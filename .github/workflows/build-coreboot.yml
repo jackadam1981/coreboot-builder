@@ -49,9 +49,9 @@ jobs:
             .git/modules
             ipxe_test
             ipxe_x64.efi
-          key: build-env-${{ hashFiles('**/coreboot/.git/refs/heads/main') }}-${{ hashFiles('**/ipxe_test/ipxe-efi-x86_64.efi') }}
+          key: build-env-${{ github.ref }}-${{ github.sha }}
           restore-keys: |
-            build-env-${{ hashFiles('**/coreboot/.git/refs/heads/main') }}-
+            build-env-${{ github.ref }}-
             build-env-
 
       - name: 配置网络支持 / Configure Network Support
