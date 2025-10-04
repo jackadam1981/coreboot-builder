@@ -162,6 +162,12 @@ jobs:
         echo "📊 固件大小对比："
         echo "原始: $(ls -lh "roms/coreboot_kaisa_without_ipxe.rom" | awk '{print $5}')"
         echo "集成 iPXE 后: $(ls -lh "$ROM_FILE" | awk '{print $5}')"
+        
+        # 为原始固件生成校验和
+        echo "🔐 生成原始固件的校验和..."
+        cd roms
+        sha1sum coreboot_kaisa_without_ipxe.rom > coreboot_kaisa_without_ipxe.rom.sha1
+        cd ..
 
     - name: 列出编译产物 / List Build Artifacts
       run: |
@@ -244,8 +250,9 @@ jobs:
           
           ### 文件清单 / File List
           - `coreboot_edk2-kaisa-mrchromebox_YYYYMMDD.rom` - 集成 iPXE 版本（推荐）
-          - `coreboot_kaisa_without_ipxe.rom` - 原始版本
-          - `*.sha1` - 校验和文件
+          - `coreboot_edk2-kaisa-mrchromebox_YYYYMMDD.rom.sha1` - 集成版本校验和
+          - `coreboot_kaisa_without_ipxe.rom` - 原始版本（不含 iPXE）
+          - `coreboot_kaisa_without_ipxe.rom.sha1` - 原始版本校验和
           
           
         files: |
