@@ -161,7 +161,9 @@ jobs:
                    echo '✅ iPXE EFI 编译成功' && \
                    echo '🔧 编译 iPXE ISO（支持所有网卡）...' && \
                    echo '📥 下载 isolinux.bin...' && \
-                   wget -O isolinux.bin https://mirror.centos.org/centos/7/os/x86_64/isolinux/isolinux.bin && \
+                   (wget -O isolinux.bin https://archive.kernel.org/pub/linux/utils/boot/syslinux/syslinux-6.03/bios/core/isolinux.bin || \
+                    wget -O isolinux.bin https://mirror.centos.org/centos/7/os/x86_64/isolinux/isolinux.bin || \
+                    wget -O isolinux.bin https://dl.rockylinux.org/pub/rocky/8/isos/x86_64/isolinux/isolinux.bin) && \
                    make bin/ipxe.iso \
                      EMBED=ipxe_embed.ipxe \
                      NO_WERROR=1 \
