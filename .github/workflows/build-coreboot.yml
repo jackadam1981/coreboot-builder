@@ -9,6 +9,16 @@ on:
         required: false
         type: boolean
         default: false
+      wds_server:
+        description: 'WDS 服务器地址 / WDS Server IP (可选，如: 192.168.1.100)'
+        required: false
+        type: string
+        default: ''
+      wds_boot_file:
+        description: 'WDS 启动文件 / WDS Boot File (可选，如: bootmgr.efi 或 bootx64.efi)'
+        required: false
+        type: string
+        default: 'bootmgr.efi'
 
 permissions:
   contents: write
@@ -75,20 +85,57 @@ jobs:
       run: |
         echo "📦 编译 iPXE EFI 应用（用于集成到固件）"
         
-        # 创建 iPXE 嵌入式脚本（自动网络引导）
-        cat > ipxe_embed.ipxe << 'EOF'
+        # 创建 iPXE 嵌入式脚本（支持自定义 WDS 服务器配置）
+        cat > ipxe_embed.ipxe << EOF
         #!ipxe
         echo ========================================
         echo iPXE Network Boot Environment
-        echo RTL8111H/RTL8168 Support
+        echo WDS Server Auto-Detection
         echo ========================================
         echo.
         echo Initializing network interface...
         dhcp net0 || dhcp || echo Network init failed
         echo.
-        echo Starting network boot...
-        autoboot || {
-          echo Auto-boot failed, entering shell
+        echo Network configured successfully
+        echo IP: ${ip} Gateway: ${gateway} DNS: ${dns}
+        echo.
+        echo Detecting WDS server configuration...
+        
+        # 检查 DHCP 是否提供了 WDS 服务器信息
+        isset ${next-server} && echo Next server: ${next-server}
+        isset ${filename} && echo Boot file: ${filename}
+        
+        # 如果 DHCP 提供了完整的启动信息，直接使用
+        isset ${next-server} && isset ${filename} && {
+          echo Using DHCP provided WDS server...
+          chain tftp://${next-server}/${filename}
+        }
+        
+        # 否则尝试自动发现 WDS 服务器
+        echo DHCP WDS info not found, trying auto-discovery...
+        
+        # 尝试自定义 WDS 服务器（如果用户指定了）
+        ${{ inputs.wds_server && inputs.wds_boot_file && format('chain tftp://{0}/{1} || ', inputs.wds_server, inputs.wds_boot_file) || '' }}chain tftp://${gateway}/bootmgr.efi || \
+        chain tftp://${gateway}/bootx64.efi || \
+        chain tftp://192.168.0.10/bootmgr.efi || \
+        chain tftp://192.168.0.10/bootx64.efi || \
+        chain tftp://192.168.1.10/bootmgr.efi || \
+        chain tftp://192.168.1.10/bootx64.efi || \
+        chain tftp://192.168.10.10/bootmgr.efi || \
+        chain tftp://192.168.10.10/bootx64.efi || \
+        chain tftp://10.0.0.10/bootmgr.efi || \
+        chain tftp://10.0.0.10/bootx64.efi || \
+        chain tftp://10.0.1.10/bootmgr.efi || \
+        chain tftp://10.0.1.10/bootx64.efi || \
+        chain tftp://10.0.10.10/bootmgr.efi || \
+        chain tftp://10.0.10.10/bootx64.efi || \
+        chain tftp://172.16.0.10/bootmgr.efi || \
+        chain tftp://172.16.0.10/bootx64.efi || {
+          echo All WDS servers failed, entering shell
+          echo You can manually configure WDS server:
+          echo   set next-server <WDS_IP>
+          echo   chain tftp://\${next-server}/bootmgr.efi
+          echo   # or try: chain tftp://\${next-server}/bootx64.efi
           shell
         }
         EOF
@@ -109,12 +156,21 @@ jobs:
                      ENABLE_HTTPS=y \
                      ENABLE_DHCP=y \
                      ENABLE_PXE=y \
-                     DRIVERS=net/rtl8168 \
                      ENABLE_REALTEK=y && \
                    cp bin-x86_64-efi/ipxe.efi /workspace/ipxe_x64.efi && \
-                   echo '✅ iPXE EFI 编译成功（包含网络支持）'"
+                   echo '✅ iPXE EFI 编译成功' && \
+                   echo '🔧 编译 iPXE ISO（支持所有网卡）...' && \
+                   make bin/ipxe.iso \
+                     EMBED=ipxe_embed.ipxe \
+                     NO_WERROR=1 \
+                     ENABLE_HTTP_BOOT=y \
+                     ENABLE_HTTPS=y \
+                     ENABLE_DHCP=y \
+                     ENABLE_PXE=y && \
+                   cp bin/ipxe.iso /workspace/ipxe_boot.iso && \
+                   echo '✅ iPXE ISO 编译成功'"
         
-        ls -lh ipxe_x64.efi || echo "❌ iPXE 编译失败"
+        ls -lh ipxe_x64.efi ipxe_boot.iso || echo "❌ iPXE 编译失败"
         
         # 验证 iPXE EFI 文件
         if [ -f "ipxe_x64.efi" ]; then
@@ -137,6 +193,30 @@ jobs:
           strings ipxe_x64.efi | grep -i "http" && echo "✅ 包含 HTTP 支持" || echo "❌ 未找到 HTTP 支持"
         else
           echo "❌ iPXE EFI 文件不存在"
+        fi
+        
+        # 验证 iPXE ISO 文件
+        if [ -f "ipxe_boot.iso" ]; then
+          echo ""
+          echo "✅ iPXE ISO 文件已生成"
+          file ipxe_boot.iso
+          echo "ISO 文件大小: $(ls -lh ipxe_boot.iso | awk '{print $5}')"
+          
+          echo ""
+          echo "🔍 检查 ISO 中的网卡驱动支持："
+          # 挂载 ISO 检查驱动
+          mkdir -p /tmp/ipxe_iso
+          mount -o loop ipxe_boot.iso /tmp/ipxe_iso 2>/dev/null || echo "无法挂载 ISO"
+          if [ -d "/tmp/ipxe_iso" ]; then
+            find /tmp/ipxe_iso -name "*.rom" -o -name "*.bin" | head -5
+            strings /tmp/ipxe_iso/*.rom 2>/dev/null | grep -i "rtl816" && echo "✅ 包含 RTL816 系列驱动" || echo "❌ 未找到 RTL816 驱动"
+            strings /tmp/ipxe_iso/*.rom 2>/dev/null | grep -i "e1000" && echo "✅ 包含 E1000 驱动" || echo "❌ 未找到 E1000 驱动"
+            strings /tmp/ipxe_iso/*.rom 2>/dev/null | grep -i "broadcom" && echo "✅ 包含 Broadcom 驱动" || echo "❌ 未找到 Broadcom 驱动"
+            umount /tmp/ipxe_iso 2>/dev/null
+            rmdir /tmp/ipxe_iso
+          fi
+        else
+          echo "❌ iPXE ISO 文件不存在"
         fi
 
     - name: 编译固件 / Build Firmware
@@ -265,6 +345,15 @@ jobs:
         path: roms/*.rom
         retention-days: 30
 
+    - name: 上传 iPXE 文件 / Upload iPXE Files
+      uses: actions/upload-artifact@v4
+      with:
+        name: ipxe-boot-files-${{ github.run_number }}
+        path: |
+          ipxe_x64.efi
+          ipxe_boot.iso
+        retention-days: 30
+
     - name: 上传校验和 / Upload Checksums
       uses: actions/upload-artifact@v4
       with:
@@ -328,10 +417,54 @@ jobs:
           4. 支持 DHCP、HTTP、HTTPS 等协议
           
           ### 文件清单 / File List
+          
+          **固件文件 / Firmware Files:**
           - `coreboot_edk2-kaisa-mrchromebox_YYYYMMDD.rom` - 集成 iPXE 版本（推荐）
           - `coreboot_edk2-kaisa-mrchromebox_YYYYMMDD.rom.sha1` - 集成版本校验和
           - `coreboot_kaisa_without_ipxe.rom` - 原始版本（不含 iPXE）
           - `coreboot_kaisa_without_ipxe.rom.sha1` - 原始版本校验和
+          
+          **iPXE 启动文件 / iPXE Boot Files:**
+          - `ipxe_x64.efi` - iPXE EFI 应用程序（RTL8168 优化，可手动加载）
+          - `ipxe_boot.iso` - iPXE 启动 ISO（支持所有网卡，用于 CD/USB 启动）
+          
+          ### iPXE 文件说明 / iPXE Files Description
+          
+          **ipxe_x64.efi**：
+          - 专门为 RTL8111H/RTL8168 网卡优化
+          - 文件较小，适合固件集成
+          - 可在 UEFI Shell 中手动加载
+          
+          **ipxe_boot.iso**：
+          - 包含所有主流网卡驱动支持
+          - 支持 Intel、Realtek、Broadcom、Marvell 等
+          - 智能 WDS 服务器自动发现
+          - 支持 DHCP 配置和手动配置
+          - 可刻录到 CD 或写入 USB 设备
+          
+          ### WDS 服务器配置 / WDS Server Configuration
+          
+          iPXE ISO 支持多种 WDS 服务器配置方式：
+          
+          1. **DHCP 自动配置**（推荐）
+             - 在 DHCP 服务器中设置 option 66 (next-server) 和 option 67 (filename)
+             - iPXE 会自动使用这些信息连接 WDS 服务器
+          
+          2. **工作流自定义配置**
+             - 运行工作流时可指定 WDS 服务器地址和启动文件
+             - iPXE 会优先尝试自定义的 WDS 服务器
+          
+          3. **自动发现**
+             - 尝试网关地址作为 WDS 服务器
+             - 尝试私有地址段的服务器地址：
+               - 192.168.0.10, 192.168.1.10, 192.168.10.10
+               - 10.0.0.10, 10.0.1.10, 10.0.10.10
+               - 172.16.0.10
+             - 优先支持 UEFI 启动文件：bootmgr.efi, bootx64.efi
+          
+          4. **手动配置**
+             - 失败时进入 iPXE shell
+             - 可手动设置服务器地址和启动文件
           
           
         files: |
