@@ -163,10 +163,26 @@ jobs:
         echo "原始: $(ls -lh "roms/coreboot_kaisa_without_ipxe.rom" | awk '{print $5}')"
         echo "集成 iPXE 后: $(ls -lh "$ROM_FILE" | awk '{print $5}')"
         
-        # 为原始固件生成校验和
-        echo "🔐 生成原始固件的校验和..."
+        # 为两个固件生成正确的校验和
+        echo "🔐 生成固件校验和..."
         cd roms
+        
+        # 删除旧的校验和文件
+        rm -f *.sha1
+        
+        # 为原始固件生成校验和
+        echo "生成原始固件校验和..."
         sha1sum coreboot_kaisa_without_ipxe.rom > coreboot_kaisa_without_ipxe.rom.sha1
+        
+        # 为集成 iPXE 的固件生成新的校验和
+        echo "生成集成 iPXE 固件校验和..."
+        ROM_BASENAME=$(basename "$ROM_FILE")
+        sha1sum "$ROM_BASENAME" > "${ROM_BASENAME}.sha1"
+        
+        echo "✅ 校验和已生成："
+        ls -la *.sha1
+        cat *.sha1
+        
         cd ..
 
     - name: 列出编译产物 / List Build Artifacts
