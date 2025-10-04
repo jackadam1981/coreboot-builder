@@ -138,15 +138,20 @@ jobs:
         
         # 备份原始固件
         cp "$ROM_FILE" "${ROM_FILE}.original"
+        cp "$ROM_FILE" "roms/coreboot_kaisa_without_ipxe.rom"
         
-        # 使用 cbfstool 添加 iPXE 到 CBFS
-        echo "🔧 将 iPXE 添加到 CBFS..."
+        # 创建集成 iPXE 的新固件文件
+        INTEGRATED_ROM="${ROM_FILE%.rom}_with_ipxe.rom"
+        cp "$ROM_FILE" "$INTEGRATED_ROM"
         
-        # 确保有写权限
-        chmod 644 "$ROM_FILE"
+        # 使用 cbfstool 添加 iPXE 到新文件
+        echo "🔧 将 iPXE 添加到新固件文件：$INTEGRATED_ROM"
         
         # 添加为 EFI 应用程序
-        coreboot/build/cbfstool "$ROM_FILE" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw -c lzma
+        coreboot/build/cbfstool "$INTEGRATED_ROM" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw -c lzma
+        
+        # 替换原始文件
+        mv "$INTEGRATED_ROM" "$ROM_FILE"
         
         echo "✅ iPXE 已集成到固件"
         echo ""
@@ -155,11 +160,8 @@ jobs:
         
         echo ""
         echo "📊 固件大小对比："
-        echo "原始: $(ls -lh "${ROM_FILE}.original" | awk '{print $5}')"
+        echo "原始: $(ls -lh "roms/coreboot_kaisa_without_ipxe.rom" | awk '{print $5}')"
         echo "集成 iPXE 后: $(ls -lh "$ROM_FILE" | awk '{print $5}')"
-        
-        # 保留原始固件
-        cp "${ROM_FILE}.original" "roms/coreboot_kaisa_without_ipxe.rom"
 
     - name: 列出编译产物 / List Build Artifacts
       run: |
