@@ -168,15 +168,40 @@ jobs:
           echo "✅ 找到 ROM 文件: $(basename "$ROM_FILE")"
           ls -lh "$ROM_FILE"
 
-          # 检查 iPXE 集成
+          # 检查 iPXE 集成状态
           echo ""
           echo "🔍 检查 iPXE 集成状态："
+          
+          # 检查编译时集成的 iPXE（作为 payload）
+          echo "📋 检查编译时集成的 iPXE payload："
+          if coreboot/build/cbfstool "$ROM_FILE" print | grep -q "fallback/payload"; then
+            echo "✅ 找到 fallback/payload（可能包含 iPXE）"
+            coreboot/build/cbfstool "$ROM_FILE" print | grep "fallback/payload"
+          fi
+          
+          # 检查运行时集成的 iPXE（独立文件）
+          echo ""
+          echo "📋 检查运行时集成的 iPXE 文件："
           if coreboot/build/cbfstool "$ROM_FILE" print | grep -q "ipxe"; then
-            echo "✅ iPXE 已集成到固件中"
+            echo "✅ 找到独立的 iPXE 文件"
             coreboot/build/cbfstool "$ROM_FILE" print | grep -i ipxe
           else
-            echo "❌ iPXE 未找到，可能集成失败"
+            echo "ℹ️  未找到独立的 iPXE 文件（可能已编译为 payload）"
           fi
+          
+          # 检查配置是否启用了 iPXE payload
+          echo ""
+          echo "📋 检查 iPXE payload 配置："
+          if grep -q "CONFIG_PAYLOAD_IPXE=y" coreboot/configs/cml/config.kaisa.uefi 2>/dev/null; then
+            echo "✅ 配置文件中启用了 CONFIG_PAYLOAD_IPXE=y"
+          else
+            echo "⚠️  配置文件中未找到 CONFIG_PAYLOAD_IPXE=y"
+          fi
+          
+          # 显示完整的 CBFS 内容
+          echo ""
+          echo "📊 完整的 CBFS 内容："
+          coreboot/build/cbfstool "$ROM_FILE" print
 
           # 生成校验和
           echo ""
