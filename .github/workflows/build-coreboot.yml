@@ -181,11 +181,8 @@ jobs:
         # 根据官方文档，使用正确的路径和类型
         echo "🔧 添加 iPXE 到 CBFS（使用官方推荐方式）..."
         
-        # 官方推荐：添加到 efi/ipxe.efi 路径，类型为 raw（不压缩）
+        # 官方推荐：只添加到 efi/ipxe.efi 路径，类型为 raw（不压缩）
         coreboot/build/cbfstool "$INTEGRATED_ROM" add -f ipxe_x64.efi -n efi/ipxe.efi -t raw
-        
-        # 备用路径：添加到 efi/boot/ 目录
-        coreboot/build/cbfstool "$INTEGRATED_ROM" add -f ipxe_x64.efi -n efi/boot/ipxe.efi -t raw
         
         # 替换原始文件
         mv "$INTEGRATED_ROM" "$ROM_FILE"
