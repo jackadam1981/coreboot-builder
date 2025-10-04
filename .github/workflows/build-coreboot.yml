@@ -160,13 +160,16 @@ jobs:
                    cp bin-x86_64-efi/ipxe.efi /workspace/ipxe_x64.efi && \
                    echo '✅ iPXE EFI 编译成功' && \
                    echo '🔧 编译 iPXE ISO（支持所有网卡）...' && \
+                   echo '📥 下载 isolinux.bin...' && \
+                   wget -O isolinux.bin https://mirror.centos.org/centos/7/os/x86_64/isolinux/isolinux.bin && \
                    make bin/ipxe.iso \
                      EMBED=ipxe_embed.ipxe \
                      NO_WERROR=1 \
                      ENABLE_HTTP_BOOT=y \
                      ENABLE_HTTPS=y \
                      ENABLE_DHCP=y \
-                     ENABLE_PXE=y && \
+                     ENABLE_PXE=y \
+                     ISOLINUX_BIN=isolinux.bin && \
                    cp bin/ipxe.iso /workspace/ipxe_boot.iso && \
                    echo '✅ iPXE ISO 编译成功'"
         
@@ -203,18 +206,11 @@ jobs:
           echo "ISO 文件大小: $(ls -lh ipxe_boot.iso | awk '{print $5}')"
           
           echo ""
-          echo "🔍 检查 ISO 中的网卡驱动支持："
-          # 挂载 ISO 检查驱动
-          mkdir -p /tmp/ipxe_iso
-          mount -o loop ipxe_boot.iso /tmp/ipxe_iso 2>/dev/null || echo "无法挂载 ISO"
-          if [ -d "/tmp/ipxe_iso" ]; then
-            find /tmp/ipxe_iso -name "*.rom" -o -name "*.bin" | head -5
-            strings /tmp/ipxe_iso/*.rom 2>/dev/null | grep -i "rtl816" && echo "✅ 包含 RTL816 系列驱动" || echo "❌ 未找到 RTL816 驱动"
-            strings /tmp/ipxe_iso/*.rom 2>/dev/null | grep -i "e1000" && echo "✅ 包含 E1000 驱动" || echo "❌ 未找到 E1000 驱动"
-            strings /tmp/ipxe_iso/*.rom 2>/dev/null | grep -i "broadcom" && echo "✅ 包含 Broadcom 驱动" || echo "❌ 未找到 Broadcom 驱动"
-            umount /tmp/ipxe_iso 2>/dev/null
-            rmdir /tmp/ipxe_iso
-          fi
+          echo "🔍 检查 ISO 文件中的网卡驱动支持："
+          # 检查 ISO 文件中的驱动字符串
+          strings ipxe_boot.iso | grep -i "rtl816" && echo "✅ 包含 RTL816 系列驱动" || echo "❌ 未找到 RTL816 驱动"
+          strings ipxe_boot.iso | grep -i "e1000" && echo "✅ 包含 E1000 驱动" || echo "❌ 未找到 E1000 驱动"
+          strings ipxe_boot.iso | grep -i "broadcom" && echo "✅ 包含 Broadcom 驱动" || echo "❌ 未找到 Broadcom 驱动"
         else
           echo "❌ iPXE ISO 文件不存在"
         fi
@@ -426,7 +422,7 @@ jobs:
           
           **iPXE 启动文件 / iPXE Boot Files:**
           - `ipxe_x64.efi` - iPXE EFI 应用程序（RTL8168 优化，可手动加载）
-          - `ipxe_boot.iso` - iPXE 启动 ISO（支持所有网卡，用于 CD/USB 启动）
+          - `ipxe_boot.iso` - iPXE ISO 镜像（支持所有网卡，兼容 Ventoy）
           
           ### iPXE 文件说明 / iPXE Files Description
           
@@ -440,11 +436,11 @@ jobs:
           - 支持 Intel、Realtek、Broadcom、Marvell 等
           - 智能 WDS 服务器自动发现
           - 支持 DHCP 配置和手动配置
-          - 可刻录到 CD 或写入 USB 设备
+          - 兼容 Ventoy，可直接复制到 Ventoy 分区使用
           
           ### WDS 服务器配置 / WDS Server Configuration
           
-          iPXE ISO 支持多种 WDS 服务器配置方式：
+          iPXE 启动文件支持多种 WDS 服务器配置方式：
           
           1. **DHCP 自动配置**（推荐）
              - 在 DHCP 服务器中设置 option 66 (next-server) 和 option 67 (filename)
