@@ -38,14 +38,7 @@ jobs:
         cd coreboot
         git submodule update --init --checkout --recursive
 
-    - name: 替换自定义 Logo / Replace Custom Logo
-      run: |
-        if [ -f "coreboot_logo.bmp" ]; then
-          cp coreboot_logo.bmp coreboot/Documentation/coreboot_logo.bmp
-          echo "✅ 已替换为自定义 Logo"
-        else
-          echo "ℹ️  使用默认 Logo"
-        fi
+    # Logo 替换步骤已移除，为 iPXE 集成节省 CBFS 空间
 
     - name: 配置网络支持 / Configure Network Support
       run: |
@@ -185,8 +178,8 @@ jobs:
         # 根据官方文档，使用正确的路径和类型
         echo "🔧 添加 iPXE 到 CBFS（使用官方推荐方式）..."
         
-        # 官方推荐：添加到 efi/ipxe/ipxe.efi 路径，使用 LZMA 压缩
-        coreboot/build/cbfstool "$INTEGRATED_ROM" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw -c lzma
+        # 官方推荐：添加到 efi/ipxe/ipxe.efi 路径，不压缩（按 iPXE 官方建议）
+        coreboot/build/cbfstool "$INTEGRATED_ROM" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw
         
         # 替换原始文件
         mv "$INTEGRATED_ROM" "$ROM_FILE"
