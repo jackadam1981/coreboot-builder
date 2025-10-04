@@ -182,6 +182,10 @@ jobs:
           
           # 在 Docker 容器内进行 iPXE 集成（解决权限问题）
           echo "🔧 在 Docker 容器内进行 iPXE 集成..."
+          
+          # 获取 ROM 文件名（避免引号嵌套问题）
+          ROM_BASENAME=$(basename "$ROM_FILE")
+          
           docker run --rm --user root \
             -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
             -v ${{ github.workspace }}/roms:/home/coreboot/roms \
@@ -190,7 +194,7 @@ jobs:
             coreboot/coreboot-sdk:latest \
             bash -c "
               # 备份原始固件
-              cp roms/$(basename \"$ROM_FILE\") roms/$(basename \"$ROM_FILE\").original
+              cp roms/$ROM_BASENAME roms/$ROM_BASENAME.original
               echo '✅ 已备份原始固件'
               
               # 使用优化的集成策略：单一推荐路径，按压缩优先级尝试
@@ -202,25 +206,25 @@ jobs:
               # 方式1：无压缩（最佳性能）
               echo ''
               echo '🔧 尝试方式1：efi/ipxe/ipxe.efi（无压缩，最佳性能）'
-              if coreboot/build/cbfstool \"roms/$(basename \"$ROM_FILE\")\" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw 2>&1; then
+              if coreboot/build/cbfstool \"roms/$ROM_BASENAME\" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw 2>&1; then
                 echo '✅ 方式1成功：无压缩集成（最佳性能）'
               else
                 echo '❌ 方式1失败，尝试方式2...'
                 
                 # 方式2：LZ4 压缩（低压缩，平衡性能和大小）
                 echo '🔧 尝试方式2：efi/ipxe/ipxe.efi（LZ4 压缩，平衡性能）'
-                if coreboot/build/cbfstool \"roms/$(basename \"$ROM_FILE\")\" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw -c lz4 2>&1; then
+                if coreboot/build/cbfstool \"roms/$ROM_BASENAME\" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw -c lz4 2>&1; then
                   echo '✅ 方式2成功：LZ4 压缩集成（平衡性能）'
                 else
                   echo '❌ 方式2失败，尝试方式3...'
                   
                   # 方式3：LZMA 压缩（高压缩，最小大小）
                   echo '🔧 尝试方式3：efi/ipxe/ipxe.efi（LZMA 压缩，最小大小）'
-                  if coreboot/build/cbfstool \"roms/$(basename \"$ROM_FILE\")\" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw -c lzma 2>&1; then
+                  if coreboot/build/cbfstool \"roms/$ROM_BASENAME\" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw -c lzma 2>&1; then
                     echo '✅ 方式3成功：LZMA 压缩集成（最小大小）'
                   else
                     echo '❌ 所有集成方式失败，恢复原始固件'
-                    cp \"roms/$(basename \"$ROM_FILE\").original\" \"roms/$(basename \"$ROM_FILE\")\"
+                    cp \"roms/$ROM_BASENAME.original\" \"roms/$ROM_BASENAME\"
                     exit 1
                   fi
                 fi
@@ -240,6 +244,7 @@ jobs:
           
           # 找到 ROM 文件
           ROM_FILE=$(ls roms/coreboot_*.rom | head -1)
+          ROM_BASENAME=$(basename "$ROM_FILE")
           
           # 在 Docker 容器内验证 iPXE 集成
           echo "🔧 在 Docker 容器内验证 iPXE 集成..."
@@ -252,9 +257,9 @@ jobs:
               # 检查 iPXE 是否已集成
               echo ''
               echo '📋 检查 iPXE 文件：'
-              if coreboot/build/cbfstool \"roms/$(basename \"$ROM_FILE\")\" print | grep -i 'ipxe'; then
+              if coreboot/build/cbfstool \"roms/$ROM_BASENAME\" print | grep -i 'ipxe'; then
                 echo '✅ iPXE 已成功集成到固件中'
-                coreboot/build/cbfstool \"roms/$(basename \"$ROM_FILE\")\" print | grep -i 'ipxe'
+                coreboot/build/cbfstool \"roms/$ROM_BASENAME\" print | grep -i 'ipxe'
               else
                 echo '❌ 未找到 iPXE 文件'
                 exit 1
@@ -263,14 +268,14 @@ jobs:
               # 显示完整 CBFS 内容
               echo ''
               echo '📊 完整 CBFS 内容：'
-              coreboot/build/cbfstool \"roms/$(basename \"$ROM_FILE\")\" print
+              coreboot/build/cbfstool \"roms/$ROM_BASENAME\" print
               
               # 生成校验和
               echo ''
               echo '🔐 生成固件校验和...'
               cd roms
               rm -f *.sha1
-              sha1sum \"$(basename \"$ROM_FILE\")\" > \"$(basename \"$ROM_FILE\").sha1\"
+              sha1sum \"$ROM_BASENAME\" > \"$ROM_BASENAME.sha1\"
               echo '✅ 校验和已生成：'
               cat *.sha1
               cd ..
