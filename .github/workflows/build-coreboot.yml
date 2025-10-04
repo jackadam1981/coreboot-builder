@@ -62,13 +62,16 @@ jobs:
           if grep -q "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" configs/cml/config.kaisa.uefi; then
             echo "✅ 网络支持配置已存在"
           else
-            echo "📝 添加网络支持配置"
+            echo "📝 添加网络支持和 iPXE payload 配置"
             echo "" >> configs/cml/config.kaisa.uefi
             echo "# 网络支持配置" >> configs/cml/config.kaisa.uefi
             echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> configs/cml/config.kaisa.uefi
             echo "CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y" >> configs/cml/config.kaisa.uefi
             echo "CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y" >> configs/cml/config.kaisa.uefi
-            echo "✅ 网络配置已添加"
+            echo "" >> configs/cml/config.kaisa.uefi
+            echo "# iPXE payload 配置" >> configs/cml/config.kaisa.uefi
+            echo "CONFIG_PAYLOAD_IPXE=y" >> configs/cml/config.kaisa.uefi
+            echo "✅ 网络和 iPXE 配置已添加"
           fi
         else
           echo "❌ 配置文件不存在，使用默认配置"
@@ -118,7 +121,7 @@ jobs:
           -w /home/coreboot/coreboot \
           coreboot/coreboot-sdk:latest \
           bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
-                   # 使用 MrChromebox 编译脚本
+                   # 使用 MrChromebox 编译脚本（配置已在配置文件中）
                    echo '🔧 使用 MrChromebox build-uefi.sh 编译 kaisa...' && \
                    ./build-uefi.sh kaisa && \
                    chmod 644 /home/coreboot/roms/*.rom && \
