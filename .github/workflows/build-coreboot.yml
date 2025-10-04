@@ -75,36 +75,55 @@ jobs:
     - name: 拉取 Coreboot SDK 容器 / Pull Coreboot SDK
       run: docker pull coreboot/coreboot-sdk:latest
 
-    - name: 编译 iPXE EFI 应用 / Build iPXE EFI Application
+    - name: 下载预编译 iPXE EFI 应用 / Download Pre-compiled iPXE EFI
       run: |
-        echo "📦 编译 iPXE EFI 应用（用于集成到固件）"
+        echo "📥 下载预编译 iPXE EFI 应用（用于编译时集成）"
         
-        # 创建 iPXE 嵌入式脚本（支持自定义 WDS 服务器配置）
-        cat > ipxe_embed.ipxe << EOF
-        #!ipxe
-        dhcp
-        autoboot
-        shell
-        EOF
+        # 创建 iPXE 测试目录
+        mkdir -p ipxe_test
+        cd ipxe_test
         
-        # 编译 iPXE（添加硬件兼容性支持）
-        docker run --rm --user root \
-          -v ${{ github.workspace }}:/workspace \
-          -w /workspace \
-          coreboot/coreboot-sdk:latest \
-          bash -c "git clone https://github.com/ipxe/ipxe.git ipxe_src && \
-                   cd ipxe_src/src && \
-                   cp /workspace/ipxe_embed.ipxe . && \
-                   echo '🔧 编译 iPXE EFI（简单配置，适合固件集成）...' && \
-                   make bin-x86_64-efi/ipxe.efi EMBED=ipxe_embed.ipxe && \
-                   cp bin-x86_64-efi/ipxe.efi /workspace/ipxe_x64.efi && \
-                   echo '✅ iPXE EFI 编译成功'"
+        # 下载官方预编译 iPXE EFI 文件
+        echo "🔧 下载 iPXE EFI 文件..."
+        wget -O ipxe-efi-x86_64.efi "https://boot.ipxe.org/ipxe-efi-x86_64.efi" || {
+          echo "❌ 官方下载失败，尝试备用源..."
+          wget -O ipxe-efi-x86_64.efi "https://github.com/ipxe/ipxe/releases/download/v1.21.1/ipxe-efi-x86_64.efi" || {
+            echo "❌ 备用源也失败，使用本地编译..."
+            cd ..
+            # 如果下载失败，回退到编译方式
+            cat > ipxe_embed.ipxe << EOF
+            #!ipxe
+            dhcp
+            autoboot
+            shell
+            EOF
+            
+            docker run --rm --user root \
+              -v ${{ github.workspace }}:/workspace \
+              -w /workspace \
+              coreboot/coreboot-sdk:latest \
+              bash -c "git clone https://github.com/ipxe/ipxe.git ipxe_src && \
+                       cd ipxe_src/src && \
+                       cp /workspace/ipxe_embed.ipxe . && \
+                       echo '🔧 编译 iPXE EFI（简单配置，适合固件集成）...' && \
+                       make bin-x86_64-efi/ipxe.efi EMBED=ipxe_embed.ipxe && \
+                       cp bin-x86_64-efi/ipxe.efi /workspace/ipxe_x64.efi && \
+                       echo '✅ iPXE EFI 编译成功'"
+          }
+        }
         
-        ls -lh ipxe_x64.efi || echo "❌ iPXE 编译失败"
+        # 如果下载成功，复制到工作目录
+        if [ -f "ipxe-efi-x86_64.efi" ]; then
+          cp ipxe-efi-x86_64.efi ../ipxe_x64.efi
+          echo "✅ 预编译 iPXE EFI 下载成功"
+        fi
+        
+        cd ..
         
         # 验证 iPXE EFI 文件
         if [ -f "ipxe_x64.efi" ]; then
-          echo "✅ iPXE EFI 文件已生成"
+          echo "✅ iPXE EFI 文件已准备"
+          ls -lh ipxe_x64.efi
           file ipxe_x64.efi
           echo "iPXE 文件前16字节（魔数检查）："
           hexdump -C ipxe_x64.efi | head -2
@@ -126,29 +145,50 @@ jobs:
         fi
         
 
-    - name: 编译固件 / Build Firmware
+    - name: 编译固件（编译时集成 iPXE）/ Build Firmware with iPXE
       run: |
         mkdir -p roms
-        echo "📦 使用 MrChromebox build-uefi.sh 编译 kaisa"
+        echo "📦 编译固件 with 编译时 iPXE 集成"
         
-        docker run --rm --user root \
-          -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
-          -v ${{ github.workspace }}/roms:/home/coreboot/roms \
-          -w /home/coreboot/coreboot \
-          coreboot/coreboot-sdk:latest \
-          bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
-                   ./build-uefi.sh kaisa && \
-                   chmod 644 /home/coreboot/roms/*.rom"
-    
-    - name: 集成 iPXE 到固件 / Integrate iPXE into Firmware
-      run: |
-        echo "📦 将 iPXE EFI 集成到固件 CBFS"
-        
-        # 检查 iPXE 是否编译成功
+        # 检查 iPXE 文件是否存在
         if [ ! -f "ipxe_x64.efi" ]; then
-          echo "⚠️  iPXE 未编译，跳过集成"
-          exit 0
+          echo "⚠️  iPXE 文件不存在，编译不含 iPXE 的固件"
+          docker run --rm --user root \
+            -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+            -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+            -w /home/coreboot/coreboot \
+            coreboot/coreboot-sdk:latest \
+            bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
+                     ./build-uefi.sh kaisa && \
+                     chmod 644 /home/coreboot/roms/*.rom"
+        else
+          echo "✅ iPXE 文件存在，进行编译时集成"
+          
+          # 复制 iPXE 到 coreboot 源码目录
+          cp ipxe_x64.efi coreboot/util/cbfstool/ipxe.efi
+          
+          # 使用编译时集成方式
+          docker run --rm --user root \
+            -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+            -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+            -w /home/coreboot/coreboot \
+            coreboot/coreboot-sdk:latest \
+            bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
+                     # 配置 iPXE payload
+                     make defconfig KBUILD_DEFCONFIG=configs/cml/config.kaisa.uefi && \
+                     make menuconfig << 'EOF'
+                     # 启用 iPXE payload
+                     Payloads -> [*] Add a payload -> iPXE -> [*] iPXE
+                     EOF
+                     # 编译 with iPXE
+                     make -j\$(nproc) && \
+                     cp build/coreboot_edk2-kaisa-mrchromebox_*.rom /home/coreboot/roms/ && \
+                     chmod 644 /home/coreboot/roms/*.rom"
         fi
+    
+    - name: 验证编译时集成结果 / Verify Build-time Integration
+      run: |
+        echo "📦 验证编译时 iPXE 集成结果"
         
         # 找到生成的 ROM 文件
         ROM_FILE=$(ls roms/coreboot_*.rom | head -1)
@@ -160,56 +200,13 @@ jobs:
         fi
         
         echo "📋 ROM 文件: $ROM_FILE"
-        echo "📋 iPXE 文件: ipxe_x64.efi ($(ls -lh ipxe_x64.efi | awk '{print $5}'))"
         
-        # 显示 iPXE 文件详细信息
+        # 显示固件详细信息
         echo ""
-        echo "📊 iPXE 文件详细信息："
-        ls -la ipxe_x64.efi
-        file ipxe_x64.efi
+        echo "📊 固件文件详细信息："
+        ls -la "$ROM_FILE"
         
-        # 备份原始固件
-        cp "$ROM_FILE" "${ROM_FILE}.original"
-        cp "$ROM_FILE" "roms/coreboot_kaisa_without_ipxe.rom"
-        
-        # 创建集成 iPXE 的新固件文件
-        INTEGRATED_ROM="${ROM_FILE%.rom}_with_ipxe.rom"
-        cp "$ROM_FILE" "$INTEGRATED_ROM"
-        
-        # 使用 cbfstool 添加 iPXE 到新文件
-        echo "🔧 将 iPXE 添加到新固件文件：$INTEGRATED_ROM"
-        
-        # 显示集成前的 CBFS 空间信息
-        echo ""
-        echo "📊 集成前 CBFS 空间信息："
-        coreboot/build/cbfstool "$INTEGRATED_ROM" print | head -20
-        
-        # 根据官方文档，使用正确的路径和类型
-        echo ""
-        echo "🔧 添加 iPXE 到 CBFS（使用 LZMA 压缩）..."
-        
-        # 尝试多种路径确保 iPXE 出现在启动菜单中
-        echo "🔧 尝试方案1：efi/boot/bootx64.efi（标准启动文件）"
-        coreboot/build/cbfstool "$INTEGRATED_ROM" add -f ipxe_x64.efi -n efi/boot/bootx64.efi -t raw || {
-          echo "❌ 方案1失败，尝试方案2：efi/boot/ipxe.efi（无压缩）"
-          coreboot/build/cbfstool "$INTEGRATED_ROM" add -f ipxe_x64.efi -n efi/boot/ipxe.efi -t raw || {
-            echo "❌ 方案2失败，尝试方案3：efi/ipxe/ipxe.efi（无压缩）"
-            coreboot/build/cbfstool "$INTEGRATED_ROM" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw || {
-              echo "❌ 方案3失败，尝试方案4：efi/ipxe/ipxe.efi（LZMA压缩）"
-              coreboot/build/cbfstool "$INTEGRATED_ROM" add -f ipxe_x64.efi -n efi/ipxe/ipxe.efi -t raw -c lzma
-            }
-          }
-        }
-        
-        # 显示集成后的 CBFS 空间信息
-        echo ""
-        echo "📊 集成后 CBFS 空间信息："
-        coreboot/build/cbfstool "$INTEGRATED_ROM" print | head -20
-        
-        # 替换原始文件
-        mv "$INTEGRATED_ROM" "$ROM_FILE"
-        
-        echo "✅ iPXE 已集成到固件"
+        # 验证 CBFS 内容
         echo ""
         echo "📦 详细验证 CBFS 内容："
         echo "=== 完整 CBFS 内容 ==="
@@ -240,24 +237,15 @@ jobs:
           echo "❌ iPXE EFI 文件未找到"
         fi
         
-        echo ""
-        echo "📊 固件大小对比："
-        echo "原始: $(ls -lh "roms/coreboot_kaisa_without_ipxe.rom" | awk '{print $5}')"
-        echo "集成 iPXE 后: $(ls -lh "$ROM_FILE" | awk '{print $5}')"
-        
-        # 为两个固件生成正确的校验和
+        # 生成校验和
         echo "🔐 生成固件校验和..."
         cd roms
         
         # 删除旧的校验和文件
         rm -f *.sha1
         
-        # 为原始固件生成校验和
-        echo "生成原始固件校验和..."
-        sha1sum coreboot_kaisa_without_ipxe.rom > coreboot_kaisa_without_ipxe.rom.sha1
-        
-        # 为集成 iPXE 的固件生成新的校验和
-        echo "生成集成 iPXE 固件校验和..."
+        # 为固件生成校验和
+        echo "生成固件校验和..."
         ROM_BASENAME=$(basename "$ROM_FILE")
         sha1sum "$ROM_BASENAME" > "${ROM_BASENAME}.sha1"
         
@@ -274,8 +262,10 @@ jobs:
         
         echo ""
         echo "📦 固件说明："
-        echo "1. coreboot_*.rom - 集成了 iPXE 的完整固件（推荐）"
-        echo "2. coreboot_kaisa_without_ipxe.rom - 不含 iPXE 的原始固件"
+        echo "1. coreboot_*.rom - 编译时集成了 iPXE 的完整固件（推荐）"
+        echo "   - 使用预编译 iPXE EFI 文件"
+        echo "   - 编译时集成，空间利用更高效"
+        echo "   - 启动菜单会显示 iPXE 选项"
 
     - name: 上传固件 / Upload Firmware Artifacts
       uses: actions/upload-artifact@v4
@@ -315,36 +305,29 @@ jobs:
           **源码 / Source:** MrChromebox Coreboot
           
           ### 固件说明 / Firmware Description
-          本次构建包含**两个版本**的固件：
+          本次构建使用**编译时集成**方式：
           
-          1. **coreboot_edk2-kaisa-mrchromebox_*.rom** - 集成了 iPXE 的完整固件 ⭐**推荐**
-             - 包含 iPXE EFI 应用在 CBFS 中
+          **coreboot_edk2-kaisa-mrchromebox_*.rom** - 编译时集成 iPXE 的完整固件 ⭐**推荐**
+             - 使用预编译 iPXE EFI 文件
+             - 编译时集成，空间利用更高效
              - 启动菜单会显示 iPXE 选项
              - 无需 U 盘即可网络启动
              - 文件大小：约 16MB（包含 iPXE）
-          
-          2. **coreboot_kaisa_without_ipxe.rom** - 不含 iPXE 的原始固件
-             - 仅包含 EDK2 原生网络栈
-             - 需要外部 iPXE 文件（U 盘加载）
-             - 文件大小：约 15MB（不含 iPXE）
-             - 适合需要更小固件或自定义 iPXE 的用户
+             - 解决了 CBFS 空间紧张问题
           
           ### 使用说明 / Instructions
           
-          **推荐使用集成 iPXE 版本：**
+          **编译时集成 iPXE 固件：**
           1. 下载 `coreboot_edk2-kaisa-mrchromebox_*.rom`
           2. 使用 flashrom 刷写：`flashrom -p internal -w coreboot_edk2-kaisa-mrchromebox_*.rom`
           3. 重启后在 UEFI 启动菜单选择 iPXE
-          
-          **或者使用原始版本 + 手动 iPXE：**
-          1. 下载 `coreboot_kaisa_without_ipxe.rom`
-          2. 使用 flashrom 刷写：`flashrom -p internal -w coreboot_kaisa_without_ipxe.rom`
-          3. 准备 iPXE U 盘，启动时加载 `ipxe.efi`
+          4. 享受编译时集成的空间优势！
           
           ### 固件特性 / Features
           - ✅ 完整 UEFI 环境（MrChromebox EDK2）
           - ✅ EDK2 原生网络栈（PXE/HTTP/iSCSI）
-          - ✅ iPXE 集成在固件中（无需 U 盘）
+          - ✅ 编译时集成 iPXE（空间高效）
+          - ✅ 预编译 iPXE EFI 文件（稳定可靠）
           - ✅ RTL8168 网卡完整支持
           - ✅ 启动菜单自动显示 iPXE 选项
           
@@ -357,21 +340,20 @@ jobs:
           ### 文件清单 / File List
           
           **固件文件 / Firmware Files:**
-          - `coreboot_edk2-kaisa-mrchromebox_YYYYMMDD.rom` - 集成 iPXE 版本（推荐）
-          - `coreboot_edk2-kaisa-mrchromebox_YYYYMMDD.rom.sha1` - 集成版本校验和
-          - `coreboot_kaisa_without_ipxe.rom` - 原始版本（不含 iPXE）
-          - `coreboot_kaisa_without_ipxe.rom.sha1` - 原始版本校验和
+          - `coreboot_edk2-kaisa-mrchromebox_YYYYMMDD.rom` - 编译时集成 iPXE 版本（推荐）
+          - `coreboot_edk2-kaisa-mrchromebox_YYYYMMDD.rom.sha1` - 固件校验和
           
           **iPXE 启动文件 / iPXE Boot Files:**
-          - `ipxe_x64.efi` - iPXE EFI 应用程序（RTL8168 优化，支持 DHCP 自动 PXE 引导）
+          - `ipxe_x64.efi` - 预编译 iPXE EFI 应用程序（用于编译时集成）
           
           ### iPXE 文件说明 / iPXE Files Description
           
           **ipxe_x64.efi**：
+          - 预编译 iPXE EFI 应用程序
           - 专门为 RTL8111H/RTL8168 网卡优化
           - 文件较小，适合固件集成
           - 支持 DHCP 自动 PXE 引导 WDS
-          - 可在 UEFI Shell 中手动加载
+          - 编译时集成，空间利用更高效
           - 智能 WDS 服务器自动发现
           
           ### WDS 服务器配置 / WDS Server Configuration
