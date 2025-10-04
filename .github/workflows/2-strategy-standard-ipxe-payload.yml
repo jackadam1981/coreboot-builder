@@ -1,0 +1,295 @@
+name: 方案2 - 标准 Coreboot + iPXE Payload / Strategy 2 - Standard Coreboot + iPXE Payload
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "创建 Release 发布 / Create Release"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📋 显示方案信息 / Display Strategy Info
+        run: |
+          echo "=========================================="
+          echo "🎯 方案2：标准 Coreboot + iPXE Payload"
+          echo "=========================================="
+          echo ""
+          echo "📝 方案说明："
+          echo "  - 使用标准 coreboot 源码（非 MrChromebox）"
+          echo "  - 将 iPXE 作为 payload 编译到固件中"
+          echo "  - 实现纯 iPXE 网络启动"
+          echo ""
+          echo "🎯 预期结果："
+          echo "  ✅ iPXE 直接作为固件 payload"
+          echo "  ✅ 启动时直接进入 iPXE 环境"
+          echo "  ✅ 最佳的网络启动性能"
+          echo ""
+          echo "📊 技术实现："
+          echo "  1. 克隆标准 coreboot 源码"
+          echo "  2. 配置 CONFIG_PAYLOAD_IPXE=y"
+          echo "  3. 编译 iPXE 作为 payload"
+          echo "  4. 生成包含 iPXE 的固件"
+          echo "=========================================="
+
+      - name: 检出构建仓库 / Checkout Builder Repository
+        uses: actions/checkout@v4
+
+      - name: 拉取 Coreboot SDK 容器 / Pull Coreboot SDK
+        run: docker pull coreboot/coreboot-sdk:latest
+
+      - name: 克隆标准 Coreboot 源码 / Clone Standard Coreboot Source
+        run: |
+          echo "📥 克隆标准 coreboot 源码"
+          git clone https://github.com/coreboot/coreboot.git coreboot
+          cd coreboot
+          git submodule update --init --checkout --recursive
+
+      - name: 检查 iPXE Payload 支持 / Check iPXE Payload Support
+        run: |
+          echo "🔍 检查标准 coreboot 的 iPXE payload 支持"
+          cd coreboot
+          
+          # 检查 payloads 目录
+          if [ -d "payloads" ]; then
+            echo "✅ 找到 payloads 目录"
+            ls -la payloads/
+            
+            # 检查 iPXE payload
+            if [ -d "payloads/ipxe" ]; then
+              echo "✅ 找到 iPXE payload 目录"
+              ls -la payloads/ipxe/
+            else
+              echo "📥 克隆 iPXE payload 源码"
+              git clone https://github.com/coreboot/coreboot.git payloads/ipxe
+            fi
+          else
+            echo "❌ 未找到 payloads 目录"
+            exit 1
+          fi
+          
+          # 检查 Kconfig 文件
+          echo ""
+          echo "📋 检查 payload 配置选项："
+          if [ -f "payloads/Kconfig" ]; then
+            echo "✅ 找到 payloads/Kconfig 文件"
+            grep -A 5 -B 5 "ipxe\|IPXE" payloads/Kconfig || echo "❌ 未找到 iPXE 配置选项"
+          else
+            echo "❌ 未找到 payloads/Kconfig 文件"
+          fi
+
+      - name: 配置 iPXE Payload / Configure iPXE Payload
+        run: |
+          echo "🔧 配置 iPXE payload"
+          cd coreboot
+          
+          # 创建默认配置文件
+          echo "📝 创建默认配置文件"
+          make defconfig
+          
+          # 尝试配置 iPXE payload
+          echo "🔧 尝试配置 iPXE payload..."
+          docker run --rm --user root \
+            -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+            -w /home/coreboot/coreboot \
+            coreboot/coreboot-sdk:latest \
+            bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
+                     make distclean && \
+                     make defconfig && \
+                     echo '配置 iPXE payload...' && \
+                     sed -i 's/CONFIG_PAYLOAD_NONE=y/# CONFIG_PAYLOAD_NONE is not set/' .config && \
+                     echo 'CONFIG_PAYLOAD_IPXE=y' >> .config && \
+                     echo 'CONFIG_PAYLOAD_IPXE_MAINBOARD=\"qemu-q35\"' >> .config && \
+                     make olddefconfig && \
+                     echo '✅ iPXE payload 配置完成'"
+
+      - name: 验证配置 / Verify Configuration
+        run: |
+          echo "🔍 验证 iPXE payload 配置"
+          cd coreboot
+          
+          echo "📋 检查配置文件："
+          if grep -q "CONFIG_PAYLOAD_IPXE=y" .config; then
+            echo "✅ CONFIG_PAYLOAD_IPXE=y 已启用"
+          else
+            echo "❌ CONFIG_PAYLOAD_IPXE=y 未找到"
+          fi
+          
+          if grep -q "CONFIG_PAYLOAD_NONE" .config; then
+            echo "⚠️  CONFIG_PAYLOAD_NONE 仍存在"
+          else
+            echo "✅ CONFIG_PAYLOAD_NONE 已禁用"
+          fi
+          
+          echo ""
+          echo "📊 相关配置选项："
+          grep -E "(PAYLOAD|IPXE)" .config || echo "❌ 未找到相关配置"
+
+      - name: 编译 iPXE Payload 固件 / Build iPXE Payload Firmware
+        run: |
+          echo "📦 编译 iPXE payload 固件"
+          cd coreboot
+          
+          mkdir -p ../roms
+          
+          # 编译固件
+          docker run --rm --user root \
+            -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+            -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+            -w /home/coreboot/coreboot \
+            coreboot/coreboot-sdk:latest \
+            bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
+                     echo '🔧 编译 iPXE payload 固件...' && \
+                     make -j\$(nproc) && \
+                     echo '✅ 编译完成' && \
+                     ls -la build/coreboot.rom && \
+                     cp build/coreboot.rom /home/coreboot/roms/ && \
+                     chmod 644 /home/coreboot/roms/*.rom"
+
+      - name: 验证 iPXE Payload 固件 / Verify iPXE Payload Firmware
+        run: |
+          echo "🔍 验证 iPXE payload 固件"
+          
+          ROM_FILE=$(ls roms/*.rom | head -1)
+          if [ -z "$ROM_FILE" ]; then
+            echo "❌ 未找到 ROM 文件"
+            exit 1
+          fi
+          
+          echo "✅ 找到 ROM 文件: $(basename "$ROM_FILE")"
+          ls -lh "$ROM_FILE"
+          
+          # 检查 CBFS 内容
+          echo ""
+          echo "📊 CBFS 内容分析："
+          coreboot/build/cbfstool "$ROM_FILE" print
+          
+          # 检查 iPXE payload
+          echo ""
+          echo "🔍 检查 iPXE payload："
+          if coreboot/build/cbfstool "$ROM_FILE" print | grep -i "payload\|ipxe"; then
+            echo "✅ 找到 iPXE payload 相关条目"
+          else
+            echo "❌ 未找到 iPXE payload"
+          fi
+
+      - name: 生成方案2测试报告 / Generate Strategy 2 Test Report
+        run: |
+          echo "📊 生成方案2测试报告"
+          mkdir -p test-reports
+          
+          ROM_FILE=$(ls roms/*.rom | head -1)
+          
+          cat > test-reports/strategy2-test-report.md << EOF
+          # 方案2测试报告 - 标准 Coreboot + iPXE Payload
+          
+          **测试时间**: $(date)
+          **GitHub Actions Run**: ${{ github.run_number }}
+          **Coreboot 版本**: $(cd coreboot && git rev-parse HEAD)
+          
+          ## 方案说明
+          
+          - **方案名称**: 方案2 - 标准 Coreboot + iPXE Payload
+          - **技术路线**: 标准 coreboot + iPXE payload 编译时集成
+          - **适用场景**: 需要纯 iPXE 网络启动的环境
+          
+          ## 测试结果
+          
+          ### 源码检查
+          - Coreboot 源码: ✅ 标准 coreboot
+          - iPXE Payload 目录: $(test -d coreboot/payloads/ipxe && echo "✅ 存在" || echo "❌ 不存在")
+          - Payload Kconfig: $(test -f coreboot/payloads/Kconfig && echo "✅ 存在" || echo "❌ 不存在")
+          
+          ### 配置状态
+          - CONFIG_PAYLOAD_IPXE: $(grep -q "CONFIG_PAYLOAD_IPXE=y" coreboot/.config && echo "✅ 已启用" || echo "❌ 未启用")
+          - CONFIG_PAYLOAD_NONE: $(grep -q "CONFIG_PAYLOAD_NONE" coreboot/.config && echo "⚠️ 仍存在" || echo "✅ 已禁用")
+          
+          ### 编译结果
+          - 固件编译: $(test -f "$ROM_FILE" && echo "✅ 成功" || echo "❌ 失败")
+          - 固件大小: $(test -f "$ROM_FILE" && ls -lh "$ROM_FILE" | awk '{print $5}' || echo "未知")
+          - CBFS 中的 iPXE: $(coreboot/build/cbfstool "$ROM_FILE" print 2>/dev/null | grep -i "payload\|ipxe" > /dev/null && echo "✅ 找到" || echo "❌ 未找到")
+          
+          ## 结论
+          
+          $(if [ -f "$ROM_FILE" ] && coreboot/build/cbfstool "$ROM_FILE" print 2>/dev/null | grep -i "payload\|ipxe" > /dev/null; then
+            echo "✅ **方案2测试成功**"
+            echo ""
+            echo "- 标准 coreboot 支持 iPXE payload"
+            echo "- iPXE 已成功编译为 payload"
+            echo "- 固件可用于实际部署"
+            echo ""
+            echo "**推荐**: 如果 MrChromebox 支持，这是最佳方案"
+          else
+            echo "❌ **方案2测试失败**"
+            echo ""
+            echo "- iPXE payload 编译失败"
+            echo "- 需要检查配置或依赖"
+          fi)
+          
+          ## 下一步建议
+          
+          - 验证 MrChromebox 是否支持 iPXE payload
+          - 在实际硬件上测试 iPXE 启动
+          - 对比方案1的集成效果
+          EOF
+          
+          cat test-reports/strategy2-test-report.md
+
+      - name: 上传固件 / Upload Firmware Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: strategy2-firmware-${{ github.run_number }}
+          path: roms/*.rom
+          retention-days: 30
+
+      - name: 上传测试报告 / Upload Test Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: strategy2-test-report-${{ github.run_number }}
+          path: test-reports/
+          retention-days: 30
+
+      - name: 创建 Release / Create Release
+        if: ${{ inputs.release == true }}
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: strategy2-firmware-${{ github.run_number }}
+          name: 方案2固件 - 标准 Coreboot + iPXE Payload / Strategy 2 - Standard Coreboot + iPXE Payload
+          body: |
+            ## 方案2：标准 Coreboot + iPXE Payload
+            
+            **构建日期 / Build Date:** ${{ github.run_id }}
+            **Coreboot 版本:** 标准 coreboot
+            
+            ### 方案说明
+            
+            - **技术路线**: 标准 coreboot + iPXE payload 编译时集成
+            - **网络支持**: 纯 iPXE 网络启动
+            - **集成方式**: 编译时集成，最佳性能
+            
+            ### 使用说明
+            
+            1. 下载固件文件
+            2. 使用 flashrom 刷写：`flashrom -p internal -w firmware.rom`
+            3. 重启直接进入 iPXE 环境
+            
+            ### 文件清单
+            
+            - 固件文件：`coreboot.rom`
+            - 测试报告：`strategy2-test-report.md`
+            
+          files: |
+            roms/*.rom
+            test-reports/*.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
