@@ -40,6 +40,7 @@ flashrom -p internal -w coreboot_edk2-kaisa-mrchromebox_*.rom
 
 ## 详细文档
 
+- **[iPXE 集成策略方案](docs/iPXE_Integration_Strategies.md)** - 所有 iPXE 集成方案的详细列表和测试计划
 - [WDS 启动优盘制作指南](docs/WDS_Boot_Disk_Guide.md) - 详细的启动优盘制作说明
 - [网络配置说明](docs/Network_Configuration.md) - DHCP 和 WDS 服务器配置
 - [故障排除指南](docs/Troubleshooting.md) - 常见问题解决方案
