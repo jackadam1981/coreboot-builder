@@ -127,8 +127,21 @@ MakeWinPEMedia /ISO D:\WinPE_amd64 D:\WinPE_Custom.iso
 
 在 DHCP 服务器中配置以下选项：
 
+**Windows DHCP 服务器 (PowerShell):**
+```powershell
+# UEFI x64 客户端
+Set-DhcpServerv4OptionValue -ScopeId 10.10.10.0 -PolicyName "PXEClient (UEFI x64)" -OptionId 067 -Value "boot\x64\wdsmgfw.efi"
+
+# UEFI x86 客户端  
+Set-DhcpServerv4OptionValue -ScopeId 10.10.10.0 -PolicyName "PXEClient (UEFI x86)" -OptionId 067 -Value "boot\x86\wdsmgfw.efi"
+
+# BIOS 客户端 (x86 & x64)
+Set-DhcpServerv4OptionValue -ScopeId 10.10.10.0 -PolicyName "PXEClient (BIOS x86 & x64)" -OptionId 067 -Value "boot\x64\wdsnbp.com"
+```
+
+**通用 DHCP 配置:**
 - **Option 66 (Next Server)**: WDS 服务器 IP 地址
-- **Option 67 (Boot File Name)**: 启动文件名（如 `bootmgr.efi`）
+- **Option 67 (Boot File)**: `boot/x64/wdsmgfw.efi` (UEFI) 或 `boot/x64/wdsnbp.com` (BIOS)
 
 ### iPXE 自动发现
 

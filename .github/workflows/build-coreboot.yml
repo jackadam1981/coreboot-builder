@@ -115,27 +115,27 @@ jobs:
         echo DHCP WDS info not found, trying auto-discovery...
         
         # 尝试自定义 WDS 服务器（如果用户指定了）
-        ${{ inputs.wds_server && inputs.wds_boot_file && format('chain tftp://{0}/{1} || ', inputs.wds_server, inputs.wds_boot_file) || '' }}chain tftp://${gateway}/bootmgr.efi || \
-        chain tftp://${gateway}/bootx64.efi || \
-        chain tftp://192.168.0.10/bootmgr.efi || \
-        chain tftp://192.168.0.10/bootx64.efi || \
-        chain tftp://192.168.1.10/bootmgr.efi || \
-        chain tftp://192.168.1.10/bootx64.efi || \
-        chain tftp://192.168.10.10/bootmgr.efi || \
-        chain tftp://192.168.10.10/bootx64.efi || \
-        chain tftp://10.0.0.10/bootmgr.efi || \
-        chain tftp://10.0.0.10/bootx64.efi || \
-        chain tftp://10.0.1.10/bootmgr.efi || \
-        chain tftp://10.0.1.10/bootx64.efi || \
-        chain tftp://10.0.10.10/bootmgr.efi || \
-        chain tftp://10.0.10.10/bootx64.efi || \
-        chain tftp://172.16.0.10/bootmgr.efi || \
-        chain tftp://172.16.0.10/bootx64.efi || {
+        ${{ inputs.wds_server && inputs.wds_boot_file && format('chain tftp://{0}/{1} || ', inputs.wds_server, inputs.wds_boot_file) || '' }}chain tftp://${gateway}/boot/x64/wdsmgfw.efi || \
+        chain tftp://${gateway}/boot/x64/wdsnbp.com || \
+        chain tftp://192.168.0.10/boot/x64/wdsmgfw.efi || \
+        chain tftp://192.168.0.10/boot/x64/wdsnbp.com || \
+        chain tftp://192.168.1.10/boot/x64/wdsmgfw.efi || \
+        chain tftp://192.168.1.10/boot/x64/wdsnbp.com || \
+        chain tftp://192.168.10.10/boot/x64/wdsmgfw.efi || \
+        chain tftp://192.168.10.10/boot/x64/wdsnbp.com || \
+        chain tftp://10.0.0.10/boot/x64/wdsmgfw.efi || \
+        chain tftp://10.0.0.10/boot/x64/wdsnbp.com || \
+        chain tftp://10.0.1.10/boot/x64/wdsmgfw.efi || \
+        chain tftp://10.0.1.10/boot/x64/wdsnbp.com || \
+        chain tftp://10.0.10.10/boot/x64/wdsmgfw.efi || \
+        chain tftp://10.0.10.10/boot/x64/wdsnbp.com || \
+        chain tftp://172.16.0.10/boot/x64/wdsmgfw.efi || \
+        chain tftp://172.16.0.10/boot/x64/wdsnbp.com || {
           echo All WDS servers failed, entering shell
           echo You can manually configure WDS server:
           echo   set next-server <WDS_IP>
-          echo   chain tftp://\${next-server}/bootmgr.efi
-          echo   # or try: chain tftp://\${next-server}/bootx64.efi
+          echo   chain tftp://\${next-server}/boot/x64/wdsmgfw.efi
+          echo   # or try: chain tftp://\${next-server}/boot/x64/wdsnbp.com
           shell
         }
         EOF
@@ -445,6 +445,7 @@ jobs:
           1. **DHCP 自动配置**（推荐）
              - 在 DHCP 服务器中设置 option 66 (next-server) 和 option 67 (filename)
              - iPXE 会自动使用这些信息连接 WDS 服务器
+             - 标准 WDS 启动文件：`boot/x64/wdsmgfw.efi` (UEFI) 或 `boot/x64/wdsnbp.com` (BIOS)
           
           2. **工作流自定义配置**
              - 运行工作流时可指定 WDS 服务器地址和启动文件
