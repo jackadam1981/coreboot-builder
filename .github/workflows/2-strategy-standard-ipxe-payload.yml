@@ -116,7 +116,7 @@ jobs:
           CONFIG_DRIVERS_UART_8250IO=y
           CONFIG_POWER_STATE_OFF_AFTER_FAILURE=y
           CONFIG_PAYLOAD_ELF=y
-          CONFIG_PAYLOAD_FILE="ipxe_files/ipxe.efi"
+          CONFIG_PAYLOAD_FILE="../ipxe_files/ipxe.efi"
           CONFIG_COMPRESSED_PAYLOAD_NONE=y
           EOF
           
