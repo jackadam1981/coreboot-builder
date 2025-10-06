@@ -164,7 +164,7 @@ jobs:
               echo '🔧 添加 Realtek 网络启动支持作为 PCI Option ROM...'
               
               # RTL8111H PCI ID: Vendor=10ec, Device=8168
-              # 命名格式: pci<vendor>,<device>.rom
+              # 命名格式: pci<vendor>,<device>.rom (coreboot 标准格式)
               
               # 添加 GBE PXE ROM 作为 PCI Option ROM
               coreboot/build/cbfstool coreboot/roms/$ROM_BASENAME add \
