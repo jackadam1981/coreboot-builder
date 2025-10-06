@@ -36,16 +36,17 @@ jobs:
           echo "  ✅ 最简单、最可靠的集成方式"
           echo ""
           echo "📊 技术实现："
-          echo "  1. 下载 iPXE EFI（包含 Realtek 驱动）"
+          echo "  1. 使用仓库中的 Realtek GBE PXE ROM Code 2.70"
           echo "  2. 编译 MrChromebox 固件（EDK2 payload）"
           echo "  3. 使用 cbfstool 添加作为 PCI Option ROM"
           echo "  4. PCI Vendor ID: 0x10ec, Device ID: 0x8168"
           echo ""
           echo "💡 技术优势："
-          echo "  ⭐ 集成复杂度较低"
-          echo "  ⭐ iPXE 内置 Realtek 驱动支持"
+          echo "  ⭐ 集成复杂度最低"
+          echo "  ⭐ 官方 Realtek PXE ROM 支持"
           echo "  ⭐ 不依赖 EDK2 网络栈"
           echo "  ⭐ 启动速度快"
+          echo "  ⭐ 仓库预置文件，无需下载"
           echo "=========================================="
 
       - name: 检出构建仓库 / Checkout Builder Repository
@@ -89,34 +90,43 @@ jobs:
           echo "🎯 目标：GBE PXE ROM Code 2.70 - 最适合 RTL8111H"
           echo "📊 文件信息：199KB，2024年6月更新，支持 RTL8168 系列"
           
-          # 下载 Realtek GBE PXE ROM Code 2.70
-          echo "📥 下载 Realtek GBE PXE ROM Code 2.70"
+          # 使用仓库中的 Realtek GBE PXE ROM Code 2.70
+          echo "📦 使用仓库中的 Realtek GBE PXE ROM Code 2.70"
           
-          # 方案1：从 Realtek 官方下载
-          wget -O RTEGPXE.270.zip "https://www.realtek.com/.../RTEGPXE.270.zip" 2>/dev/null || {
-            echo "⚠️ 官方下载失败，尝试备用方案"
-            
-            # 备用方案1：从可信镜像下载
-            wget -O RTEGPXE.270.zip "https://github.com/ipxe/ipxe/raw/master/src/bin/RTEGPXE.270.zip" 2>/dev/null || {
-              echo "⚠️ 备用源1下载失败，尝试备用方案2"
-              
-              # 备用方案2：从其他可信源下载
-              wget -O RTEGPXE.270.zip "https://downloads.sourceforge.net/project/realtek/drivers/RTEGPXE.270.zip" 2>/dev/null || {
-                echo "⚠️ 备用源2下载失败，使用 iPXE 替代方案"
-              
-              # 方案2：使用 iPXE 内置驱动
-              echo "📥 下载预编译 iPXE EFI（包含 Realtek 驱动）"
-              wget -O rtl8111_ipxe.efi "https://boot.ipxe.org/ipxe.efi" || {
-                echo "❌ iPXE 下载失败"
-                exit 1
-              }
-              echo "✅ iPXE EFI 下载成功"
-            }
-          }
-          
-          # 如果 ZIP 文件下载成功，解压并提取 PXE ROM
+          # 检查仓库中是否已有文件
           if [ -f "RTEGPXE.270.zip" ]; then
-            echo "✅ RTEGPXE.270.zip 下载成功"
+            echo "✅ 找到仓库中的 RTEGPXE.270.zip 文件"
+            echo "📊 文件大小：$(du -h RTEGPXE.270.zip | cut -f1)"
+          else
+            echo "⚠️ 仓库中未找到 PXE ROM 文件，尝试下载"
+            
+            # 备用方案：如果仓库中没有文件，尝试下载
+            wget -O RTEGPXE.270.zip "https://www.realtek.com/.../RTEGPXE.270.zip" 2>/dev/null || {
+              echo "⚠️ 官方下载失败，尝试备用方案"
+              
+              # 备用方案1：从可信镜像下载
+              wget -O RTEGPXE.270.zip "https://github.com/ipxe/ipxe/raw/master/src/bin/RTEGPXE.270.zip" 2>/dev/null || {
+                echo "⚠️ 备用源1下载失败，尝试备用方案2"
+                
+                # 备用方案2：从其他可信源下载
+                wget -O RTEGPXE.270.zip "https://downloads.sourceforge.net/project/realtek/drivers/RTEGPXE.270.zip" 2>/dev/null || {
+                  echo "⚠️ 备用源2下载失败，使用 iPXE 替代方案"
+                
+                  # 方案2：使用 iPXE 内置驱动
+                  echo "📥 下载预编译 iPXE EFI（包含 Realtek 驱动）"
+                  wget -O rtl8111_ipxe.efi "https://boot.ipxe.org/ipxe.efi" || {
+                    echo "❌ iPXE 下载失败"
+                    exit 1
+                  }
+                  echo "✅ iPXE EFI 下载成功"
+                }
+              }
+            }
+          fi
+          
+          # 如果 ZIP 文件存在，解压并提取 PXE ROM
+          if [ -f "RTEGPXE.270.zip" ]; then
+            echo "✅ RTEGPXE.270.zip 文件可用"
             echo "📦 解压 PXE ROM 文件..."
             
             unzip -q RTEGPXE.270.zip
