@@ -185,19 +185,70 @@ efi/ipxe/ipxe.efi     # iPXE 专用路径
 
 ---
 
+## 🎯 **方案7：Realtek 8111 PXE ROM 集成** ⭐**新方案 - 最简单**
+
+### **目标**
+- 集成 Realtek 官方 PXE ROM 到 coreboot/EDK2
+- 利用硬件原生 PXE 支持
+- 无需修改 payload 或网络栈
+
+### **技术实现**
+```bash
+# 1. 下载 Realtek 8111 官方 PXE ROM
+wget https://www.realtek.com/.../rtl8111_pxe_uefi.rom
+
+# 2. 添加到 CBFS 作为 PCI Option ROM
+cbfstool coreboot.rom add \
+  -f rtl8111_pxe_uefi.rom \
+  -n pci10ec,8168.rom \
+  -t raw
+
+# 3. coreboot 自动加载 PCI Option ROM
+# RTL8111H: Vendor ID = 0x10ec, Device ID = 0x8168
+```
+
+### **预期结果**
+- 硬件层面启用网络启动
+- BIOS/UEFI 自动识别网卡的 PXE 能力
+- 最简单、最可靠的集成方式
+
+### **测试状态**
+- ✅ 工作流待创建：`7-strategy-rtl8111-pxe-rom.yml`
+- ⏳ 待测试
+- 📝 测试要点：PCI Option ROM 加载、网络启动功能
+- 💡 **优势**：
+  - 官方支持，兼容性好
+  - 不依赖 EDK2 网络栈
+  - 不需要修改 iPXE
+  - 集成步骤最简单
+
+### **技术优势**
+| 特性 | 方案7 (PXE ROM) | 方案1 (iPXE) | 方案2 (iPXE Payload) |
+|------|----------------|--------------|---------------------|
+| **集成复杂度** | ⭐ 最简单 | ⭐⭐⭐ 中等 | ⭐⭐⭐⭐ 复杂 |
+| **官方支持** | ✅ Realtek 官方 | ❌ 社区 | ❌ 社区 |
+| **网络兼容性** | ✅ 硬件原生 | ⚠️ 依赖驱动 | ✅ iPXE 驱动 |
+| **启动速度** | ⭐⭐⭐ 快 | ⭐⭐ 一般 | ⭐⭐ 一般 |
+| **功能丰富性** | ⭐⭐ 基础 PXE | ⭐⭐⭐⭐⭐ 高级功能 | ⭐⭐⭐⭐⭐ 高级功能 |
+
+---
+
 ## 📊 **测试优先级**
 
+### **最高优先级** 🔥
+1. **方案7** - Realtek 8111 PXE ROM 集成（最简单、最可靠）
+
 ### **高优先级**
-1. **方案1** - MrChromebox EDK2 + 运行时 iPXE 集成（当前方案）
-2. **方案2** - 标准 Coreboot + iPXE Payload（最佳方案，待验证）
+2. **方案2** - 标准 Coreboot + iPXE Payload（功能最强）
 3. **方案5** - 纯 EDK2 网络启动（基础验证）
 
 ### **中优先级**
-4. **方案4** - QEMU 测试环境（开发测试）
-5. **方案6** - 多路径 iPXE 集成（优化测试）
+4. **方案1** - MrChromebox EDK2 + 运行时 iPXE 集成（已发现 EDK2 网络栈问题）
+5. **方案4** - QEMU 测试环境（开发测试）
+6. **方案6** - 多路径 iPXE 集成（优化测试）
 
 ### **低优先级**
-6. **方案3** - MrChromebox + 预编译 iPXE 编译时集成（已确认不支持）
+7. **方案3** - MrChromebox + 预编译 iPXE 编译时集成（已确认不支持）
 
 ---
 
