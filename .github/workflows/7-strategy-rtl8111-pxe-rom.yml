@@ -71,7 +71,7 @@ jobs:
           cd pxerom_files
           
           # 解压并提取 PXE ROM
-          unzip -q RTEGPXE.270.zip
+          unzip -q ../RTEGPXE.270.zip
           cp BIN/rtegpxe.nic gbe_pxe_rom_2.70.rom
           
           echo "✅ PXE ROM 提取成功"
