@@ -109,21 +109,36 @@ jobs:
               # 检查编译结果
               echo ''
               echo '📦 编译完成，检查生成的文件：'
-              ls -lh ~/dev/firmware/ || echo '⚠️ firmware 目录不存在'
-              ls -lh ~/dev/roms/ || echo '⚠️ roms 目录不存在'
+              
+              # 查找 MrChromebox 的实际输出路径
+              echo '🔍 查找编译输出文件...'
+              find ~/dev -name "*.rom" -type f 2>/dev/null | head -10 || echo '⚠️ ~/dev 下未找到 ROM 文件'
+              find . -name "*.rom" -type f 2>/dev/null | head -10
+              
+              # 检查常见的输出路径
+              ROM_FILE=""
+              for path in ~/dev/roms/coreboot_edk2-kaisa-mrchromebox_*.rom ~/dev/firmware/*.rom; do
+                if [ -f "$path" ]; then
+                  ROM_FILE="$path"
+                  echo "✅ 找到 ROM 文件: $ROM_FILE"
+                  break
+                fi
+              done
+              
+              if [ -z "$ROM_FILE" ]; then
+                echo '❌ 未找到编译生成的 ROM 文件'
+                echo '📋 当前目录结构：'
+                ls -la
+                echo '📋 ~/dev 目录结构：'
+                ls -la ~/dev/ 2>/dev/null || echo '⚠️ ~/dev 目录不存在'
+                exit 1
+              fi
               
               # 复制生成的 ROM 文件到统一位置
               mkdir -p /home/coreboot/coreboot/roms
-              if [ -f ~/dev/roms/coreboot_edk2-kaisa-mrchromebox_*.rom ]; then
-                cp ~/dev/roms/coreboot_edk2-kaisa-mrchromebox_*.rom /home/coreboot/coreboot/roms/
-                echo '✅ ROM 文件已复制'
-              elif [ -f ~/dev/firmware/*.rom ]; then
-                cp ~/dev/firmware/*.rom /home/coreboot/coreboot/roms/
-                echo '✅ ROM 文件已复制（从 firmware 目录）'
-              else
-                echo '❌ 未找到编译生成的 ROM 文件'
-                exit 1
-              fi
+              ROM_BASENAME="coreboot_edk2-kaisa-mrchromebox_$(date +%Y%m%d).rom"
+              cp "$ROM_FILE" "/home/coreboot/coreboot/roms/$ROM_BASENAME"
+              echo "✅ ROM 文件已复制: /home/coreboot/coreboot/roms/$ROM_BASENAME"
               
               # 设置权限
               chmod 644 /home/coreboot/coreboot/roms/*.rom
