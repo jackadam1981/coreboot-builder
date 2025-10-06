@@ -89,17 +89,19 @@ jobs:
           echo "🎯 目标：GBE PXE ROM Code 2.70 - 最适合 RTL8111H"
           echo "📊 文件信息：199KB，2024年6月更新，支持 RTL8168 系列"
           
-          # 尝试从 Realtek 官方下载 GBE PXE ROM Code 2.70
-          # 注意：需要找到实际的下载链接
-          wget -O gbe_pxe_rom_2.70.rom "https://www.realtek.com/.../gbe_pxe_rom_code_2.70.rom" 2>/dev/null || {
+          # 下载 Realtek GBE PXE ROM Code 2.70
+          echo "📥 下载 Realtek GBE PXE ROM Code 2.70"
+          
+          # 方案1：从 Realtek 官方下载
+          wget -O RTEGPXE.270.zip "https://www.realtek.com/.../RTEGPXE.270.zip" 2>/dev/null || {
             echo "⚠️ 官方下载失败，尝试备用方案"
             
             # 备用方案1：从可信镜像下载
-            wget -O gbe_pxe_rom_2.70.rom "https://github.com/ipxe/ipxe/raw/master/src/bin/10ec8168.rom" 2>/dev/null || {
+            wget -O RTEGPXE.270.zip "https://github.com/ipxe/ipxe/raw/master/src/bin/RTEGPXE.270.zip" 2>/dev/null || {
               echo "⚠️ 备用源1下载失败，尝试备用方案2"
               
               # 备用方案2：从其他可信源下载
-              wget -O gbe_pxe_rom_2.70.rom "https://downloads.sourceforge.net/project/realtek/drivers/gbe_pxe_rom_2.70.rom" 2>/dev/null || {
+              wget -O RTEGPXE.270.zip "https://downloads.sourceforge.net/project/realtek/drivers/RTEGPXE.270.zip" 2>/dev/null || {
                 echo "⚠️ 备用源2下载失败，使用 iPXE 替代方案"
               
               # 方案2：使用 iPXE 内置驱动
@@ -112,12 +114,24 @@ jobs:
             }
           }
           
-          # 如果 GBE PXE ROM 下载成功
-          if [ -f "gbe_pxe_rom_2.70.rom" ]; then
-            echo "✅ GBE PXE ROM Code 2.70 下载成功"
-            echo "🧪 准备测试 GBE PXE ROM 与 RTL8111H 的兼容性"
-            echo "📊 文件大小：$(du -h gbe_pxe_rom_2.70.rom | cut -f1)"
-            echo "🎯 这是最适合 RTL8111H 的官方 PXE ROM！"
+          # 如果 ZIP 文件下载成功，解压并提取 PXE ROM
+          if [ -f "RTEGPXE.270.zip" ]; then
+            echo "✅ RTEGPXE.270.zip 下载成功"
+            echo "📦 解压 PXE ROM 文件..."
+            
+            unzip -q RTEGPXE.270.zip
+            
+            # 复制 rtegpxe.nic (56KB) 作为我们的 PXE ROM
+            if [ -f "BIN/rtegpxe.nic" ]; then
+              cp BIN/rtegpxe.nic gbe_pxe_rom_2.70.rom
+              echo "✅ GBE PXE ROM Code 2.70 提取成功"
+              echo "📊 文件大小：$(du -h gbe_pxe_rom_2.70.rom | cut -f1)"
+              echo "🎯 PCI ID: 0x10ec:0x8168 (RTL8111H)"
+              echo "🧪 准备测试 GBE PXE ROM 与 RTL8111H 的兼容性"
+            else
+              echo "❌ 未找到 BIN/rtegpxe.nic 文件"
+              exit 1
+            fi
           fi
           
           # 方案3：可选 - 编译自定义 iPXE（作为备用）
@@ -262,7 +276,8 @@ EOF
               # 优先测试 GBE PXE ROM Code 2.70
               if [ -f pxerom_files/gbe_pxe_rom_2.70.rom ]; then
                 echo '🧪 测试 GBE PXE ROM Code 2.70 兼容性'
-                echo '📦 使用 gbe_pxe_rom_2.70.rom (199KB, 2024/06/03)'
+                echo '📦 使用 gbe_pxe_rom_2.70.rom (56KB, 2024/05/27)'
+                echo '🎯 来源：Realtek rtegpxe.nic，PCI ID: 0x10ec:0x8168'
                 
                 # 方案1: 添加 GBE PXE ROM Code 2.70
                 coreboot/build/cbfstool coreboot/roms/$ROM_BASENAME add \

@@ -1,0 +1,97 @@
+;************************************************************************
+;*
+;*  Chapter 1. How to use this patch file?
+;*
+;*      This file (NIC.TXT) contains info. that helps you patch
+;*      'RTGBPXE.NIC'(v1.01) file into your own Boot ROM driver.
+;*
+;*      To generate your custom driver, please follow the steps
+;*      described below:
+;*
+;*      a). Follow the instructions to edit the message area in each
+;*          line. Save this file when you finish editing.
+;*          ( see CHAPTER 2 for more details ! )
+;*
+;*         !!! NOTE: DO NOT EDIT THE OFFSET AND LENGTH AREA !!!
+;*
+;*      b). Make sure that you have the following files in your working
+;*          directory:
+;*
+;*              RTPATCH.EXE      ------->   The patch execution file
+;*              RTGBPXE.NIC      ------->   BOOT ROM image file
+;*              NIC.TXT          ------->   ROM patch info. file
+;*
+;*      c). After you decide the name for your packet driver,
+;*          simply type:
+;*
+;*          > RTPATCH.EXE RTEGPXE.NIC NIC.TXT  [your rom] <ENTER>  
+;*
+;*         !!! NOTE: DO NOT USE THE SAME DRIVER NAME AS THE ORIGINAL
+;*                   DRIVER!!!
+;*
+;*      d). Then, re-calculate cksum to your rom 
+;*          just type:
+;*
+;*           ROMCKSUM.EXE -cksum=7 [your rom] <ENTER>
+;*
+;*      e). If no error occurs, you should find your custom driver is
+;*          generated under your working directory.
+;*
+;*
+;* Chapter 2. How to edit this file ?
+;*
+;*
+;*      Each line in this file contains a display message info. of the
+;*      driver. Each line has the same format:
+;*
+;*          <offset> <length> <message>
+;*      e.g.
+;*           1266      28      'Packet driver for RTL8129',0x0d,0x0a,'$';
+;*           ----      --      ----------------------------------------
+;*                                                                
+;*        Do not edit here!       |                                 | EOL
+;*                           Put your own message here!           |
+;*          (HEX)     (DEC)                                     delimiter
+;*
+;*
+;*
+;*      *NOTE: DO NOT EDIT THE <offset> AND <length> AREA !!!
+;*
+;*      *NOTE: Anything after comment character ';' will be ignored!
+;*
+;*      *NOTE: Always add ';'(EOL) at end of each line!
+;*
+;*      *NOTE: If delimiter is needed, keep delimiter intact! In this case,
+;*             leave the '$' as the last byte.
+;*
+;*      *NOTE: 0H can only be added as delimiter! Message after 0H will be lost!
+;*
+;*      *NOTE: Total length of your message should not exceed <length>.
+;*
+;*      *NOTE: If you must use the comment character (;) in your message,
+;*             put 3bh instead of ';'. Same for (').
+;*
+;*      *NOTE: Do not exceed 250 characters in each line.
+;*
+;************************************************************************
+
+;************************************************************************
+;       Put PXE driver name here
+;************************************************************************
+
+
+165	70	'Realtek PCIe GBE Family Controller Series v2.70 (05/27/24)',0x0d,0x0a,0
+1ab	20	'Realtek PXE B00 D00',0		;'Realtek Boot Agent',0
+251f	44	'Realtek PCI-E Gigabit Ethernet Boot Agent  ',0
+2573	49	'Realtek PCI Express Gigabit Ethernet Boot Agent ',0
+
+44	2	0xec,0x10
+46	2	0x68,0x81
+
+;************************************************************************
+;	'$DisINT',0   ;Enable Int 18h and 19h
+;	'$DisINT',1   ;Disbale Int 18h
+;	'$DisINT',2   ;Disbale Int 19h
+;	'$DisINT',3   ;Disbale Int 18h and 19h
+;************************************************************************
+1000	8	'$DisINT',0
