@@ -102,6 +102,9 @@ jobs:
               pwd
               ls -la
               
+              # 修复 Git 安全目录问题
+              git config --global --add safe.directory /home/coreboot/coreboot
+              
               # 运行 MrChromebox 编译脚本
               echo '🔨 开始编译固件...'
               ./build-uefi.sh kaisa
@@ -112,8 +115,8 @@ jobs:
               
               # 查找 MrChromebox 的实际输出路径
               echo '🔍 查找编译输出文件...'
-              find ~/dev -name "*.rom" -type f 2>/dev/null | head -10 || echo '⚠️ ~/dev 下未找到 ROM 文件'
-              find . -name "*.rom" -type f 2>/dev/null | head -10
+              find ~/dev -name '*.rom' -type f 2>/dev/null | head -10 || echo '⚠️ ~/dev 下未找到 ROM 文件'
+              find . -name '*.rom' -type f 2>/dev/null | head -10
               
               # 检查常见的输出路径
               ROM_FILE=""
