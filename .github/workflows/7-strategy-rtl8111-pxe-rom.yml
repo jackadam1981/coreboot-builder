@@ -3,7 +3,7 @@ name: Realtek iPXE ROM
 on:
   # 支持推送触发和手动触发
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   workflow_dispatch:
     inputs:
       release:
@@ -18,9 +18,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
-    steps:
 
+    steps:
       - name: 检出构建仓库 / Checkout Builder Repository
         uses: actions/checkout@v4
 
@@ -34,15 +33,26 @@ jobs:
           cd coreboot
           git submodule update --init --checkout --recursive
 
+      - name: 配置网络支持 / Configure Network Support
+        run: |
+          echo "📝 追加 EDK2 网络支持配置"
+          cd coreboot
+          echo "" >> configs/cml/config.kaisa.uefi
+          echo "# 网络支持配置" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y" >> configs/cml/config.kaisa.uefi
+          echo "" >> configs/cml/config.kaisa.uefi
+
       - name: 📦 编译 MrChromebox Coreboot 固件 / Build Coreboot
         run: |
           echo "🔨 编译 MrChromebox coreboot（kaisa 主板）"
-          
+
           # 使用 MrChromebox 标准编译流程（参考 build-coreboot.yml）
           # 确保输出目录权限正确
           mkdir -p roms
           chmod 755 roms
-          
+
           # 使用 MrChromebox 标准编译流程
           docker run --rm --user root \
             -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
@@ -89,13 +99,13 @@ jobs:
           name: "Coreboot Kaisa - 方案7 (RTL8111 PXE ROM) #${{ github.run_number }}"
           body: |
             # 🎯 方案7：Realtek 8111 PXE ROM 集成
-            
+
             ## ⚠️ 注意事项
-            
+
             - 刷写固件前请备份原有固件
             - 确保电源稳定，刷写过程中不要断电
             - 建议先在测试设备上验证
-            
+
             **构建时间**: ${{ github.event.repository.updated_at }}
           files: |
             roms/*.rom
@@ -104,5 +114,3 @@ jobs:
             integration_report.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-
