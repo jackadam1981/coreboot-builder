@@ -91,62 +91,31 @@ jobs:
       - name: 📦 编译 MrChromebox Coreboot 固件 / Build Coreboot
         run: |
           echo "🔨 编译 MrChromebox coreboot（kaisa 主板）"
-          docker run --rm \
+          docker run --rm --user root \
             -v "$(pwd)/coreboot:/home/coreboot/coreboot" \
+            -v "$(pwd)/roms:/home/coreboot/roms" \
             -w /home/coreboot/coreboot \
             coreboot/coreboot-sdk:latest \
-            /bin/bash -c "
-              # 显示环境信息
-              echo '📊 编译环境信息：'
-              uname -a
-              pwd
-              ls -la
-              
-              # 修复 Git 安全目录问题
-              git config --global --add safe.directory /home/coreboot/coreboot
-              
-              # 运行 MrChromebox 编译脚本
-              echo '🔨 开始编译固件...'
-              ./build-uefi.sh kaisa
-              
-              # 检查编译结果
-              echo ''
-              echo '📦 编译完成，检查生成的文件：'
-              
-              # 查找 MrChromebox 的实际输出路径
-              echo '🔍 查找编译输出文件...'
-              find ~/dev -name '*.rom' -type f 2>/dev/null | head -10 || echo '⚠️ ~/dev 下未找到 ROM 文件'
-              find . -name '*.rom' -type f 2>/dev/null | head -10
-              
-              # 检查常见的输出路径
-              ROM_FILE=""
-              for path in ~/dev/roms/coreboot_edk2-kaisa-mrchromebox_*.rom ~/dev/firmware/*.rom; do
-                if [ -f "$path" ]; then
-                  ROM_FILE="$path"
-                  echo "✅ 找到 ROM 文件: $ROM_FILE"
-                  break
-                fi
-              done
-              
-              if [ -z "$ROM_FILE" ]; then
-                echo '❌ 未找到编译生成的 ROM 文件'
-                echo '📋 当前目录结构：'
-                ls -la
-                echo '📋 ~/dev 目录结构：'
-                ls -la ~/dev/ 2>/dev/null || echo '⚠️ ~/dev 目录不存在'
-                exit 1
-              fi
-              
-              # 复制生成的 ROM 文件到统一位置
-              mkdir -p /home/coreboot/coreboot/roms
-              ROM_BASENAME="coreboot_edk2-kaisa-mrchromebox_$(date +%Y%m%d).rom"
-              cp "$ROM_FILE" "/home/coreboot/coreboot/roms/$ROM_BASENAME"
-              echo "✅ ROM 文件已复制: /home/coreboot/coreboot/roms/$ROM_BASENAME"
-              
-              # 设置权限
-              chmod 644 /home/coreboot/coreboot/roms/*.rom
-              chown 1001:1001 /home/coreboot/coreboot/roms/*.rom
-            "
+            bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
+                     echo '🔧 使用 MrChromebox build-uefi.sh 编译 kaisa...' && \
+                     ./build-uefi.sh kaisa && \
+                     echo '📦 编译完成，查找输出文件...' && \
+                     find ~/dev -name '*.rom' -type f 2>/dev/null | head -5 && \
+                     find . -name '*.rom' -type f 2>/dev/null | head -5 && \
+                     ROM_FILE=\$(find ~/dev -name '*.rom' -type f 2>/dev/null | head -1) && \
+                     if [ -z \"\$ROM_FILE\" ]; then \
+                       ROM_FILE=\$(find . -name '*.rom' -type f 2>/dev/null | head -1); \
+                     fi && \
+                     if [ -n \"\$ROM_FILE\" ]; then \
+                       ROM_BASENAME=\"coreboot_edk2-kaisa-mrchromebox_\$(date +%Y%m%d).rom\" && \
+                       cp \"\$ROM_FILE\" \"/home/coreboot/roms/\$ROM_BASENAME\" && \
+                       chmod 644 /home/coreboot/roms/*.rom && \
+                       echo \"✅ ROM 文件已复制: /home/coreboot/roms/\$ROM_BASENAME\"; \
+                     else \
+                       echo '❌ 未找到编译生成的 ROM 文件'; \
+                       ls -la ~/dev/ 2>/dev/null || echo '⚠️ ~/dev 目录不存在'; \
+                       exit 1; \
+                     fi"
 
       - name: 🔧 集成 Realtek 8111 PXE ROM / Integrate RTL8111 PXE ROM
         run: |
