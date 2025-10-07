@@ -43,6 +43,12 @@ jobs:
           echo "CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y" >> configs/cml/config.kaisa.uefi
           echo "" >> configs/cml/config.kaisa.uefi
+          echo "# Intel 芯片组系统稳定配置（适合 Kaisa 主板）" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_SOC_INTEL_COMMON_BLOCK_POWER_LIMIT=y" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_SOC_INTEL_COMMON_BLOCK_THERMAL=y" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_SOUTHBRIDGE_INTEL_COMMON_WATCHDOG=y" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL=y" >> configs/cml/config.kaisa.uefi
+          echo "" >> configs/cml/config.kaisa.uefi
 
       - name: 📦 编译 MrChromebox Coreboot 固件 / Build Coreboot
         run: |
