@@ -134,6 +134,11 @@ jobs:
           echo "✅ 找到 ROM 文件: $ROM_FILE"
           ROM_BASENAME=$(basename "$ROM_FILE")
           
+          # 备份原始 ROM 文件（集成前）
+          ORIGINAL_ROM_BASENAME="${ROM_BASENAME%.*}_original.rom"
+          cp "$ROM_FILE" "roms/$ORIGINAL_ROM_BASENAME"
+          echo "📋 原始 ROM 已备份为: $ORIGINAL_ROM_BASENAME"
+          
           # 在 Docker 容器内执行 cbfstool 操作
           docker run --rm --user root \
             -v "$(pwd)/coreboot:/home/coreboot/coreboot" \
@@ -200,30 +205,49 @@ jobs:
                 fi
               fi
               
+              # 重命名集成后的 ROM 文件
+              INTEGRATED_ROM_BASENAME=\"${ROM_BASENAME%.*}_with_pxe_rom.rom\"
+              mv roms/$ROM_BASENAME roms/\$INTEGRATED_ROM_BASENAME
+              
               # 设置权限
-              chmod 644 roms/$ROM_BASENAME
-              chown 1001:1001 roms/$ROM_BASENAME
+              chmod 644 roms/\$INTEGRATED_ROM_BASENAME
+              chown 1001:1001 roms/\$INTEGRATED_ROM_BASENAME
+              
+              echo \"✅ 集成后的 ROM 已重命名为: \$INTEGRATED_ROM_BASENAME\"
               
               echo ''
               echo '📋 ROM 文件信息（集成后）：'
-              coreboot/build/cbfstool roms/$ROM_BASENAME print
+              coreboot/build/cbfstool roms/\$INTEGRATED_ROM_BASENAME print
             "
 
       - name: 📦 验证集成结果 / Verify Integration
         run: |
           echo "📦 验证 Realtek 8111 PXE ROM 集成结果"
           
-          # 查找 ROM 文件
-          ROM_FILE=$(ls roms/*.rom | head -1)
-          if [ -z "$ROM_FILE" ]; then
-            echo "❌ 未找到 ROM 文件"
+          # 查找集成后的 ROM 文件
+          INTEGRATED_ROM_FILE=$(ls roms/*_with_pxe_rom.rom | head -1)
+          ORIGINAL_ROM_FILE=$(ls roms/*_original.rom | head -1)
+          
+          if [ -z "$INTEGRATED_ROM_FILE" ]; then
+            echo "❌ 未找到集成后的 ROM 文件"
+            echo "📋 检查 roms 目录内容："
+            ls -la roms/ 2>/dev/null || echo "⚠️ roms 目录不存在"
             exit 1
           fi
           
-          echo "✅ 找到 ROM 文件: $(basename "$ROM_FILE")"
-          ls -lh "$ROM_FILE"
+          echo "✅ 找到集成后的 ROM 文件: $(basename "$INTEGRATED_ROM_FILE")"
+          if [ -n "$ORIGINAL_ROM_FILE" ]; then
+            echo "✅ 找到原始 ROM 文件: $(basename "$ORIGINAL_ROM_FILE")"
+          fi
           
-          ROM_BASENAME=$(basename "$ROM_FILE")
+          echo ""
+          echo "📊 ROM 文件对比："
+          ls -lh "$INTEGRATED_ROM_FILE"
+          if [ -n "$ORIGINAL_ROM_FILE" ]; then
+            ls -lh "$ORIGINAL_ROM_FILE"
+          fi
+          
+          ROM_BASENAME=$(basename "$INTEGRATED_ROM_FILE")
           
           # 在 Docker 容器内验证
           docker run --rm --user root \
@@ -265,19 +289,39 @@ jobs:
           cd roms
           # 使用 sudo 删除旧的校验和文件
           sudo rm -f *.sha1 *.sha256 2>/dev/null || true
-          sha1sum "$(basename "$ROM_FILE")" > "$(basename "$ROM_FILE").sha1"
-          sha256sum "$(basename "$ROM_FILE")" > "$(basename "$ROM_FILE").sha256"
+          
+          # 为集成后的 ROM 生成校验和
+          sha1sum "$(basename "$INTEGRATED_ROM_FILE")" > "$(basename "$INTEGRATED_ROM_FILE").sha1"
+          sha256sum "$(basename "$INTEGRATED_ROM_FILE")" > "$(basename "$INTEGRATED_ROM_FILE").sha256"
+          
+          # 为原始 ROM 生成校验和（如果存在）
+          if [ -n "$ORIGINAL_ROM_FILE" ]; then
+            sha1sum "$(basename "$ORIGINAL_ROM_FILE")" > "$(basename "$ORIGINAL_ROM_FILE").sha1"
+            sha256sum "$(basename "$ORIGINAL_ROM_FILE")" > "$(basename "$ORIGINAL_ROM_FILE").sha256"
+          fi
+          
           echo "✅ 校验和已生成"
-          cat *.sha1
-          cat *.sha256
+          echo ""
+          echo "📊 集成后的 ROM 校验和："
+          cat "$(basename "$INTEGRATED_ROM_FILE").sha1"
+          cat "$(basename "$INTEGRATED_ROM_FILE").sha256"
+          
+          if [ -n "$ORIGINAL_ROM_FILE" ]; then
+            echo ""
+            echo "📊 原始 ROM 校验和："
+            cat "$(basename "$ORIGINAL_ROM_FILE").sha1"
+            cat "$(basename "$ORIGINAL_ROM_FILE").sha256"
+          fi
           cd ..
 
       - name: 📝 生成集成报告 / Generate Integration Report
         run: |
           echo "📝 生成方案7集成报告"
           
-          ROM_FILE=$(ls roms/*.rom | head -1)
-          ROM_NAME=$(basename "$ROM_FILE")
+          INTEGRATED_ROM_FILE=$(ls roms/*_with_pxe_rom.rom | head -1)
+          ORIGINAL_ROM_FILE=$(ls roms/*_original.rom | head -1)
+          INTEGRATED_ROM_NAME=$(basename "$INTEGRATED_ROM_FILE")
+          ORIGINAL_ROM_NAME=$(basename "$ORIGINAL_ROM_FILE" 2>/dev/null || echo "未找到")
           
           cat > integration_report.md << EOF
           # 方案7 - Realtek 8111 PXE ROM 集成报告
@@ -285,8 +329,10 @@ jobs:
           ## 📋 构建信息
           
           - **构建日期**: $(date '+%Y-%m-%d %H:%M:%S')
-          - **固件文件**: $ROM_NAME
-          - **固件大小**: $(du -h "$ROM_FILE" | cut -f1)
+          - **集成后固件**: $INTEGRATED_ROM_NAME
+          - **集成后大小**: $(du -h "$INTEGRATED_ROM_FILE" | cut -f1)
+          - **原始固件**: $ORIGINAL_ROM_NAME
+          - **原始大小**: $(du -h "$ORIGINAL_ROM_FILE" | cut -f1 2>/dev/null || echo "未找到")
           - **方案类型**: Realtek 8111 PXE ROM 集成
           
           ## 🎯 方案说明
@@ -311,19 +357,31 @@ jobs:
           
           ### 验证结果
           \`\`\`
-          $(docker run --rm -v "$(pwd)/coreboot:/home/coreboot/coreboot" -w /home/coreboot coreboot/coreboot-sdk:latest /bin/bash -c "coreboot/build/cbfstool coreboot/roms/$ROM_NAME print | grep -A 3 'pci10ec,8168.rom' || echo 'PXE ROM 未找到'")
+          $(docker run --rm -v "$(pwd)/coreboot:/home/coreboot/coreboot" -w /home/coreboot coreboot/coreboot-sdk:latest /bin/bash -c "coreboot/build/cbfstool roms/$INTEGRATED_ROM_NAME print | grep -A 3 'pci10ec,8168.rom' || echo 'PXE ROM 未找到'")
           \`\`\`
           
           ## 🔐 校验和
           
-          ### SHA1
+          ### 集成后固件
+          **SHA1**:
           \`\`\`
-          $(cat roms/*.sha1)
+          $(cat "$INTEGRATED_ROM_FILE.sha1" 2>/dev/null || echo "未生成")
           \`\`\`
           
-          ### SHA256
+          **SHA256**:
           \`\`\`
-          $(cat roms/*.sha256)
+          $(cat "$INTEGRATED_ROM_FILE.sha256" 2>/dev/null || echo "未生成")
+          \`\`\`
+          
+          ### 原始固件
+          **SHA1**:
+          \`\`\`
+          $(cat "$ORIGINAL_ROM_FILE.sha1" 2>/dev/null || echo "未生成")
+          \`\`\`
+          
+          **SHA256**:
+          \`\`\`
+          $(cat "$ORIGINAL_ROM_FILE.sha256" 2>/dev/null || echo "未生成")
           \`\`\`
           
           ## 📝 使用说明
