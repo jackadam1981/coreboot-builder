@@ -293,13 +293,13 @@ jobs:
           sudo rm -f *.sha1 *.sha256 2>/dev/null || true
           
           # 为集成后的 ROM 生成校验和
-          sudo sha1sum "$(basename "$INTEGRATED_ROM_FILE")" > "$(basename "$INTEGRATED_ROM_FILE").sha1"
-          sudo sha256sum "$(basename "$INTEGRATED_ROM_FILE")" > "$(basename "$INTEGRATED_ROM_FILE").sha256"
+          sudo bash -c "sha1sum '$(basename "$INTEGRATED_ROM_FILE")' > '$(basename "$INTEGRATED_ROM_FILE").sha1'"
+          sudo bash -c "sha256sum '$(basename "$INTEGRATED_ROM_FILE")' > '$(basename "$INTEGRATED_ROM_FILE").sha256'"
           
           # 为原始 ROM 生成校验和（如果存在）
           if [ -n "$ORIGINAL_ROM_FILE" ]; then
-            sudo sha1sum "$(basename "$ORIGINAL_ROM_FILE")" > "$(basename "$ORIGINAL_ROM_FILE").sha1"
-            sudo sha256sum "$(basename "$ORIGINAL_ROM_FILE")" > "$(basename "$ORIGINAL_ROM_FILE").sha256"
+            sudo bash -c "sha1sum '$(basename "$ORIGINAL_ROM_FILE")' > '$(basename "$ORIGINAL_ROM_FILE").sha1'"
+            sudo bash -c "sha256sum '$(basename "$ORIGINAL_ROM_FILE")' > '$(basename "$ORIGINAL_ROM_FILE").sha256'"
           fi
           
           echo "✅ 校验和已生成"
