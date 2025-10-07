@@ -46,10 +46,10 @@ jobs:
           echo "CONFIG_EDK2_LOAD_OPTION_ROMS=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_PXE=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_BUILD_IPXE=y" >> configs/cml/config.kaisa.uefi
-          echo "CONFIG_IPXE_MASTER=y" >> configs/cml/config.kaisa.uefi
-          echo "CONFIG_IPXE_SERIAL_CONSOLE=y" >> configs/cml/config.kaisa.uefi
-          echo "CONFIG_IPXE_HAS_HTTPS=y" >> configs/cml/config.kaisa.uefi
-          echo "CONFIG_IPXE_TRUST_CMD=y" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_IPXE_STABLE=y" >> configs/cml/config.kaisa.uefi
+          echo "# CONFIG_IPXE_SERIAL_CONSOLE=y  # 禁用串口控制台以减小大小" >> configs/cml/config.kaisa.uefi
+          echo "# CONFIG_IPXE_HAS_HTTPS=y  # 禁用HTTPS以减小大小" >> configs/cml/config.kaisa.uefi
+          echo "# CONFIG_IPXE_TRUST_CMD=y  # 禁用TRUST命令以减小大小" >> configs/cml/config.kaisa.uefi
           # CONFIG_IPXE_NO_PROMPT 不配置，默认显示PXE启动提示
           echo "CONFIG_COMPRESSED_PAYLOAD_LZMA=y" >> configs/cml/config.kaisa.uefi
           echo "" >> configs/cml/config.kaisa.uefi
@@ -137,10 +137,10 @@ jobs:
              - CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y
              - CONFIG_PXE=y
              - CONFIG_BUILD_IPXE=y
-             - CONFIG_IPXE_MASTER=y (使用最新 iPXE 版本)
-             - CONFIG_IPXE_SERIAL_CONSOLE=y
-             - CONFIG_IPXE_HAS_HTTPS=y
-             - CONFIG_IPXE_TRUST_CMD=y
+             - CONFIG_IPXE_STABLE=y (使用稳定版 iPXE 以减小大小)
+             - 禁用 CONFIG_IPXE_SERIAL_CONSOLE (减小 ROM 大小)
+             - 禁用 CONFIG_IPXE_HAS_HTTPS (减小 ROM 大小)
+             - 禁用 CONFIG_IPXE_TRUST_CMD (减小 ROM 大小)
              - CONFIG_IPXE_NO_PROMPT 不配置 (默认显示PXE启动提示)
              - CONFIG_COMPRESSED_PAYLOAD_LZMA=y (启用载荷压缩以节省空间)
              - CONFIG_EDK2_DISABLE_SERIAL_TERMINAL=y (禁用串口终端以节省空间)
