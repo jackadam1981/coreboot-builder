@@ -192,123 +192,21 @@ jobs:
         run: |
           echo "📦 验证 Realtek 8111 PXE ROM 集成结果"
           
-          # 1. 检查 PXE ROM 文件是否存在于源码中
-          echo "🔍 检查源码中的 PXE ROM 文件..."
-          if [ -f "coreboot/3rdparty/blobs/mainboard/google/puff/puff/pci10ec,8168.rom" ]; then
-            echo "✅ PXE ROM 文件已存在于源码中"
-            echo "📁 文件位置：coreboot/3rdparty/blobs/mainboard/google/puff/puff/pci10ec,8168.rom"
-            echo "📊 文件大小：$(du -h coreboot/3rdparty/blobs/mainboard/google/puff/puff/pci10ec,8168.rom | cut -f1)"
-          else
-            echo "❌ PXE ROM 文件未找到"
-            exit 1
-          fi
-          
-          # 2. 检查配置是否正确
-          echo "🔍 检查 PXE ROM 配置..."
-          if grep -q "CONFIG_PXE_ROM_FILE=\"pci10ec,8168.rom\"" coreboot/configs/cml/config.kaisa.uefi; then
-            echo "✅ PXE ROM 配置正确"
-          else
-            echo "❌ PXE ROM 配置缺失"
-            exit 1
-          fi
-          
-          # 3. 查找生成的 ROM 文件
-          echo "🔍 查找编译生成的 ROM 文件..."
+          # 查找 ROM 文件
           ROM_FILE=$(ls roms/*.rom | head -1)
           if [ -z "$ROM_FILE" ]; then
             echo "❌ 未找到 ROM 文件"
-            echo "📋 检查 roms 目录内容："
-            ls -la roms/ 2>/dev/null || echo "⚠️ roms 目录不存在"
             exit 1
           fi
           
-          echo "✅ 找到 ROM 文件: $ROM_FILE"
           ROM_BASENAME=$(basename "$ROM_FILE")
+          echo "✅ 找到 ROM 文件: $ROM_BASENAME"
+          echo "📊 文件大小: $(ls -lh "$ROM_FILE" | awk '{print $5}')"
           
-          # 4. ROM 文件已经是编译时集成了 PXE ROM 的完整固件
-          echo "📋 ROM 文件已包含 PXE ROM 支持: $ROM_BASENAME"
+          # 使用 cbfstool 验证 PXE ROM 集成
+          echo "🔍 验证 PXE ROM 集成状态..."
+          CBFS_TOOL="./tools/cbfstool"
           
-          # 5. 使用本地 cbfstool 验证 PXE ROM 集成
-          echo "🔍 使用本地 cbfstool 验证 PXE ROM 集成状态..."
-          
-          # 调试：显示当前工作目录和目录结构
-          echo "🔍 调试信息："
-          echo "  当前工作目录: $(pwd)"
-          echo "  当前用户: $(whoami)"
-          echo ""
-          echo "📁 检查 coreboot-builder 目录结构："
-          ls -la /home/coreboot-builder/ 2>/dev/null || echo "  ❌ /home/coreboot-builder/ 不存在"
-          ls -la /root/coreboot-builder/ 2>/dev/null || echo "  ❌ /root/coreboot-builder/ 不存在"
-          echo ""
-          echo "📁 检查 tools 目录："
-          ls -la /home/coreboot-builder/tools/ 2>/dev/null || echo "  ❌ /home/coreboot-builder/tools/ 不存在"
-          ls -la /root/coreboot-builder/tools/ 2>/dev/null || echo "  ❌ /root/coreboot-builder/tools/ 不存在"
-          echo ""
-          echo "📁 检查相对路径 tools 目录："
-          ls -la tools/ 2>/dev/null || echo "  ❌ tools/ 目录不存在"
-          echo ""
-          
-          # 尝试多个可能的 cbfstool 路径
-          CBFS_TOOL=""
-          POSSIBLE_PATHS=(
-            "/home/coreboot-builder/tools/cbfstool"
-            "/root/coreboot-builder/tools/cbfstool"
-            "./tools/cbfstool"
-            "tools/cbfstool"
-            "cbfstool"
-          )
-          
-          for path in "${POSSIBLE_PATHS[@]}"; do
-            echo "🔍 检查路径: $path"
-            if [ -f "$path" ]; then
-              CBFS_TOOL="$path"
-              echo "✅ 找到 cbfstool: $path"
-              echo "  文件大小: $(ls -lh "$path" | awk '{print $5}')"
-              echo "  文件权限: $(ls -l "$path" | awk '{print $1}')"
-              break
-            else
-              echo "  ❌ 不存在"
-            fi
-          done
-          
-          if [ -z "$CBFS_TOOL" ]; then
-            echo ""
-            echo "❌ 所有路径都找不到 cbfstool 工具"
-            echo "🔍 搜索系统中的 cbfstool："
-            find / -name "cbfstool" 2>/dev/null | head -10 || echo "  系统中未找到 cbfstool"
-            exit 1
-          fi
-          
-          echo "✅ 找到 cbfstool: $CBFS_TOOL"
-          
-          # 调试：检查 ROM 文件信息
-          echo ""
-          echo "🔍 ROM 文件调试信息："
-          echo "  ROM 文件路径: roms/$ROM_BASENAME"
-          echo "  ROM 文件大小: $(ls -lh roms/$ROM_BASENAME | awk '{print $5}')"
-          echo "  ROM 文件权限: $(ls -l roms/$ROM_BASENAME | awk '{print $1}')"
-          echo "  ROM 文件类型: $(file roms/$ROM_BASENAME)"
-          echo ""
-          
-          # 调试：检查 ROM 文件头部
-          echo "🔍 ROM 文件头部信息："
-          hexdump -C roms/$ROM_BASENAME | head -5
-          echo ""
-          
-          # 调试：尝试使用 cbfstool 的不同选项
-          echo "🔍 尝试 cbfstool 不同选项："
-          echo "  1. 尝试 print 命令："
-          "$CBFS_TOOL" roms/$ROM_BASENAME print 2>&1 || echo "    print 命令失败"
-          echo ""
-          echo "  2. 尝试 info 命令："
-          "$CBFS_TOOL" roms/$ROM_BASENAME info 2>&1 || echo "    info 命令失败"
-          echo ""
-          echo "  3. 尝试 extract 命令（测试）："
-          "$CBFS_TOOL" roms/$ROM_BASENAME extract -n fallback/payload -f /tmp/test_payload 2>&1 || echo "    extract 命令失败"
-          echo ""
-          
-          # 检查 PCI Option ROM
-          echo "🔍 检查 PCI Option ROM..."
           if "$CBFS_TOOL" roms/$ROM_BASENAME print 2>/dev/null | grep -q 'pci10ec,8168.rom'; then
             echo "✅ Realtek 网络启动支持已成功集成到固件中"
             echo ""
@@ -321,26 +219,10 @@ jobs:
             echo "  - 兼容 RTL8168 系列 PXE ROM"
           else
             echo "❌ Realtek 网络启动支持未找到，可能集成失败"
-            echo ""
-            echo "📋 尝试获取完整的 CBFS 内容："
-            "$CBFS_TOOL" roms/$ROM_BASENAME print 2>&1 || echo "  cbfstool print 命令失败"
-            echo ""
-            echo "🔍 可能的原因："
-            echo "  1. ROM 文件不是有效的 CBFS 格式"
-            echo "  2. ROM 文件损坏或不完整"
-            echo "  3. PXE ROM 未正确集成到编译过程中"
-            echo "  4. 编译过程中出现问题"
-            echo ""
-            echo "📋 建议检查："
-            echo "  1. 检查编译日志是否有错误"
-            echo "  2. 确认 PXE ROM 文件在编译前正确放置"
-            echo "  3. 验证 coreboot 配置是否正确"
+            echo "📋 CBFS 内容："
+            "$CBFS_TOOL" roms/$ROM_BASENAME print 2>&1 || echo "  cbfstool 命令失败"
             exit 1
           fi
-          
-          echo ""
-          echo "📊 CBFS 完整内容："
-          "$CBFS_TOOL" roms/$ROM_BASENAME print
           
           # 生成校验和
           echo ""
