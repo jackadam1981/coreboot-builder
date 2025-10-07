@@ -87,13 +87,20 @@ jobs:
           echo "✅ 找到 ROM 文件: $(basename "$ROM_FILE")"
           ls -lh "$ROM_FILE"
 
-          #cbftools验证ROM文件中是否包含ipxe条目
-          echo "📦 验证 ROM 文件内容"
-          cbfstool "$ROM_FILE" print
-          echo "📦 验证 ROM 文件中是否包含 PXE 条目"
-          cbfstool "$ROM_FILE" print | grep -i pxe
+          # 使用 coreboot-sdk 容器构建并调用 cbfstool 验证 PXE/iPXE 条目
+          echo "📦 使用容器内 cbfstool 验证 ROM"
+          docker run --rm --user root \
+            -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+            -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+            -w /home/coreboot/coreboot \
+            coreboot/coreboot-sdk:latest \
+            bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
+                     make -C util/cbfstool >/dev/null && \
+                     util/cbfstool/cbfstool /home/coreboot/roms/$(basename \"$ROM_FILE\") print && \
+                     echo '📦 验证 ROM 文件中是否包含 PXE 条目' && \
+                     util/cbfstool/cbfstool /home/coreboot/roms/$(basename \"$ROM_FILE\") print | grep -i pxe"
           if [ $? -ne 0 ]; then
-            echo "❌ 未找到 iPXE 条目"
+            echo "❌ 未找到 iPXE/PXE 条目"
             exit 1
           fi
 
