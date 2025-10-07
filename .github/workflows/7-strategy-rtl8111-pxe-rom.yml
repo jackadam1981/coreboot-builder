@@ -237,9 +237,11 @@ jobs:
           echo "  当前用户: $(whoami)"
           echo ""
           echo "📁 检查 coreboot-builder 目录结构："
+          ls -la /home/coreboot-builder/ 2>/dev/null || echo "  ❌ /home/coreboot-builder/ 不存在"
           ls -la /root/coreboot-builder/ 2>/dev/null || echo "  ❌ /root/coreboot-builder/ 不存在"
           echo ""
           echo "📁 检查 tools 目录："
+          ls -la /home/coreboot-builder/tools/ 2>/dev/null || echo "  ❌ /home/coreboot-builder/tools/ 不存在"
           ls -la /root/coreboot-builder/tools/ 2>/dev/null || echo "  ❌ /root/coreboot-builder/tools/ 不存在"
           echo ""
           echo "📁 检查相对路径 tools 目录："
@@ -249,6 +251,7 @@ jobs:
           # 尝试多个可能的 cbfstool 路径
           CBFS_TOOL=""
           POSSIBLE_PATHS=(
+            "/home/coreboot-builder/tools/cbfstool"
             "/root/coreboot-builder/tools/cbfstool"
             "./tools/cbfstool"
             "tools/cbfstool"
