@@ -168,11 +168,18 @@ jobs:
                      ./build-uefi.sh kaisa; BUILD_EXIT_CODE=\$? && \
                      echo \"📦 编译完成，退出码: \$BUILD_EXIT_CODE\" && \
                      echo '📋 查找输出文件...' && \
+                     echo '🔍 查找 MrChromebox 编译输出目录...' && \
                      find ~/dev -name '*.rom' -type f 2>/dev/null | head -5 && \
-                     find . -name '*.rom' -type f 2>/dev/null | head -5 && \
+                     echo '🔍 查找 build 目录中的 ROM 文件...' && \
+                     find build -name '*.rom' -type f 2>/dev/null | head -5 && \
+                     echo '🔍 查找当前目录中的 ROM 文件（排除 PXE ROM）...' && \
+                     find . -name '*.rom' -type f -not -path './3rdparty/*' 2>/dev/null | head -5 && \
                      ROM_FILE=\$(find ~/dev -name '*.rom' -type f 2>/dev/null | head -1) && \
                      if [ -z \"\$ROM_FILE\" ]; then \
-                       ROM_FILE=\$(find . -name '*.rom' -type f 2>/dev/null | head -1); \
+                       ROM_FILE=\$(find build -name '*.rom' -type f 2>/dev/null | head -1); \
+                     fi && \
+                     if [ -z \"\$ROM_FILE\" ]; then \
+                       ROM_FILE=\$(find . -name '*.rom' -type f -not -path './3rdparty/*' 2>/dev/null | head -1); \
                      fi && \
                      if [ -n \"\$ROM_FILE\" ]; then \
                        ROM_SIZE=\$(stat -c%s \"\$ROM_FILE\" 2>/dev/null || echo 0) && \
