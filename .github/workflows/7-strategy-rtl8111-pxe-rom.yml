@@ -42,16 +42,21 @@ jobs:
           mkdir -p 3rdparty/blobs/mainboard/google/puff/variants/kaisa
           
           # 下载预编译的 iPXE ROM for Realtek RTL8111
-          # 使用 iPXE 官方预编译的 PCI ROM
-          curl -L -o 3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom \
-            "https://boot.ipxe.org/rtl8111.rom" || \
-          curl -L -o 3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom \
-            "https://rom-o-matic.net/ipxe.git/build/ipxe.pxe"
+          # 尝试多个 iPXE ROM 下载源
+          echo "📥 尝试下载 iPXE ROM..."
           
-          # 如果官方链接失败，使用备用链接
+          # 方案1: 使用 rom-o-matic 构建服务生成 RTL8111 ROM
+          curl -L -o 3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom \
+            "https://rom-o-matic.net/ipxe.git/build/ipxe.pxe" || \
+          curl -L -o 3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom \
+            "https://boot.ipxe.org/undionly.kpxe" || \
+          curl -L -o 3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom \
+            "https://boot.ipxe.org/ipxe.pxe"
+          
+          # 如果以上都失败，使用通用的 PXE ROM
           if [ ! -f 3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom ]; then
-            echo "⚠️  官方链接失败，使用备用 iPXE ROM"
-            # 下载通用的 iPXE ROM
+            echo "⚠️  标准 iPXE ROM 下载失败，使用通用 PXE ROM"
+            # 下载通用的 PXE ROM
             curl -L -o 3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom \
               "https://boot.ipxe.org/undionly.kpxe"
           fi
