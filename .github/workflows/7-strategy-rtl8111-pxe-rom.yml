@@ -116,7 +116,16 @@ jobs:
           body: |
             # 🎯 方案7：Realtek 8111 PXE ROM 集成
 
-            仅三项主要配置，可以保证uefi shell 可以使用ipxe.efi来正确网络引导。
+            已在编译前自动追加三项网络配置，确保在 UEFI Shell 可使用 ipxe.efi 正常进行网络引导：
+            - CONFIG_EDK2_NETWORK_PXE_SUPPORT=y
+            - CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y
+            - CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y
+
+            同时追加 Intel 芯片组稳定性相关配置（适配 Kaisa 主板）：
+            - CONFIG_SOC_INTEL_COMMON_BLOCK_POWER_LIMIT=y
+            - CONFIG_SOC_INTEL_COMMON_BLOCK_THERMAL=y
+            - CONFIG_SOUTHBRIDGE_INTEL_COMMON_WATCHDOG=y
+            - CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL=y
 
             **构建时间**: ${{ github.event.repository.updated_at }}
           files: |
