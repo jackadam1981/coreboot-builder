@@ -52,6 +52,10 @@ jobs:
           echo "CONFIG_IPXE_TRUST_CMD=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_COMPRESSED_PAYLOAD_LZMA=y" >> configs/cml/config.kaisa.uefi
           echo "" >> configs/cml/config.kaisa.uefi
+          echo "# iPXE 启动菜单配置" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_PXE_ROM_ID=\"10ec,8168\"" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_PXE_ROM_FILE=\"pci10ec,8168.rom\"" >> configs/cml/config.kaisa.uefi
+          echo "" >> configs/cml/config.kaisa.uefi
           echo "# EDK2 载荷大小优化配置" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_EDK2_DISABLE_SERIAL_TERMINAL=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_EDK2_DISABLE_USB_SUPPORT=y" >> configs/cml/config.kaisa.uefi
@@ -139,6 +143,8 @@ jobs:
              - CONFIG_COMPRESSED_PAYLOAD_LZMA=y (启用载荷压缩以节省空间)
              - CONFIG_EDK2_DISABLE_SERIAL_TERMINAL=y (禁用串口终端以节省空间)
              - CONFIG_EDK2_DISABLE_USB_SUPPORT=y (禁用USB支持以节省空间)
+             - CONFIG_PXE_ROM_ID="10ec,8168" (指定网卡PCI ID)
+             - CONFIG_PXE_ROM_FILE="pci10ec,8168.rom" (指定PXE ROM文件名)
 
              同时追加 Intel 芯片组稳定性相关配置（适配 Kaisa 主板）：
             - CONFIG_SOC_INTEL_COMMON_BLOCK_POWER_LIMIT=y
