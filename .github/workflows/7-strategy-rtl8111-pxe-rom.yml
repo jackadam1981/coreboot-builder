@@ -33,15 +33,19 @@ jobs:
           cd coreboot
           git submodule update --init --checkout --recursive
 
-      - name: 配置网络支持 / Configure Network Support
+      - name: 配置 PXE ROM 支持 / Configure PXE ROM Support
         run: |
-          echo "📝 追加 EDK2 网络支持配置"
+          echo "📝 添加 PXE ROM 支持配置"
           cd coreboot
           echo "" >> configs/cml/config.kaisa.uefi
-          echo "# 网络支持配置" >> configs/cml/config.kaisa.uefi
+          echo "# PXE ROM 支持配置" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_EDK2_LOAD_OPTION_ROMS=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_PXE=y" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_BUILD_IPXE=y" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_COMPRESSED_PAYLOAD_NONE=y" >> configs/cml/config.kaisa.uefi
           echo "" >> configs/cml/config.kaisa.uefi
           echo "# Intel 芯片组系统稳定配置（适合 Kaisa 主板）" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_SOC_INTEL_COMMON_BLOCK_POWER_LIMIT=y" >> configs/cml/config.kaisa.uefi
@@ -112,10 +116,14 @@ jobs:
           body: |
             # 🎯 方案7：Realtek 8111 PXE ROM 集成
 
-            已在编译前自动追加三项网络配置，确保在 UEFI Shell 可使用 ipxe.efi 正常进行网络引导：
+            已在编译前自动追加 PXE ROM 支持配置，启用内部 iPXE 编译：
+            - CONFIG_EDK2_LOAD_OPTION_ROMS=y
             - CONFIG_EDK2_NETWORK_PXE_SUPPORT=y
             - CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y
             - CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y
+            - CONFIG_PXE=y
+            - CONFIG_BUILD_IPXE=y
+            - CONFIG_COMPRESSED_PAYLOAD_NONE=y
 
             同时追加 Intel 芯片组稳定性相关配置（适配 Kaisa 主板）：
             - CONFIG_SOC_INTEL_COMMON_BLOCK_POWER_LIMIT=y
