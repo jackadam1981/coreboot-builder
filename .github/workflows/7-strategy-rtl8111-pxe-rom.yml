@@ -228,60 +228,41 @@ jobs:
           # 4. ROM 文件已经是编译时集成了 PXE ROM 的完整固件
           echo "📋 ROM 文件已包含 PXE ROM 支持: $ROM_BASENAME"
           
-          # 5. 使用 cbfstool 验证 PXE ROM 集成
-          echo "🔍 使用 cbfstool 验证 PXE ROM 集成状态..."
+          # 5. 使用本地 cbfstool 验证 PXE ROM 集成
+          echo "🔍 使用本地 cbfstool 验证 PXE ROM 集成状态..."
           
-          # 在 Docker 容器内验证 - 使用正确的 cbfstool 路径
-          docker run --rm --user root \
-            -v "$(pwd)/roms:/home/coreboot/roms" \
-            -w /home/coreboot \
-            coreboot/coreboot-sdk:latest \
-            /bin/bash -c "
-              echo '🔍 验证 PXE ROM 集成状态：'
-              echo ''
-              
-              # 尝试不同的 cbfstool 路径
-              CBFS_TOOL=''
-              if command -v cbfstool >/dev/null 2>&1; then
-                CBFS_TOOL='cbfstool'
-              elif [ -f '/usr/local/bin/cbfstool' ]; then
-                CBFS_TOOL='/usr/local/bin/cbfstool'
-              elif [ -f '/usr/bin/cbfstool' ]; then
-                CBFS_TOOL='/usr/bin/cbfstool'
-              else
-                echo '❌ 找不到 cbfstool 工具'
-                echo '📋 检查可用工具：'
-                ls -la /usr/local/bin/cbfs* 2>/dev/null || echo '  /usr/local/bin 中无 cbfs 工具'
-                ls -la /usr/bin/cbfs* 2>/dev/null || echo '  /usr/bin 中无 cbfs 工具'
-                which cbfstool 2>/dev/null || echo '  PATH 中无 cbfstool'
-                exit 1
-              fi
-              
-              echo \"✅ 找到 cbfstool: \$CBFS_TOOL\"
-              
-              # 检查 PCI Option ROM
-              if \$CBFS_TOOL roms/$ROM_BASENAME print | grep -q 'pci10ec,8168.rom'; then
-                echo '✅ Realtek 网络启动支持已成功集成到固件中'
-                echo ''
-                echo '📋 PCI Option ROM 详细信息：'
-                \$CBFS_TOOL roms/$ROM_BASENAME print | grep -A 3 'pci10ec,8168.rom'
-                echo ''
-                echo '🎯 集成成功！固件现在支持：'
-                echo '  - RTL8111H 网卡网络启动'
-                echo '  - PCI Option ROM 自动加载'
-                echo '  - 兼容 RTL8168 系列 PXE ROM'
-              else
-                echo '❌ Realtek 网络启动支持未找到，可能集成失败'
-                echo ''
-                echo '📋 完整的 CBFS 内容：'
-                \$CBFS_TOOL roms/$ROM_BASENAME print
-                exit 1
-              fi
-              
-              echo ''
-              echo '📊 CBFS 完整内容：'
-              \$CBFS_TOOL roms/$ROM_BASENAME print
-            "
+          # 使用确定的 cbfstool 路径
+          CBFS_TOOL="/root/coreboot-builder/tools/cbfstool"
+          
+          if [ ! -f "$CBFS_TOOL" ]; then
+            echo "❌ 找不到 cbfstool 工具: $CBFS_TOOL"
+            exit 1
+          fi
+          
+          echo "✅ 找到 cbfstool: $CBFS_TOOL"
+          
+          # 检查 PCI Option ROM
+          if "$CBFS_TOOL" roms/$ROM_BASENAME print | grep -q 'pci10ec,8168.rom'; then
+            echo "✅ Realtek 网络启动支持已成功集成到固件中"
+            echo ""
+            echo "📋 PCI Option ROM 详细信息："
+            "$CBFS_TOOL" roms/$ROM_BASENAME print | grep -A 3 'pci10ec,8168.rom'
+            echo ""
+            echo "🎯 集成成功！固件现在支持："
+            echo "  - RTL8111H 网卡网络启动"
+            echo "  - PCI Option ROM 自动加载"
+            echo "  - 兼容 RTL8168 系列 PXE ROM"
+          else
+            echo "❌ Realtek 网络启动支持未找到，可能集成失败"
+            echo ""
+            echo "📋 完整的 CBFS 内容："
+            "$CBFS_TOOL" roms/$ROM_BASENAME print
+            exit 1
+          fi
+          
+          echo ""
+          echo "📊 CBFS 完整内容："
+          "$CBFS_TOOL" roms/$ROM_BASENAME print
           
           # 生成校验和
           echo ""
@@ -340,7 +321,7 @@ jobs:
           
           ### 验证结果
           \`\`\`
-          $(docker run --rm -v "$(pwd)/roms:/home/coreboot/roms" -w /home/coreboot coreboot/coreboot-sdk:latest /bin/bash -c "if command -v cbfstool >/dev/null 2>&1; then cbfstool roms/$ROM_NAME print | grep -A 3 'pci10ec,8168.rom' || echo 'PXE ROM 未找到'; else echo 'cbfstool 工具未找到'; fi")
+          $(if [ -f "/root/coreboot-builder/tools/cbfstool" ]; then /root/coreboot-builder/tools/cbfstool roms/$ROM_NAME print | grep -A 3 'pci10ec,8168.rom' || echo 'PXE ROM 未找到'; else echo 'cbfstool 工具未找到'; fi)
           \`\`\`
           
           ## 🔐 校验和
