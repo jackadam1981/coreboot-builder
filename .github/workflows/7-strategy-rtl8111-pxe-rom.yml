@@ -100,6 +100,7 @@ jobs:
             echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> configs/cml/config.kaisa.uefi
             echo "CONFIG_PXE=y" >> configs/cml/config.kaisa.uefi
             echo "CONFIG_PXE_ROM_FILE=\"pci10ec,8168.rom\"" >> configs/cml/config.kaisa.uefi
+            echo "CONFIG_EDK2_UEFI_NETWORK_PXE_BOOTING=y" >> configs/cml/config.kaisa.uefi
             echo "CONFIG_COMPRESSED_PAYLOAD_NONE=y" >> configs/cml/config.kaisa.uefi
             echo "" >> configs/cml/config.kaisa.uefi
             echo "# 注意：PXE ROM 配置用于 Realtek RTL8111H 网络启动支持" >> configs/cml/config.kaisa.uefi
