@@ -177,6 +177,8 @@ jobs:
                        chmod 644 ../roms/*.rom && \
                        echo \"✅ ROM 文件已生成: \$(basename \$ROM_FILE)\"; \
                        echo \"📁 文件位置: \$ROM_FILE\"; \
+                       echo \"📊 ROM 文件详细信息:\"; \
+                       ls -lh ../roms/*.rom; \
                      else \
                        echo '❌ 未找到编译生成的 ROM 文件'; \
                        exit 1; \
