@@ -112,6 +112,8 @@ jobs:
             echo "# PXE ROM 支持配置" >> configs/cml/config.kaisa.uefi
             echo "CONFIG_EDK2_LOAD_OPTION_ROMS=y" >> configs/cml/config.kaisa.uefi
             echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> configs/cml/config.kaisa.uefi
+            echo "CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y" >> configs/cml/config.kaisa.uefi
+            echo "CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y" >> configs/cml/config.kaisa.uefi
             echo "CONFIG_PXE=y" >> configs/cml/config.kaisa.uefi
             echo "CONFIG_PXE_ROM_FILE=\"pci10ec,8168.rom\"" >> configs/cml/config.kaisa.uefi
             echo "CONFIG_COMPRESSED_PAYLOAD_NONE=y" >> configs/cml/config.kaisa.uefi
@@ -274,11 +276,11 @@ jobs:
               echo ''
               
               # 检查 PCI Option ROM
-              if coreboot/build/cbfstool roms/$ROM_BASENAME print | grep -q 'pci10ec,8168.rom'; then
+              if cbfstool roms/$ROM_BASENAME print | grep -q 'pci10ec,8168.rom'; then
                 echo '✅ Realtek 网络启动支持已成功集成到固件中'
                 echo ''
                 echo '📋 PCI Option ROM 详细信息：'
-                coreboot/build/cbfstool roms/$ROM_BASENAME print | grep -A 3 'pci10ec,8168.rom'
+                cbfstool roms/$ROM_BASENAME print | grep -A 3 'pci10ec,8168.rom'
                 echo ''
                 echo '🎯 集成成功！固件现在支持：'
                 echo '  - RTL8111H 网卡网络启动'
@@ -288,13 +290,13 @@ jobs:
                 echo '❌ Realtek 网络启动支持未找到，可能集成失败'
                 echo ''
                 echo '📋 完整的 CBFS 内容：'
-                coreboot/build/cbfstool roms/$ROM_BASENAME print
+                cbfstool roms/$ROM_BASENAME print
                 exit 1
               fi
               
               echo ''
               echo '📊 CBFS 完整内容：'
-              coreboot/build/cbfstool roms/$ROM_BASENAME print
+              cbfstool roms/$ROM_BASENAME print
             "
           
           # 生成校验和
@@ -371,7 +373,7 @@ jobs:
           
           ### 验证结果
           \`\`\`
-          $(docker run --rm -v "$(pwd)/coreboot:/home/coreboot/coreboot" -w /home/coreboot coreboot/coreboot-sdk:latest /bin/bash -c "coreboot/build/cbfstool roms/$INTEGRATED_ROM_NAME print | grep -A 3 'pci10ec,8168.rom' || echo 'PXE ROM 未找到'")
+          $(docker run --rm -v "$(pwd)/roms:/home/coreboot/roms" -w /home/coreboot coreboot/coreboot-sdk:latest /bin/bash -c "cbfstool roms/$INTEGRATED_ROM_NAME print | grep -A 3 'pci10ec,8168.rom' || echo 'PXE ROM 未找到'")
           \`\`\`
           
           ## 🔐 校验和
