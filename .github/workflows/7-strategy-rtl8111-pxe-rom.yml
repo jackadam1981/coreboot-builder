@@ -163,6 +163,10 @@ jobs:
           mkdir -p roms
           
           # 使用 MrChromebox 标准编译流程（参考 build-coreboot.yml）
+          # 确保输出目录权限正确
+          chmod 755 roms/
+          chown -R 1001:1001 roms/ 2>/dev/null || true
+          
           docker run --rm --user root \
             -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
             -v ${{ github.workspace }}/roms:/home/coreboot/roms \
@@ -184,6 +188,7 @@ jobs:
                        echo \"找到 ROM 文件: \$ROM_FILE\" && \
                        cp \"\$ROM_FILE\" /home/coreboot/roms/ && \
                        chmod 644 /home/coreboot/roms/*.rom && \
+                       chown 1001:1001 /home/coreboot/roms/*.rom && \
                        echo '✅ ROM 文件已复制到输出目录'; \
                      else \
                        echo '❌ 未找到编译生成的 ROM 文件'; \
