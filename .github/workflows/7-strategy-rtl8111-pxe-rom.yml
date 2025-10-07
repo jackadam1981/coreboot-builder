@@ -81,6 +81,16 @@ jobs:
           echo "✅ 找到 ROM 文件: $(basename "$ROM_FILE")"
           ls -lh "$ROM_FILE"
 
+          #cbftools验证ROM文件中是否包含ipxe条目
+          echo "📦 验证 ROM 文件内容"
+          cbfstool "$ROM_FILE" print
+          echo "📦 验证 ROM 文件中是否包含 PXE 条目"
+          cbfstool "$ROM_FILE" print | grep -i pxe
+          if [ $? -ne 0 ]; then
+            echo "❌ 未找到 iPXE 条目"
+            exit 1
+          fi
+
       - name: 上传固件 / Upload Firmware
         uses: actions/upload-artifact@v4
         with:
