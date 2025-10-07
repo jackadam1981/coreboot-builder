@@ -418,26 +418,55 @@ jobs:
           
           ### 🔧 PXE 启动菜单不显示的解决方案
           
-          **如果启动菜单中没有 PXE 选项，请检查以下设置：**
+          **MrChromebox 固件配置方式：**
           
-          #### A. BIOS/UEFI 网络设置
-          - ✅ **PXE Boot** - 必须启用
-          - ✅ **Network Boot** - 必须启用
-          - ✅ **Legacy Boot** - 建议启用（PCI Option ROM 通常使用 Legacy 模式）
+          #### A. EDK2 固件配置
+          MrChromebox 使用 EDK2 作为 payload，配置方式与传统 BIOS 不同：
           
-          #### B. 启动模式设置
-          - 🔄 **Boot Mode** - 设置为 Legacy 或 UEFI + Legacy 混合模式
-          - 🔄 **CSM (Compatibility Support Module)** - 如果可用，建议启用
+          - 🔧 **启动时按 F12** - 尝试直接进入网络启动
+          - 🔧 **启动时按 ESC** - 进入 Boot Manager 菜单
+          - 🔧 **启动时按 F2/F10** - 进入 EDK2 设置界面
           
-          #### C. 网络启动顺序
-          - 📋 **Boot Priority** - 将网络启动添加到启动顺序列表
-          - 📋 **Boot Override** - 检查是否有网络启动选项
+          #### B. EDK2 设置选项
+          在 EDK2 设置界面中查找：
           
-          #### D. 高级设置
-          - ⚙️ **PCI ROM Execution** - 确保启用（允许 PCI Option ROM 执行）
-          - ⚙️ **Option ROM Loading** - 确保启用
+          - ⚙️ **Boot Manager** - 检查是否有网络启动选项
+          - ⚙️ **Boot Maintenance Manager** - 网络启动配置
+          - ⚙️ **Device Manager** - PCI 设备配置
+          - ⚙️ **Network Configuration** - 网络设置
           
-          **注意：** PCI Option ROM 通常在 Legacy 模式下工作，如果系统设置为纯 UEFI 模式，可能不会显示 PXE 启动选项。
+          #### C. 可能的配置位置
+          
+          **1. Boot Manager 菜单**
+          - 启动时按 ESC 进入
+          - 查找 "Network Boot" 或 "PXE Boot" 选项
+          
+          **2. Device Manager**
+          - 查找 "Network Controller" 或 "Realtek RTL8111"
+          - 检查是否启用网络启动
+          
+          **3. Boot Maintenance Manager**
+          - 查找 "Boot Options" 或 "Boot Order"
+          - 添加网络启动到启动顺序
+          
+          #### D. 替代启动方法
+          
+          **如果菜单中没有 PXE 选项，尝试：**
+          
+          1. **直接启动键**
+             - 启动时按 `F12` - 直接网络启动
+             - 启动时按 `ESC` - Boot Manager
+             - 启动时按 `F2/F10` - 设置界面
+          
+          2. **命令行启动**
+             - 在 EDK2 Shell 中手动执行网络启动
+             - 查找 `snponly.efi` 或 `ipxe.efi` 文件
+          
+          3. **验证 PCI Option ROM**
+             - 确认 PCI Option ROM 已正确加载
+             - 检查网卡是否被识别
+          
+          **注意：** MrChromebox 固件基于 EDK2，配置界面与传统 BIOS 不同，可能需要使用不同的按键组合进入设置。
           
           ## 💡 技术优势
           
@@ -523,11 +552,22 @@ jobs:
             
             ## 🔧 故障排除
             
-            **如果启动菜单中没有 PXE 选项：**
-            - 检查 BIOS/UEFI 是否启用了 PXE Boot
-            - 确认启动模式设置为 Legacy 或混合模式
-            - 验证 PCI ROM Execution 已启用
-            - 检查网络启动是否在启动顺序中
+            **MrChromebox 固件 PXE 启动方法：**
+            
+            **1. 直接启动键尝试：**
+            - 启动时按 `F12` - 直接网络启动
+            - 启动时按 `ESC` - 进入 Boot Manager 菜单
+            - 启动时按 `F2/F10` - 进入 EDK2 设置界面
+            
+            **2. EDK2 设置界面查找：**
+            - Boot Manager - 检查网络启动选项
+            - Device Manager - 查找 Realtek RTL8111 网卡
+            - Boot Maintenance Manager - 配置启动顺序
+            
+            **3. 如果仍无 PXE 选项：**
+            - 确认 PCI Option ROM 已正确集成
+            - 检查网卡是否被系统识别
+            - 尝试在 EDK2 Shell 中手动执行网络启动
             
             ## ⚠️ 注意事项
             
