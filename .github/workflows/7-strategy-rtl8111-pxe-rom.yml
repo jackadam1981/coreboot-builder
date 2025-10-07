@@ -103,7 +103,6 @@ jobs:
             echo "CONFIG_COMPRESSED_PAYLOAD_NONE=y" >> configs/cml/config.kaisa.uefi
             echo "" >> configs/cml/config.kaisa.uefi
             echo "# 系统配置" >> configs/cml/config.kaisa.uefi
-            echo "CONFIG_POWER_STATE_OFF_AFTER_FAILURE=y" >> configs/cml/config.kaisa.uefi
             echo "CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL=y" >> configs/cml/config.kaisa.uefi
             echo "" >> configs/cml/config.kaisa.uefi
             echo "# 注意：PXE ROM 配置用于 Realtek RTL8111H 网络启动支持" >> configs/cml/config.kaisa.uefi
