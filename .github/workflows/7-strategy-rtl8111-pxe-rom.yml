@@ -136,7 +136,9 @@ jobs:
           
           # 备份原始 ROM 文件（集成前）
           ORIGINAL_ROM_BASENAME="${ROM_BASENAME%.*}_original.rom"
-          cp "$ROM_FILE" "roms/$ORIGINAL_ROM_BASENAME"
+          sudo cp "$ROM_FILE" "roms/$ORIGINAL_ROM_BASENAME"
+          sudo chmod 644 "roms/$ORIGINAL_ROM_BASENAME"
+          sudo chown runner:runner "roms/$ORIGINAL_ROM_BASENAME"
           echo "📋 原始 ROM 已备份为: $ORIGINAL_ROM_BASENAME"
           
           # 在 Docker 容器内执行 cbfstool 操作
