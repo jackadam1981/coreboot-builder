@@ -281,8 +281,35 @@ jobs:
           
           echo "✅ 找到 cbfstool: $CBFS_TOOL"
           
+          # 调试：检查 ROM 文件信息
+          echo ""
+          echo "🔍 ROM 文件调试信息："
+          echo "  ROM 文件路径: roms/$ROM_BASENAME"
+          echo "  ROM 文件大小: $(ls -lh roms/$ROM_BASENAME | awk '{print $5}')"
+          echo "  ROM 文件权限: $(ls -l roms/$ROM_BASENAME | awk '{print $1}')"
+          echo "  ROM 文件类型: $(file roms/$ROM_BASENAME)"
+          echo ""
+          
+          # 调试：检查 ROM 文件头部
+          echo "🔍 ROM 文件头部信息："
+          hexdump -C roms/$ROM_BASENAME | head -5
+          echo ""
+          
+          # 调试：尝试使用 cbfstool 的不同选项
+          echo "🔍 尝试 cbfstool 不同选项："
+          echo "  1. 尝试 print 命令："
+          "$CBFS_TOOL" roms/$ROM_BASENAME print 2>&1 || echo "    print 命令失败"
+          echo ""
+          echo "  2. 尝试 info 命令："
+          "$CBFS_TOOL" roms/$ROM_BASENAME info 2>&1 || echo "    info 命令失败"
+          echo ""
+          echo "  3. 尝试 extract 命令（测试）："
+          "$CBFS_TOOL" roms/$ROM_BASENAME extract -n fallback/payload -f /tmp/test_payload 2>&1 || echo "    extract 命令失败"
+          echo ""
+          
           # 检查 PCI Option ROM
-          if "$CBFS_TOOL" roms/$ROM_BASENAME print | grep -q 'pci10ec,8168.rom'; then
+          echo "🔍 检查 PCI Option ROM..."
+          if "$CBFS_TOOL" roms/$ROM_BASENAME print 2>/dev/null | grep -q 'pci10ec,8168.rom'; then
             echo "✅ Realtek 网络启动支持已成功集成到固件中"
             echo ""
             echo "📋 PCI Option ROM 详细信息："
@@ -295,8 +322,19 @@ jobs:
           else
             echo "❌ Realtek 网络启动支持未找到，可能集成失败"
             echo ""
-            echo "📋 完整的 CBFS 内容："
-            "$CBFS_TOOL" roms/$ROM_BASENAME print
+            echo "📋 尝试获取完整的 CBFS 内容："
+            "$CBFS_TOOL" roms/$ROM_BASENAME print 2>&1 || echo "  cbfstool print 命令失败"
+            echo ""
+            echo "🔍 可能的原因："
+            echo "  1. ROM 文件不是有效的 CBFS 格式"
+            echo "  2. ROM 文件损坏或不完整"
+            echo "  3. PXE ROM 未正确集成到编译过程中"
+            echo "  4. 编译过程中出现问题"
+            echo ""
+            echo "📋 建议检查："
+            echo "  1. 检查编译日志是否有错误"
+            echo "  2. 确认 PXE ROM 文件在编译前正确放置"
+            echo "  3. 验证 coreboot 配置是否正确"
             exit 1
           fi
           
