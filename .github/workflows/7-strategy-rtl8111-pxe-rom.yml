@@ -41,15 +41,15 @@ jobs:
           echo "# PXE ROM 支持配置" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_EDK2_LOAD_OPTION_ROMS=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> configs/cml/config.kaisa.uefi
-           # echo "CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y" >> configs/cml/config.kaisa.uefi
-           # echo "CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_PXE=y" >> configs/cml/config.kaisa.uefi
-           echo "CONFIG_BUILD_IPXE=y" >> configs/cml/config.kaisa.uefi
-           echo "CONFIG_IPXE_MASTER=y" >> configs/cml/config.kaisa.uefi
-           echo "CONFIG_IPXE_SERIAL_CONSOLE=y" >> configs/cml/config.kaisa.uefi
-           echo "CONFIG_IPXE_HAS_HTTPS=y" >> configs/cml/config.kaisa.uefi
-           echo "CONFIG_IPXE_TRUST_CMD=y" >> configs/cml/config.kaisa.uefi
-           echo "CONFIG_COMPRESSED_PAYLOAD_NONE=y" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_BUILD_IPXE=y" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_IPXE_MASTER=y" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_IPXE_SERIAL_CONSOLE=y" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_IPXE_HAS_HTTPS=y" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_IPXE_TRUST_CMD=y" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_COMPRESSED_PAYLOAD_NONE=y" >> configs/cml/config.kaisa.uefi
           echo "" >> configs/cml/config.kaisa.uefi
           echo "# Intel 芯片组系统稳定配置（适合 Kaisa 主板）" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_SOC_INTEL_COMMON_BLOCK_POWER_LIMIT=y" >> configs/cml/config.kaisa.uefi
@@ -123,6 +123,8 @@ jobs:
              已在编译前自动追加 PXE ROM 支持配置，启用内部 iPXE 编译：
              - CONFIG_EDK2_LOAD_OPTION_ROMS=y
              - CONFIG_EDK2_NETWORK_PXE_SUPPORT=y
+             - CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y
+             - CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y
              - CONFIG_PXE=y
              - CONFIG_BUILD_IPXE=y
              - CONFIG_IPXE_MASTER=y (使用最新 iPXE 版本)
