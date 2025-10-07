@@ -185,11 +185,21 @@ jobs:
                      find .. -name '*.rom' -type f 2>/dev/null && \
                      echo '📋 检查输出目录权限...' && \
                      ls -la /home/coreboot/roms/ && \
-                     echo '📋 查找第一个 .rom 文件...' && \
-                     ROM_FILE=\$(find /home/coreboot -name '*.rom' -type f 2>/dev/null | head -1) && \
+                     echo '📋 查找编译生成的固件文件...' && \
+                     ROM_FILE=\$(find . -name '*.rom' -type f -not -path './3rdparty/*' 2>/dev/null | head -1) && \
+                     if [ -z \"\$ROM_FILE\" ]; then \
+                       ROM_FILE=\$(find build -name '*.rom' -type f 2>/dev/null | head -1); \
+                     fi && \
+                     if [ -z \"\$ROM_FILE\" ]; then \
+                       ROM_FILE=\$(find ~/dev -name '*.rom' -type f 2>/dev/null | head -1); \
+                     fi && \
                      if [ -n \"\$ROM_FILE\" ]; then \
                        echo \"✅ 找到 ROM 文件: \$ROM_FILE\" && \
-                       echo '✅ ROM 文件已在正确位置'; \
+                       echo '📋 复制 ROM 文件到输出目录...' && \
+                       cp \"\$ROM_FILE\" /home/coreboot/roms/ && \
+                       chmod 644 /home/coreboot/roms/*.rom && \
+                       chown 1001:1001 /home/coreboot/roms/*.rom && \
+                       echo '✅ ROM 文件已复制到输出目录'; \
                      else \
                        echo '❌ 未找到编译生成的 ROM 文件'; \
                      fi && \
