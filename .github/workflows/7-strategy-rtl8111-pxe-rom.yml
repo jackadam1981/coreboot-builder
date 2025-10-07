@@ -171,13 +171,12 @@ jobs:
             bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
                      echo '🔧 使用 MrChromebox build-uefi.sh 编译 kaisa...' && \
                      ./build-uefi.sh kaisa && \
-                     echo '📋 查找 ROM 文件...' && \
+                     echo '📋 检查 ROM 文件...' && \
                      ROM_FILE=\$(find ../roms -name '*.rom' -type f 2>/dev/null | head -1) && \
                      if [ -n \"\$ROM_FILE\" ]; then \
-                       ROM_BASENAME=\"coreboot_edk2-kaisa-mrchromebox_\$(date +%Y%m%d).rom\" && \
-                       mv \"\$ROM_FILE\" \"/home/coreboot/roms/\$ROM_BASENAME\" && \
-                       chmod 644 /home/coreboot/roms/*.rom && \
-                       echo \"✅ ROM 文件已重命名: \$ROM_BASENAME\"; \
+                       chmod 644 ../roms/*.rom && \
+                       echo \"✅ ROM 文件已生成: \$(basename \$ROM_FILE)\"; \
+                       echo \"📁 文件位置: \$ROM_FILE\"; \
                      else \
                        echo '❌ 未找到编译生成的 ROM 文件'; \
                        exit 1; \
