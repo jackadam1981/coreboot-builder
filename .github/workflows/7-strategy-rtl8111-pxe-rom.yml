@@ -149,8 +149,9 @@ jobs:
             coreboot/coreboot-sdk:latest \
             bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
                      echo '🔧 使用 MrChromebox build-uefi.sh 编译 kaisa...' && \
-                     ./build-uefi.sh kaisa && \
-                     echo '📦 编译完成，查找输出文件...' && \
+                     ./build-uefi.sh kaisa; BUILD_EXIT_CODE=\$? && \
+                     echo \"📦 编译完成，退出码: \$BUILD_EXIT_CODE\" && \
+                     echo '📋 查找输出文件...' && \
                      find ~/dev -name '*.rom' -type f 2>/dev/null | head -5 && \
                      find . -name '*.rom' -type f 2>/dev/null | head -5 && \
                      ROM_FILE=\$(find ~/dev -name '*.rom' -type f 2>/dev/null | head -1) && \
@@ -161,11 +162,14 @@ jobs:
                        ROM_BASENAME=\"coreboot_edk2-kaisa-mrchromebox_\$(date +%Y%m%d).rom\" && \
                        cp \"\$ROM_FILE\" \"/home/coreboot/roms/\$ROM_BASENAME\" && \
                        chmod 644 /home/coreboot/roms/*.rom && \
-                       echo \"✅ ROM 文件已复制: /home/coreboot/roms/\$ROM_BASENAME\"; \
+                       echo \"✅ ROM 文件已复制: /home/coreboot/roms/\$ROM_BASENAME\" && \
+                       echo \"🎉 编译成功！ROM 文件已生成\" && \
+                       exit 0; \
                      else \
                        echo '❌ 未找到编译生成的 ROM 文件'; \
                        ls -la ~/dev/ 2>/dev/null || echo '⚠️ ~/dev 目录不存在'; \
-                       exit 1; \
+                       echo \"❌ 编译失败，退出码: \$BUILD_EXIT_CODE\"; \
+                       exit \$BUILD_EXIT_CODE; \
                      fi"
 
       - name: 🔧 集成 Realtek 8111 PXE ROM / Integrate RTL8111 PXE ROM
