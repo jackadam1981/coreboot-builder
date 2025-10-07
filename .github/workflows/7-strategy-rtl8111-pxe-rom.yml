@@ -1,7 +1,9 @@
 name: 方案7 - Realtek 8111 PXE ROM 集成 / Strategy 7 - RTL8111 PXE ROM Integration
 
 on:
-  # 支持手动触发
+  # 支持推送触发和手动触发
+  push:
+    branches: [ main, master ]
   workflow_dispatch:
     inputs:
       release:
@@ -62,36 +64,7 @@ jobs:
           cd coreboot
           git submodule update --init --checkout --recursive
 
-      - name: 📦 提取 Realtek PXE ROM / Extract Realtek PXE ROM
-        run: |
-          echo "📦 提取 Realtek GBE PXE ROM Code 2.70"
-          
-          # 创建目录
-          mkdir -p pxerom_files
-          cd pxerom_files
-          
-          # 解压并提取 PXE ROM
-          unzip -q ../RTEGPXE.270.zip
-          # 尝试使用 .lom 文件（可能更适合 coreboot）
-          cp BIN/rtegpxe.lom gbe_pxe_rom_2.70.rom
-          
-          echo "✅ PXE ROM 提取成功"
-          echo "📊 文件大小：$(du -h gbe_pxe_rom_2.70.rom | cut -f1)"
-          echo "🎯 PCI ID: 0x10ec:0x8168 (RTL8111H)"
-
-      - name: 🔧 集成 PXE ROM 到源码 / Integrate PXE ROM into Source
-        run: |
-          echo "🔧 将 PXE ROM 集成到 coreboot 源码中"
-          
-          # 创建 3rdparty/blobs 目录结构
-          mkdir -p coreboot/3rdparty/blobs/mainboard/google/puff/puff
-          
-          # 复制 PXE ROM 文件到正确位置
-          cp pxerom_files/gbe_pxe_rom_2.70.rom coreboot/3rdparty/blobs/mainboard/google/puff/puff/pci10ec,8168.rom
-          
-          echo "✅ PXE ROM 已复制到源码目录"
-          echo "📁 文件位置：coreboot/3rdparty/blobs/mainboard/google/puff/puff/pci10ec,8168.rom"
-          echo "📊 文件大小：$(du -h coreboot/3rdparty/blobs/mainboard/google/puff/puff/pci10ec,8168.rom | cut -f1)"
+      # 移除外部 PXE ROM 解压与复制步骤，改用内建 iPXE 构建
 
       - name: 配置 PXE ROM 支持 / Configure PXE ROM Support
         run: |
@@ -115,7 +88,7 @@ jobs:
             echo "CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y" >> configs/cml/config.kaisa.uefi
             echo "CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y" >> configs/cml/config.kaisa.uefi
             echo "CONFIG_PXE=y" >> configs/cml/config.kaisa.uefi
-            echo "CONFIG_PXE_ROM_FILE=\"pci10ec,8168.rom\"" >> configs/cml/config.kaisa.uefi
+            echo "CONFIG_BUILD_IPXE=y" >> configs/cml/config.kaisa.uefi
             echo "CONFIG_COMPRESSED_PAYLOAD_NONE=y" >> configs/cml/config.kaisa.uefi
             echo "" >> configs/cml/config.kaisa.uefi
             echo "# Intel 芯片组系统稳定配置（适合 Kaisa 主板）" >> configs/cml/config.kaisa.uefi
@@ -241,18 +214,17 @@ jobs:
           echo "🔍 验证 PXE ROM 集成状态..."
           CBFS_TOOL="./tools/cbfstool"
           
-          if "$CBFS_TOOL" "$ROM_FILE" print 2>/dev/null | grep -q 'pci10ec,8168.rom'; then
-            echo "✅ Realtek 网络启动支持已成功集成到固件中"
+          if "$CBFS_TOOL" "$ROM_FILE" print 2>/dev/null | grep -qi 'ipxe'; then
+            echo "✅ iPXE 网络启动支持已成功集成到固件中"
             echo ""
-            echo "📋 PCI Option ROM 详细信息："
-            "$CBFS_TOOL" "$ROM_FILE" print | grep -A 3 'pci10ec,8168.rom'
+            echo "📋 iPXE 相关条目："
+            "$CBFS_TOOL" "$ROM_FILE" print | grep -i 'ipxe' -A 3 || true
             echo ""
             echo "🎯 集成成功！固件现在支持："
-            echo "  - RTL8111H 网卡网络启动"
+            echo "  - iPXE 高级网络启动（HTTP/HTTPS 等）"
             echo "  - PCI Option ROM 自动加载"
-            echo "  - 兼容 RTL8168 系列 PXE ROM"
           else
-            echo "❌ Realtek 网络启动支持未找到，可能集成失败"
+            echo "❌ 未检测到 iPXE 条目，可能集成失败"
             echo "📋 CBFS 内容："
             "$CBFS_TOOL" "$ROM_FILE" print 2>&1 || echo "  cbfstool 命令失败"
             exit 1
@@ -271,6 +243,7 @@ jobs:
           sudo rm -f *.sha1 *.sha256 2>/dev/null || true
           
           # 为 ROM 生成校验和
+          ROM_BASENAME=$(basename "$ROM_FILE")
           sudo bash -c "sha1sum '$ROM_BASENAME' > '$ROM_BASENAME.sha1'"
           sudo bash -c "sha256sum '$ROM_BASENAME' > '$ROM_BASENAME.sha256'"
           
