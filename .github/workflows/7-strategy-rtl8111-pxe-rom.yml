@@ -231,11 +231,48 @@ jobs:
           # 5. 使用本地 cbfstool 验证 PXE ROM 集成
           echo "🔍 使用本地 cbfstool 验证 PXE ROM 集成状态..."
           
-          # 使用确定的 cbfstool 路径
-          CBFS_TOOL="/root/coreboot-builder/tools/cbfstool"
+          # 调试：显示当前工作目录和目录结构
+          echo "🔍 调试信息："
+          echo "  当前工作目录: $(pwd)"
+          echo "  当前用户: $(whoami)"
+          echo ""
+          echo "📁 检查 coreboot-builder 目录结构："
+          ls -la /root/coreboot-builder/ 2>/dev/null || echo "  ❌ /root/coreboot-builder/ 不存在"
+          echo ""
+          echo "📁 检查 tools 目录："
+          ls -la /root/coreboot-builder/tools/ 2>/dev/null || echo "  ❌ /root/coreboot-builder/tools/ 不存在"
+          echo ""
+          echo "📁 检查相对路径 tools 目录："
+          ls -la tools/ 2>/dev/null || echo "  ❌ tools/ 目录不存在"
+          echo ""
           
-          if [ ! -f "$CBFS_TOOL" ]; then
-            echo "❌ 找不到 cbfstool 工具: $CBFS_TOOL"
+          # 尝试多个可能的 cbfstool 路径
+          CBFS_TOOL=""
+          POSSIBLE_PATHS=(
+            "/root/coreboot-builder/tools/cbfstool"
+            "./tools/cbfstool"
+            "tools/cbfstool"
+            "cbfstool"
+          )
+          
+          for path in "${POSSIBLE_PATHS[@]}"; do
+            echo "🔍 检查路径: $path"
+            if [ -f "$path" ]; then
+              CBFS_TOOL="$path"
+              echo "✅ 找到 cbfstool: $path"
+              echo "  文件大小: $(ls -lh "$path" | awk '{print $5}')"
+              echo "  文件权限: $(ls -l "$path" | awk '{print $1}')"
+              break
+            else
+              echo "  ❌ 不存在"
+            fi
+          done
+          
+          if [ -z "$CBFS_TOOL" ]; then
+            echo ""
+            echo "❌ 所有路径都找不到 cbfstool 工具"
+            echo "🔍 搜索系统中的 cbfstool："
+            find / -name "cbfstool" 2>/dev/null | head -10 || echo "  系统中未找到 cbfstool"
             exit 1
           fi
           
