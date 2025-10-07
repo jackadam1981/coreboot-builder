@@ -122,9 +122,11 @@ jobs:
           echo "🔧 将 Realtek 8111 PXE ROM 集成到固件中"
           
           # 查找生成的 ROM 文件
-          ROM_FILE=$(ls coreboot/roms/*.rom | head -1)
+          ROM_FILE=$(ls roms/*.rom | head -1)
           if [ -z "$ROM_FILE" ]; then
             echo "❌ 未找到 ROM 文件"
+            echo "📋 检查 roms 目录内容："
+            ls -la roms/ 2>/dev/null || echo "⚠️ roms 目录不存在"
             exit 1
           fi
           
