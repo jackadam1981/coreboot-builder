@@ -406,11 +406,38 @@ jobs:
           2. 验证校验和确保文件完整性
           3. 使用 flashrom 刷写固件
           
-          ### 启动测试
+          ### 启动测试和配置
           1. 刷写固件后重启设备
           2. 进入 BIOS/UEFI 设置
-          3. 检查网络启动选项
-          4. 测试 PXE 网络启动功能
+          3. **重要：配置网络启动选项**
+             - 启用 PXE Boot
+             - 启用 Network Boot
+             - 启用 Legacy Boot（PCI Option ROM 需要）
+          4. 设置启动顺序，添加网络启动
+          5. 测试 PXE 网络启动功能
+          
+          ### 🔧 PXE 启动菜单不显示的解决方案
+          
+          **如果启动菜单中没有 PXE 选项，请检查以下设置：**
+          
+          #### A. BIOS/UEFI 网络设置
+          - ✅ **PXE Boot** - 必须启用
+          - ✅ **Network Boot** - 必须启用
+          - ✅ **Legacy Boot** - 建议启用（PCI Option ROM 通常使用 Legacy 模式）
+          
+          #### B. 启动模式设置
+          - 🔄 **Boot Mode** - 设置为 Legacy 或 UEFI + Legacy 混合模式
+          - 🔄 **CSM (Compatibility Support Module)** - 如果可用，建议启用
+          
+          #### C. 网络启动顺序
+          - 📋 **Boot Priority** - 将网络启动添加到启动顺序列表
+          - 📋 **Boot Override** - 检查是否有网络启动选项
+          
+          #### D. 高级设置
+          - ⚙️ **PCI ROM Execution** - 确保启用（允许 PCI Option ROM 执行）
+          - ⚙️ **Option ROM Loading** - 确保启用
+          
+          **注意：** PCI Option ROM 通常在 Legacy 模式下工作，如果系统设置为纯 UEFI 模式，可能不会显示 PXE 启动选项。
           
           ## 💡 技术优势
           
@@ -487,8 +514,20 @@ jobs:
             2. 验证校验和
             3. 使用 flashrom 刷写固件
             4. 重启后进入 BIOS/UEFI 设置
-            5. 检查网络启动选项
+            5. **重要：启用网络启动选项**
+               - 启用 PXE Boot
+               - 启用 Network Boot  
+               - 启用 Legacy Boot（PCI Option ROM 需要）
+               - 设置启动模式为 Legacy 或混合模式
             6. 测试 PXE 网络启动功能
+            
+            ## 🔧 故障排除
+            
+            **如果启动菜单中没有 PXE 选项：**
+            - 检查 BIOS/UEFI 是否启用了 PXE Boot
+            - 确认启动模式设置为 Legacy 或混合模式
+            - 验证 PCI ROM Execution 已启用
+            - 检查网络启动是否在启动顺序中
             
             ## ⚠️ 注意事项
             
