@@ -1,4 +1,4 @@
-name: 方案7 - Realtek 8111 PXE ROM 集成 / Strategy 7 - RTL8111 PXE ROM Integration
+name: Realtek iPXE ROM
 
 on:
   # 支持推送触发和手动触发
@@ -10,7 +10,7 @@ on:
         description: "创建 Release 发布 / Create Release"
         required: false
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: write
@@ -40,6 +40,7 @@ jobs:
           
           # 使用 MrChromebox 标准编译流程（参考 build-coreboot.yml）
           # 确保输出目录权限正确
+          mkdir -p roms
           chmod 755 roms
           
           # 使用 MrChromebox 标准编译流程
@@ -81,7 +82,7 @@ jobs:
             integration_report.md
 
       - name: 创建 Release / Create Release
-        if: ${{ false }}
+        if: ${{ github.event.inputs.release == 'true' }}
         uses: softprops/action-gh-release@v1
         with:
           tag_name: kaisa-rtl8111-pxerom-${{ github.run_number }}
