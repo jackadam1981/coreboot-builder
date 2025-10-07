@@ -170,19 +170,7 @@ jobs:
             coreboot/coreboot-sdk:latest \
             bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
                      echo '🔧 使用 MrChromebox build-uefi.sh 编译 kaisa...' && \
-                     ./build-uefi.sh kaisa && \
-                     echo '📋 检查 ROM 文件...' && \
-                     ROM_FILE=\$(find ../roms -name '*.rom' -type f 2>/dev/null | head -1) && \
-                     if [ -n \"\$ROM_FILE\" ]; then \
-                       chmod 644 ../roms/*.rom && \
-                       echo \"✅ ROM 文件已生成: \$(basename \$ROM_FILE)\"; \
-                       echo \"📁 文件位置: \$ROM_FILE\"; \
-                       echo \"📊 ROM 文件详细信息:\"; \
-                       ls -lh ../roms/*.rom; \
-                     else \
-                       echo '❌ 未找到编译生成的 ROM 文件'; \
-                       exit 1; \
-                     fi"
+                     ./build-uefi.sh kaisa"
           
           # 显示编译结果
           echo "=== 编译完成的固件 / Compiled Firmware ==="
