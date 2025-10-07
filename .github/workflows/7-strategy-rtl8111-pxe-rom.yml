@@ -158,59 +158,34 @@ jobs:
       - name: 📦 编译 MrChromebox Coreboot 固件 / Build Coreboot
         run: |
           echo "🔨 编译 MrChromebox coreboot（kaisa 主板）"
+          
+          # 创建输出目录
+          mkdir -p roms
+          
+          # 编译固件
           docker run --rm --user root \
             -v "$(pwd)/coreboot:/home/coreboot/coreboot" \
             -v "$(pwd)/roms:/home/coreboot/roms" \
             -w /home/coreboot/coreboot \
             coreboot/coreboot-sdk:latest \
-            bash -c "
-              git config --global --add safe.directory /home/coreboot/coreboot
-              echo '🔧 使用 MrChromebox build-uefi.sh 编译 kaisa...'
-              ./build-uefi.sh kaisa
-              BUILD_EXIT_CODE=\$?
-              echo \"📦 编译完成，退出码: \$BUILD_EXIT_CODE\"
-              
-              echo '📋 查找输出文件...'
-              echo '🔍 查找 MrChromebox 编译输出目录...'
-              find ~/dev -name '*.rom' -type f 2>/dev/null | head -5
-              echo '🔍 查找 build 目录中的 ROM 文件...'
-              find build -name '*.rom' -type f 2>/dev/null | head -5
-              echo '🔍 查找当前目录中的 ROM 文件（排除 PXE ROM）...'
-              find . -name '*.rom' -type f -not -path './3rdparty/*' 2>/dev/null | head -5
-              
-              ROM_FILE=\$(find ~/dev -name '*.rom' -type f 2>/dev/null | head -1)
-              if [ -z \"\$ROM_FILE\" ]; then
-                ROM_FILE=\$(find build -name '*.rom' -type f 2>/dev/null | head -1)
-              fi
-              if [ -z \"\$ROM_FILE\" ]; then
-                ROM_FILE=\$(find . -name '*.rom' -type f -not -path './3rdparty/*' 2>/dev/null | head -1)
-              fi
-              
-              if [ -n \"\$ROM_FILE\" ]; then
-                ROM_SIZE=\$(stat -c%s \"\$ROM_FILE\" 2>/dev/null || echo 0)
-                echo \"🔍 找到 ROM 文件: \$ROM_FILE (大小: \$ROM_SIZE 字节)\"
-                if [ \$ROM_SIZE -lt 10000000 ]; then
-                  echo \"❌ ROM 文件太小 (\$ROM_SIZE 字节)，可能不是完整的 coreboot 固件\"
-                  echo \"📋 跳过此文件，继续查找...\"
-                  ROM_FILE=\"\"
-                else
-                  echo \"✅ ROM 文件大小正常 (\$ROM_SIZE 字节)，应该是完整的 coreboot 固件\"
-                  ROM_BASENAME=\"coreboot_edk2-kaisa-mrchromebox_\$(date +%Y%m%d).rom\"
-                  cp \"\$ROM_FILE\" \"/home/coreboot/roms/\$ROM_BASENAME\"
-                  chmod 644 /home/coreboot/roms/*.rom
-                  echo \"✅ ROM 文件已复制: /home/coreboot/roms/\$ROM_BASENAME\"
-                  echo \"🎉 编译成功！ROM 文件已生成\"
-                  exit 0
-                fi
-              fi
-              
-              if [ -z \"\$ROM_FILE\" ]; then
-                echo '❌ 未找到编译生成的 ROM 文件'
-                ls -la ~/dev/ 2>/dev/null || echo '⚠️ ~/dev 目录不存在'
-                echo \"❌ 编译失败，退出码: \$BUILD_EXIT_CODE\"
-                exit \$BUILD_EXIT_CODE
-              fi
-            "
+            bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
+                     echo '🔧 使用 MrChromebox build-uefi.sh 编译 kaisa...' && \
+                     ./build-uefi.sh kaisa && \
+                     echo '📋 查找并复制 ROM 文件...' && \
+                     ROM_FILE=\$(find ~/dev -name '*.rom' -type f 2>/dev/null | head -1) && \
+                     if [ -n \"\$ROM_FILE\" ]; then \
+                       ROM_BASENAME=\"coreboot_edk2-kaisa-mrchromebox_\$(date +%Y%m%d).rom\" && \
+                       cp \"\$ROM_FILE\" \"/home/coreboot/roms/\$ROM_BASENAME\" && \
+                       chmod 644 /home/coreboot/roms/*.rom && \
+                       echo \"✅ ROM 文件已生成: \$ROM_BASENAME\"; \
+                     else \
+                       echo '❌ 未找到编译生成的 ROM 文件'; \
+                       exit 1; \
+                     fi"
+          
+          # 显示编译结果
+          echo "=== 编译完成的固件 / Compiled Firmware ==="
+          ls -lh roms/
 
       - name: 📦 验证 PXE ROM 集成结果 / Verify PXE ROM Integration
         run: |
