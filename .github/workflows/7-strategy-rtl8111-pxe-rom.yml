@@ -33,6 +33,38 @@ jobs:
           cd coreboot
           git submodule update --init --checkout --recursive
 
+      - name: 下载预编译 PXE ROM / Download Pre-built PXE ROM
+        run: |
+          echo "📥 下载预编译的 iPXE ROM"
+          cd coreboot
+          
+          # 创建 3rdparty 目录结构
+          mkdir -p 3rdparty/blobs/mainboard/google/puff/variants/kaisa
+          
+          # 下载预编译的 iPXE ROM for Realtek RTL8111
+          # 使用 iPXE 官方预编译的 PCI ROM
+          curl -L -o 3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom \
+            "https://boot.ipxe.org/rtl8111.rom" || \
+          curl -L -o 3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom \
+            "https://rom-o-matic.net/ipxe.git/build/ipxe.pxe"
+          
+          # 如果官方链接失败，使用备用链接
+          if [ ! -f 3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom ]; then
+            echo "⚠️  官方链接失败，使用备用 iPXE ROM"
+            # 下载通用的 iPXE ROM
+            curl -L -o 3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom \
+              "https://boot.ipxe.org/undionly.kpxe"
+          fi
+          
+          # 验证 ROM 文件
+          if [ -f 3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom ]; then
+            echo "✅ PXE ROM 下载成功"
+            ls -la 3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom
+          else
+            echo "❌ PXE ROM 下载失败"
+            exit 1
+          fi
+
       - name: 配置 PXE ROM 支持 / Configure PXE ROM Support
         run: |
           echo "📝 添加 PXE ROM 支持配置"
@@ -45,21 +77,8 @@ jobs:
           echo "CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_PXE=y" >> configs/cml/config.kaisa.uefi
-          echo "CONFIG_BUILD_IPXE=y" >> configs/cml/config.kaisa.uefi
-          echo "CONFIG_IPXE_STABLE=y" >> configs/cml/config.kaisa.uefi
-          echo "# CONFIG_IPXE_SERIAL_CONSOLE=y  # 禁用串口控制台以减小大小" >> configs/cml/config.kaisa.uefi
-          echo "# CONFIG_IPXE_HAS_HTTPS=y  # 禁用HTTPS以减小大小" >> configs/cml/config.kaisa.uefi
-          echo "# CONFIG_IPXE_TRUST_CMD=y  # 禁用TRUST命令以减小大小" >> configs/cml/config.kaisa.uefi
-          # CONFIG_IPXE_NO_PROMPT 不配置，默认显示PXE启动提示
-          echo "CONFIG_COMPRESSED_PAYLOAD_LZMA=y" >> configs/cml/config.kaisa.uefi
-          echo "" >> configs/cml/config.kaisa.uefi
-          echo "# iPXE 启动菜单配置" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_PXE_ROM_FILE=\"pxe.rom\"" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_PXE_ROM_ID=\"10ec,8168\"" >> configs/cml/config.kaisa.uefi
-          echo "CONFIG_PXE_ROM_FILE=\"pci10ec,8168.rom\"" >> configs/cml/config.kaisa.uefi
-          echo "" >> configs/cml/config.kaisa.uefi
-          echo "# EDK2 载荷大小优化配置" >> configs/cml/config.kaisa.uefi
-          echo "CONFIG_EDK2_DISABLE_SERIAL_TERMINAL=y" >> configs/cml/config.kaisa.uefi
-          echo "CONFIG_EDK2_DISABLE_USB_SUPPORT=y" >> configs/cml/config.kaisa.uefi
           echo "" >> configs/cml/config.kaisa.uefi
 
           echo "# Intel 芯片组系统稳定配置（适合 Kaisa 主板）" >> configs/cml/config.kaisa.uefi
@@ -131,24 +150,15 @@ jobs:
           body: |
             # 🎯 方案7：Realtek 8111 PXE ROM 集成
 
-             已在编译前自动追加 PXE ROM 支持配置
+             已在编译前自动下载预编译 iPXE ROM 并追加 PXE ROM 支持配置：
+             - 下载预编译的 iPXE ROM (rtl8111.rom)
              - CONFIG_EDK2_LOAD_OPTION_ROMS=y
              - CONFIG_EDK2_NETWORK_PXE_SUPPORT=y
              - CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y
              - CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y
              - CONFIG_PXE=y
-             - CONFIG_BUILD_IPXE=y
-             - CONFIG_IPXE_STABLE=y (使用稳定版 iPXE 以减小大小)
-             - 禁用 CONFIG_IPXE_SERIAL_CONSOLE (串口控制台，减小 ROM 大小)
-             - 禁用 CONFIG_IPXE_HAS_HTTPS (HTTPS协议，显著减小 ROM 大小)
-             - 禁用 CONFIG_IPXE_TRUST_CMD (TRUST安全命令，减小 ROM 大小)
-             - CONFIG_IPXE_NO_PROMPT 不配置 (显示PXE启动提示和菜单)
-             - 不嵌入 iPXE 脚本 (避免自动配置脚本增加 ROM 大小)
-             - CONFIG_COMPRESSED_PAYLOAD_LZMA=y (启用载荷压缩以节省空间)
-             - CONFIG_EDK2_DISABLE_SERIAL_TERMINAL=y (禁用串口终端以节省空间)
-             - CONFIG_EDK2_DISABLE_USB_SUPPORT=y (禁用USB支持以节省空间)
-             - CONFIG_PXE_ROM_ID="10ec,8168" (指定网卡PCI ID)
-             - CONFIG_PXE_ROM_FILE="pci10ec,8168.rom" (指定PXE ROM文件名)
+             - CONFIG_PXE_ROM_FILE="pxe.rom"
+             - CONFIG_PXE_ROM_ID="10ec,8168" (Realtek RTL8111 网卡)
 
              同时追加 Intel 芯片组稳定性相关配置（适配 Kaisa 主板）：
             - CONFIG_SOC_INTEL_COMMON_BLOCK_POWER_LIMIT=y
