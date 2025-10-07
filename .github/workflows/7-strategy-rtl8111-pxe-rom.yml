@@ -72,7 +72,8 @@ jobs:
           
           # 解压并提取 PXE ROM
           unzip -q ../RTEGPXE.270.zip
-          cp BIN/rtegpxe.nic gbe_pxe_rom_2.70.rom
+          # 尝试使用 .lom 文件（可能更适合 coreboot）
+          cp BIN/rtegpxe.lom gbe_pxe_rom_2.70.rom
           
           echo "✅ PXE ROM 提取成功"
           echo "📊 文件大小：$(du -h gbe_pxe_rom_2.70.rom | cut -f1)"
@@ -163,24 +164,36 @@ jobs:
               # 命名格式: pci<vendor>,<device>.rom (coreboot 标准格式)
               
               # 尝试添加 GBE PXE ROM 作为 PCI Option ROM
-              echo '🔧 尝试添加 PXE ROM...'
+              echo '🔧 尝试添加 PXE ROM（.lom 文件）...'
               if coreboot/build/cbfstool roms/$ROM_BASENAME add \
                 -f pxerom_files/gbe_pxe_rom_2.70.rom \
                 -n pci10ec,8168.rom \
                 -t raw; then
-                echo '✅ GBE PXE ROM 集成成功'
+                echo '✅ GBE PXE ROM 集成成功（.lom 文件）'
               else
-                echo '❌ GBE PXE ROM 集成失败，尝试其他格式...'
-                # 尝试作为 optionrom 类型
+                echo '❌ .lom 文件集成失败，尝试 .nic 文件...'
+                # 尝试使用 .nic 文件
+                cp pxerom_files/BIN/rtegpxe.nic pxerom_files/gbe_pxe_rom_2.70.nic
                 if coreboot/build/cbfstool roms/$ROM_BASENAME add \
-                  -f pxerom_files/gbe_pxe_rom_2.70.rom \
+                  -f pxerom_files/gbe_pxe_rom_2.70.nic \
                   -n pci10ec,8168.rom \
-                  -t optionrom; then
-                  echo '✅ GBE PXE ROM 集成成功（optionrom 类型）'
+                  -t raw; then
+                  echo '✅ GBE PXE ROM 集成成功（.nic 文件）'
                 else
-                  echo '❌ 所有格式都失败，检查文件格式和 CBFS 空间'
-                  echo '📊 CBFS 空间使用情况：'
-                  coreboot/build/cbfstool roms/$ROM_BASENAME print | grep -E '(Size|Comp|empty)'
+                  echo '❌ .nic 文件也失败，尝试 optionrom 类型...'
+                  # 尝试作为 optionrom 类型
+                  if coreboot/build/cbfstool roms/$ROM_BASENAME add \
+                    -f pxerom_files/gbe_pxe_rom_2.70.nic \
+                    -n pci10ec,8168.rom \
+                    -t optionrom; then
+                    echo '✅ GBE PXE ROM 集成成功（.nic + optionrom 类型）'
+                  else
+                    echo '❌ 所有尝试都失败，检查文件格式和 CBFS 空间'
+                    echo '📊 CBFS 空间使用情况：'
+                    coreboot/build/cbfstool roms/$ROM_BASENAME print | grep -E '(Size|Comp|empty)'
+                    echo '📋 尝试的文件：'
+                    ls -la pxerom_files/
+                  fi
                 fi
               fi
               
