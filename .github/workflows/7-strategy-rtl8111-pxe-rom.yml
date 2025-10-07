@@ -176,33 +176,17 @@ jobs:
                      echo '🔧 使用 MrChromebox build-uefi.sh 编译 kaisa...' && \
                      ./build-uefi.sh kaisa; BUILD_EXIT_CODE=\$? && \
                      echo \"📦 编译完成，退出码: \$BUILD_EXIT_CODE\" && \
-                     echo '🔍 查找编译输出文件...' && \
-                     echo '  查找 ../roms 目录:' && \
-                     find ../roms -name '*.rom' -type f 2>/dev/null | head -5 && \
-                     echo '  查找 ./roms 目录:' && \
-                     find ./roms -name '*.rom' -type f 2>/dev/null | head -5 && \
-                     echo '  查找当前目录:' && \
-                     find . -name '*.rom' -type f 2>/dev/null | head -5 && \
-                     echo '  查找 build 目录:' && \
-                     find build -name '*.rom' -type f 2>/dev/null | head -5 && \
-                     echo '  查找 ~/dev 目录:' && \
-                     find ~/dev -name '*.rom' -type f 2>/dev/null | head -5 && \
+                     echo '🔍 查找所有 .rom 文件...' && \
+                     echo '📋 所有找到的 .rom 文件:' && \
+                     find /home/coreboot -name '*.rom' -type f 2>/dev/null && \
+                     echo '📋 当前工作目录下的 .rom 文件:' && \
+                     find . -name '*.rom' -type f 2>/dev/null && \
+                     echo '📋 上级目录的 .rom 文件:' && \
+                     find .. -name '*.rom' -type f 2>/dev/null && \
                      echo '📋 检查输出目录权限...' && \
                      ls -la /home/coreboot/roms/ && \
-                     echo '📋 查找 ROM 文件...' && \
-                     ROM_FILE=\$(find ../roms -name '*.rom' -type f 2>/dev/null | head -1) && \
-                     if [ -z \"\$ROM_FILE\" ]; then \
-                       ROM_FILE=\$(find ./roms -name '*.rom' -type f 2>/dev/null | head -1); \
-                     fi && \
-                     if [ -z \"\$ROM_FILE\" ]; then \
-                       ROM_FILE=\$(find . -name '*.rom' -type f 2>/dev/null | head -1); \
-                     fi && \
-                     if [ -z \"\$ROM_FILE\" ]; then \
-                       ROM_FILE=\$(find build -name '*.rom' -type f 2>/dev/null | head -1); \
-                     fi && \
-                     if [ -z \"\$ROM_FILE\" ]; then \
-                       ROM_FILE=\$(find ~/dev -name '*.rom' -type f 2>/dev/null | head -1); \
-                     fi && \
+                     echo '📋 查找第一个 .rom 文件...' && \
+                     ROM_FILE=\$(find /home/coreboot -name '*.rom' -type f 2>/dev/null | head -1) && \
                      if [ -n \"\$ROM_FILE\" ]; then \
                        echo \"✅ 找到 ROM 文件: \$ROM_FILE\" && \
                        echo '✅ ROM 文件已在正确位置'; \
