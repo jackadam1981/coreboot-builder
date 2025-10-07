@@ -31,8 +31,9 @@ jobs:
           owner_repo="$GH_REPO"
           api_base="https://api.github.com"
 
-          # 收集所有 release（分页）
-          releases_json="[]"
+          # 收集所有 release（分页）到临时文件，避免命令行过长
+          releases_file=$(mktemp)
+          echo "[]" > "$releases_file"
           page=1
           per_page=100
           while :; do
@@ -42,14 +43,18 @@ jobs:
             if [ "$count" = "0" ]; then
               break
             fi
-            releases_json=$(jq -c --argjson a "$releases_json" --argjson b "$page_json" -n '$a + $b')
+            page_file=$(mktemp)
+            echo "$page_json" > "$page_file"
+            jq -c -s 'add' "$releases_file" "$page_file" > "${releases_file}.tmp"
+            mv "${releases_file}.tmp" "$releases_file"
+            rm -f "$page_file"
             page=$((page+1))
           done
 
-          echo "共获取到 Releases: $(echo "$releases_json" | jq 'length')"
+          echo "共获取到 Releases: $(jq 'length' "$releases_file")"
 
           # 按创建时间降序
-          filtered=$(echo "$releases_json" | jq -c "sort_by(.created_at) | reverse")
+          filtered=$(jq -c "sort_by(.created_at) | reverse" "$releases_file")
           total=$(echo "$filtered" | jq 'length')
           echo "过滤后数量: $total"
 
