@@ -50,6 +50,7 @@ jobs:
           echo "CONFIG_IPXE_SERIAL_CONSOLE=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_IPXE_HAS_HTTPS=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_IPXE_TRUST_CMD=y" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_IPXE_SHOW_PROMPT=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_COMPRESSED_PAYLOAD_LZMA=y" >> configs/cml/config.kaisa.uefi
           echo "" >> configs/cml/config.kaisa.uefi
           echo "# iPXE 启动菜单配置" >> configs/cml/config.kaisa.uefi
@@ -140,6 +141,7 @@ jobs:
              - CONFIG_IPXE_SERIAL_CONSOLE=y
              - CONFIG_IPXE_HAS_HTTPS=y
              - CONFIG_IPXE_TRUST_CMD=y
+             - CONFIG_IPXE_SHOW_PROMPT=y (显示PXE启动提示)
              - CONFIG_COMPRESSED_PAYLOAD_LZMA=y (启用载荷压缩以节省空间)
              - CONFIG_EDK2_DISABLE_SERIAL_TERMINAL=y (禁用串口终端以节省空间)
              - CONFIG_EDK2_DISABLE_USB_SUPPORT=y (禁用USB支持以节省空间)
