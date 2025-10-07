@@ -263,7 +263,8 @@ jobs:
           echo ""
           echo "🔐 生成固件校验和..."
           cd roms
-          rm -f *.sha1 *.sha256
+          # 使用 sudo 删除旧的校验和文件
+          sudo rm -f *.sha1 *.sha256 2>/dev/null || true
           sha1sum "$(basename "$ROM_FILE")" > "$(basename "$ROM_FILE").sha1"
           sha256sum "$(basename "$ROM_FILE")" > "$(basename "$ROM_FILE").sha256"
           echo "✅ 校验和已生成"
