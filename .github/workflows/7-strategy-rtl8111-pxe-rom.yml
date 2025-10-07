@@ -136,18 +136,19 @@ jobs:
           # 在 Docker 容器内执行 cbfstool 操作
           docker run --rm \
             -v "$(pwd)/coreboot:/home/coreboot/coreboot" \
+            -v "$(pwd)/roms:/home/coreboot/roms" \
             -v "$(pwd)/pxerom_files:/home/coreboot/pxerom_files" \
             -w /home/coreboot \
             coreboot/coreboot-sdk:latest \
             /bin/bash -c "
               echo '🔍 当前环境：'
               pwd
-              ls -la coreboot/roms/
+              ls -la roms/
               ls -la pxerom_files/
               
               echo ''
               echo '📋 ROM 文件信息（集成前）：'
-              coreboot/build/cbfstool coreboot/roms/$ROM_BASENAME print
+              coreboot/build/cbfstool roms/$ROM_BASENAME print
               
               echo ''
               echo '🔧 添加 Realtek 网络启动支持作为 PCI Option ROM...'
@@ -156,7 +157,7 @@ jobs:
               # 命名格式: pci<vendor>,<device>.rom (coreboot 标准格式)
               
               # 添加 GBE PXE ROM 作为 PCI Option ROM
-              coreboot/build/cbfstool coreboot/roms/$ROM_BASENAME add \
+              coreboot/build/cbfstool roms/$ROM_BASENAME add \
                 -f pxerom_files/gbe_pxe_rom_2.70.rom \
                 -n pci10ec,8168.rom \
                 -t raw && \
@@ -164,12 +165,12 @@ jobs:
                 echo '❌ GBE PXE ROM 集成失败'
               
               # 设置权限
-              chmod 644 coreboot/roms/$ROM_BASENAME
-              chown 1001:1001 coreboot/roms/$ROM_BASENAME
+              chmod 644 roms/$ROM_BASENAME
+              chown 1001:1001 roms/$ROM_BASENAME
               
               echo ''
               echo '📋 ROM 文件信息（集成后）：'
-              coreboot/build/cbfstool coreboot/roms/$ROM_BASENAME print
+              coreboot/build/cbfstool roms/$ROM_BASENAME print
             "
 
       - name: 📦 验证集成结果 / Verify Integration
@@ -177,7 +178,7 @@ jobs:
           echo "📦 验证 Realtek 8111 PXE ROM 集成结果"
           
           # 查找 ROM 文件
-          ROM_FILE=$(ls coreboot/roms/*.rom | head -1)
+          ROM_FILE=$(ls roms/*.rom | head -1)
           if [ -z "$ROM_FILE" ]; then
             echo "❌ 未找到 ROM 文件"
             exit 1
@@ -191,6 +192,7 @@ jobs:
           # 在 Docker 容器内验证
           docker run --rm \
             -v "$(pwd)/coreboot:/home/coreboot/coreboot" \
+            -v "$(pwd)/roms:/home/coreboot/roms" \
             -w /home/coreboot \
             coreboot/coreboot-sdk:latest \
             /bin/bash -c "
@@ -198,11 +200,11 @@ jobs:
               echo ''
               
               # 检查 PCI Option ROM
-              if coreboot/build/cbfstool coreboot/roms/$ROM_BASENAME print | grep -q 'pci10ec,8168.rom'; then
+              if coreboot/build/cbfstool roms/$ROM_BASENAME print | grep -q 'pci10ec,8168.rom'; then
                 echo '✅ Realtek 网络启动支持已成功集成到固件中'
                 echo ''
                 echo '📋 PCI Option ROM 详细信息：'
-                coreboot/build/cbfstool coreboot/roms/$ROM_BASENAME print | grep -A 3 'pci10ec,8168.rom'
+                coreboot/build/cbfstool roms/$ROM_BASENAME print | grep -A 3 'pci10ec,8168.rom'
                 echo ''
                 echo '🎯 集成成功！固件现在支持：'
                 echo '  - RTL8111H 网卡网络启动'
@@ -212,32 +214,32 @@ jobs:
                 echo '❌ Realtek 网络启动支持未找到，可能集成失败'
                 echo ''
                 echo '📋 完整的 CBFS 内容：'
-                coreboot/build/cbfstool coreboot/roms/$ROM_BASENAME print
+                coreboot/build/cbfstool roms/$ROM_BASENAME print
                 exit 1
               fi
               
               echo ''
               echo '📊 CBFS 完整内容：'
-              coreboot/build/cbfstool coreboot/roms/$ROM_BASENAME print
+              coreboot/build/cbfstool roms/$ROM_BASENAME print
             "
           
           # 生成校验和
           echo ""
           echo "🔐 生成固件校验和..."
-          cd coreboot/roms
+          cd roms
           rm -f *.sha1 *.sha256
           sha1sum "$(basename "$ROM_FILE")" > "$(basename "$ROM_FILE").sha1"
           sha256sum "$(basename "$ROM_FILE")" > "$(basename "$ROM_FILE").sha256"
           echo "✅ 校验和已生成"
           cat *.sha1
           cat *.sha256
-          cd ../..
+          cd ..
 
       - name: 📝 生成集成报告 / Generate Integration Report
         run: |
           echo "📝 生成方案7集成报告"
           
-          ROM_FILE=$(ls coreboot/roms/*.rom | head -1)
+          ROM_FILE=$(ls roms/*.rom | head -1)
           ROM_NAME=$(basename "$ROM_FILE")
           
           cat > integration_report.md << EOF
@@ -279,12 +281,12 @@ jobs:
           
           ### SHA1
           \`\`\`
-          $(cat coreboot/roms/*.sha1)
+          $(cat roms/*.sha1)
           \`\`\`
           
           ### SHA256
           \`\`\`
-          $(cat coreboot/roms/*.sha256)
+          $(cat roms/*.sha256)
           \`\`\`
           
           ## 📝 使用说明
@@ -337,9 +339,9 @@ jobs:
         with:
           name: coreboot-kaisa-rtl8111-pxerom-${{ github.run_number }}
           path: |
-            coreboot/roms/*.rom
-            coreboot/roms/*.sha1
-            coreboot/roms/*.sha256
+            roms/*.rom
+            roms/*.sha1
+            roms/*.sha256
             integration_report.md
 
       - name: 创建 Release / Create Release
@@ -386,9 +388,9 @@ jobs:
             
             **构建时间**: ${{ github.event.repository.updated_at }}
           files: |
-            coreboot/roms/*.rom
-            coreboot/roms/*.sha1
-            coreboot/roms/*.sha256
+            roms/*.rom
+            roms/*.sha1
+            roms/*.sha256
             integration_report.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
