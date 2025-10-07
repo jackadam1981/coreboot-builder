@@ -55,161 +55,20 @@ jobs:
                      chmod 644 /home/coreboot/roms/*.rom && \
                      echo '✅ MrChromebox 编译完成'"
 
-        if: ${{ false }}
+      - name: 验证编译结果 / Verify Build Results
         run: |
-          echo "📝 生成方案7集成报告"
-          
-          ROM_FILE=$(ls roms/*.rom | head -1)
-          ROM_NAME=$(basename "$ROM_FILE")
-          
-          cat > integration_report.md << EOF
-          # 方案7 - Realtek 8111 PXE ROM 集成报告
-          
-          ## 📋 构建信息
-          
-          - **构建日期**: $(date '+%Y-%m-%d %H:%M:%S')
-          - **固件文件**: $ROM_NAME
-          - **固件大小**: $(du -h "$ROM_FILE" | cut -f1)
-          - **方案类型**: Realtek 8111 PXE ROM 集成
-          
-          ## 🎯 方案说明
-          
-          ### 技术实现
-          - 使用 MrChromebox 的 EDK2 作为主要 payload
-          - 集成 Realtek 8111 官方 PXE ROM 作为 PCI Option ROM
-          - PCI Vendor ID: 0x10ec, Device ID: 0x8168
-          - PCI Option ROM 命名: pci10ec,8168.rom
-          
-          ### 预期功能
-          - ✅ 硬件层面启用网络启动
-          - ✅ BIOS/UEFI 自动识别网卡的 PXE 能力
-          - ✅ 无需额外驱动或配置
-          
-          ## 📊 集成状态
-          
-          ### PXE ROM 集成
-          - PXE ROM 文件: rtl8111_ipxe.efi
-          - CBFS 路径: pci10ec,8168.rom
-          - 类型: PCI Option ROM
-          
-          ### 验证结果
-          \`\`\`
-          $(if [ -f "/root/coreboot-builder/tools/cbfstool" ]; then /root/coreboot-builder/tools/cbfstool roms/$ROM_NAME print | grep -A 3 'pci10ec,8168.rom' || echo 'PXE ROM 未找到'; else echo 'cbfstool 工具未找到'; fi)
-          \`\`\`
-          
-          ## 🔐 校验和
-          
-          ### 固件校验和
-          **SHA1**:
-          \`\`\`
-          $(cat "$ROM_NAME.sha1" 2>/dev/null || echo "未生成")
-          \`\`\`
-          
-          **SHA256**:
-          \`\`\`
-          $(cat "$ROM_NAME.sha256" 2>/dev/null || echo "未生成")
-          \`\`\`
-          
-          ## 📝 使用说明
-          
-          ### 刷写固件
-          1. 下载固件文件和校验和文件
-          2. 验证校验和确保文件完整性
-          3. 使用 flashrom 刷写固件
-          
-          ### 启动测试和配置
-          1. 刷写固件后重启设备
-          2. 进入 BIOS/UEFI 设置
-          3. **重要：配置网络启动选项**
-             - 启用 PXE Boot
-             - 启用 Network Boot
-             - 启用 Legacy Boot（PCI Option ROM 需要）
-          4. 设置启动顺序，添加网络启动
-          5. 测试 PXE 网络启动功能
-          
-          ### 🔧 PXE 启动菜单不显示的解决方案
-          
-          **MrChromebox 固件配置方式：**
-          
-          #### A. EDK2 固件配置
-          MrChromebox 使用 EDK2 作为 payload，配置方式与传统 BIOS 不同：
-          
-          - 🔧 **启动时按 F12** - 尝试直接进入网络启动
-          - 🔧 **启动时按 ESC** - 进入 Boot Manager 菜单
-          - 🔧 **启动时按 F2/F10** - 进入 EDK2 设置界面
-          
-          #### B. EDK2 设置选项
-          在 EDK2 设置界面中查找：
-          
-          - ⚙️ **Boot Manager** - 检查是否有网络启动选项
-          - ⚙️ **Boot Maintenance Manager** - 网络启动配置
-          - ⚙️ **Device Manager** - PCI 设备配置
-          - ⚙️ **Network Configuration** - 网络设置
-          
-          #### C. 可能的配置位置
-          
-          **1. Boot Manager 菜单**
-          - 启动时按 ESC 进入
-          - 查找 "Network Boot" 或 "PXE Boot" 选项
-          
-          **2. Device Manager**
-          - 查找 "Network Controller" 或 "Realtek RTL8111"
-          - 检查是否启用网络启动
-          
-          **3. Boot Maintenance Manager**
-          - 查找 "Boot Options" 或 "Boot Order"
-          - 添加网络启动到启动顺序
-          
-          #### D. 替代启动方法
-          
-          **如果菜单中没有 PXE 选项，尝试：**
-          
-          1. **直接启动键**
-             - 启动时按 `F12` - 直接网络启动
-             - 启动时按 `ESC` - Boot Manager
-             - 启动时按 `F2/F10` - 设置界面
-          
-          2. **命令行启动**
-             - 在 EDK2 Shell 中手动执行网络启动
-             - 查找 `snponly.efi` 或 `ipxe.efi` 文件
-          
-          3. **验证 PCI Option ROM**
-             - 确认 PCI Option ROM 已正确加载
-             - 检查网卡是否被识别
-          
-          **注意：** MrChromebox 固件基于 EDK2，配置界面与传统 BIOS 不同，可能需要使用不同的按键组合进入设置。
-          
-          ## 💡 技术优势
-          
-          - ⭐ **最简单的集成方式** - 只需添加 PCI Option ROM
-          - ⭐ **官方支持** - 使用 Realtek 或 iPXE 官方驱动
-          - ⭐ **硬件原生** - 不依赖 payload 网络栈
-          - ⭐ **高兼容性** - 自动识别网卡并启用 PXE
-          
-          ## 📊 方案对比
-          
-          | 特性 | 方案7 (PXE ROM) | 方案1 (iPXE) | 方案2 (iPXE Payload) |
-          |------|----------------|--------------|---------------------|
-          | 集成复杂度 | ⭐ 最简单 | ⭐⭐⭐ 中等 | ⭐⭐⭐⭐ 复杂 |
-          | 官方支持 | ✅ Realtek/iPXE 官方 | ❌ 社区 | ❌ 社区 |
-          | 网络兼容性 | ✅ 硬件原生 | ⚠️ 依赖驱动 | ✅ iPXE 驱动 |
-          | 启动速度 | ⭐⭐⭐ 快 | ⭐⭐ 一般 | ⭐⭐ 一般 |
-          | 功能丰富性 | ⭐⭐ 基础 PXE | ⭐⭐⭐⭐⭐ 高级功能 | ⭐⭐⭐⭐⭐ 高级功能 |
-          
-          ## 🔄 后续改进
-          
-          - [ ] 测试实际网络启动功能
-          - [ ] 验证 WDS 服务器连接
-          - [ ] 测试不同网络环境
-          - [ ] 对比其他方案的性能
-          
-          ---
-          
-          **构建时间**: $(date '+%Y-%m-%d %H:%M:%S UTC')
-          EOF
-          
-          echo "✅ 集成报告已生成"
-          cat integration_report.md
+          echo "📦 验证编译结果"
+
+          # 检查 ROM 文件
+          ROM_FILE=$(ls roms/coreboot_*.rom | head -1)
+          if [ -z "$ROM_FILE" ]; then
+            echo "❌ 未找到 ROM 文件"
+            ls -la roms/
+            exit 1
+          fi
+
+          echo "✅ 找到 ROM 文件: $(basename "$ROM_FILE")"
+          ls -lh "$ROM_FILE"
 
       - name: 上传固件 / Upload Firmware
         uses: actions/upload-artifact@v4
@@ -229,56 +88,6 @@ jobs:
           name: "Coreboot Kaisa - 方案7 (RTL8111 PXE ROM) #${{ github.run_number }}"
           body: |
             # 🎯 方案7：Realtek 8111 PXE ROM 集成
-            
-            ## 📋 方案说明
-            
-            - **集成方式**: Realtek 8111 PXE ROM 作为 PCI Option ROM
-            - **主板**: Acer Chromebox CXI4 (kaisa)
-            - **网卡**: Realtek RTL8111H (PCI ID: 10ec:8168)
-            - **Payload**: MrChromebox EDK2
-            
-            ## 💡 技术优势
-            
-            - ⭐ **最简单的集成方式** - 只需添加 PCI Option ROM
-            - ⭐ **官方支持** - 使用 Realtek 或 iPXE 官方驱动
-            - ⭐ **硬件原生** - 不依赖 payload 网络栈
-            - ⭐ **高兼容性** - 自动识别网卡并启用 PXE
-            
-            ## 🔐 文件校验
-            
-            请下载后验证 SHA1/SHA256 校验和确保文件完整性。
-            
-            ## 📝 使用说明
-            
-            1. 下载固件文件
-            2. 验证校验和
-            3. 使用 flashrom 刷写固件
-            4. 重启后进入 BIOS/UEFI 设置
-            5. **重要：启用网络启动选项**
-               - 启用 PXE Boot
-               - 启用 Network Boot  
-               - 启用 Legacy Boot（PCI Option ROM 需要）
-               - 设置启动模式为 Legacy 或混合模式
-            6. 测试 PXE 网络启动功能
-            
-            ## 🔧 故障排除
-            
-            **MrChromebox 固件 PXE 启动方法：**
-            
-            **1. 直接启动键尝试：**
-            - 启动时按 `F12` - 直接网络启动
-            - 启动时按 `ESC` - 进入 Boot Manager 菜单
-            - 启动时按 `F2/F10` - 进入 EDK2 设置界面
-            
-            **2. EDK2 设置界面查找：**
-            - Boot Manager - 检查网络启动选项
-            - Device Manager - 查找 Realtek RTL8111 网卡
-            - Boot Maintenance Manager - 配置启动顺序
-            
-            **3. 如果仍无 PXE 选项：**
-            - 确认 PCI Option ROM 已正确集成
-            - 检查网卡是否被系统识别
-            - 尝试在 EDK2 Shell 中手动执行网络启动
             
             ## ⚠️ 注意事项
             
