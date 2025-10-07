@@ -153,16 +153,36 @@ jobs:
               echo ''
               echo '🔧 添加 Realtek 网络启动支持作为 PCI Option ROM...'
               
+              # 检查 PXE ROM 文件
+              echo '📋 检查 PXE ROM 文件：'
+              ls -la pxerom_files/
+              file pxerom_files/gbe_pxe_rom_2.70.rom
+              echo ''
+              
               # RTL8111H PCI ID: Vendor=10ec, Device=8168
               # 命名格式: pci<vendor>,<device>.rom (coreboot 标准格式)
               
-              # 添加 GBE PXE ROM 作为 PCI Option ROM
-              coreboot/build/cbfstool roms/$ROM_BASENAME add \
+              # 尝试添加 GBE PXE ROM 作为 PCI Option ROM
+              echo '🔧 尝试添加 PXE ROM...'
+              if coreboot/build/cbfstool roms/$ROM_BASENAME add \
                 -f pxerom_files/gbe_pxe_rom_2.70.rom \
                 -n pci10ec,8168.rom \
-                -t raw && \
-                echo '✅ GBE PXE ROM 集成成功' || \
-                echo '❌ GBE PXE ROM 集成失败'
+                -t raw; then
+                echo '✅ GBE PXE ROM 集成成功'
+              else
+                echo '❌ GBE PXE ROM 集成失败，尝试其他格式...'
+                # 尝试作为 optionrom 类型
+                if coreboot/build/cbfstool roms/$ROM_BASENAME add \
+                  -f pxerom_files/gbe_pxe_rom_2.70.rom \
+                  -n pci10ec,8168.rom \
+                  -t optionrom; then
+                  echo '✅ GBE PXE ROM 集成成功（optionrom 类型）'
+                else
+                  echo '❌ 所有格式都失败，检查文件格式和 CBFS 空间'
+                  echo '📊 CBFS 空间使用情况：'
+                  coreboot/build/cbfstool roms/$ROM_BASENAME print | grep -E '(Size|Comp|empty)'
+                fi
+              fi
               
               # 设置权限
               chmod 644 roms/$ROM_BASENAME
