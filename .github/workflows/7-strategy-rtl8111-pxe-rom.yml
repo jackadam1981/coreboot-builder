@@ -135,7 +135,7 @@ jobs:
           ROM_BASENAME=$(basename "$ROM_FILE")
           
           # 在 Docker 容器内执行 cbfstool 操作
-          docker run --rm \
+          docker run --rm --user root \
             -v "$(pwd)/coreboot:/home/coreboot/coreboot" \
             -v "$(pwd)/roms:/home/coreboot/roms" \
             -v "$(pwd)/pxerom_files:/home/coreboot/pxerom_files" \
@@ -226,7 +226,7 @@ jobs:
           ROM_BASENAME=$(basename "$ROM_FILE")
           
           # 在 Docker 容器内验证
-          docker run --rm \
+          docker run --rm --user root \
             -v "$(pwd)/coreboot:/home/coreboot/coreboot" \
             -v "$(pwd)/roms:/home/coreboot/roms" \
             -w /home/coreboot \
