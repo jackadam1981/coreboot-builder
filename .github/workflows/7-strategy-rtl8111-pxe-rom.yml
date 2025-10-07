@@ -77,6 +77,7 @@ jobs:
           echo "CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_PXE=y" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_PXE_ROM=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_PXE_ROM_FILE=\"pxe.rom\"" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_PXE_ROM_ID=\"10ec,8168\"" >> configs/cml/config.kaisa.uefi
           echo "" >> configs/cml/config.kaisa.uefi
@@ -87,6 +88,18 @@ jobs:
           echo "CONFIG_SOUTHBRIDGE_INTEL_COMMON_WATCHDOG=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL=y" >> configs/cml/config.kaisa.uefi
           echo "" >> configs/cml/config.kaisa.uefi
+
+      - name: 修复 PXE ROM Makefile 规则 / Fix PXE ROM Makefile Rule
+        run: |
+          echo "🔧 修复 PXE ROM Makefile 规则"
+          cd coreboot
+          
+          # 修复 Makefile 规则，允许单独使用 CONFIG_PXE_ROM=y
+          # 原规则：cbfs-files-$(CONFIG_PXE_ROM)$(CONFIG_BUILD_IPXE) += pci$(CONFIG_PXE_ROM_ID).rom
+          # 添加新规则：cbfs-files-$(CONFIG_PXE_ROM) += pci$(CONFIG_PXE_ROM_ID).rom
+          sed -i '369a\\n# 修复：允许单独使用 CONFIG_PXE_ROM=y\ncbfs-files-$(CONFIG_PXE_ROM) += pci$(CONFIG_PXE_ROM_ID).rom' payloads/external/Makefile.mk
+          
+          echo "✅ Makefile 规则修复完成"
 
       - name: 📦 编译 MrChromebox Coreboot 固件 / Build Coreboot
         run: |
@@ -150,23 +163,24 @@ jobs:
           body: |
             # 🎯 方案7：Realtek 8111 PXE ROM 集成
 
-             已在编译前自动下载预编译 iPXE ROM 并追加 PXE ROM 支持配置：
-             - 下载预编译的 iPXE ROM 到 coreboot 根目录 (pxe.rom)
-             - CONFIG_EDK2_LOAD_OPTION_ROMS=y
-             - CONFIG_EDK2_NETWORK_PXE_SUPPORT=y
-             - CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y
-             - CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y
-             - CONFIG_PXE=y
-             - CONFIG_PXE_ROM_FILE="pxe.rom" (下载到根目录)
-             - CONFIG_PXE_ROM_ID="10ec,8168" (Realtek RTL8111 网卡)
+              已在编译前自动下载预编译 iPXE ROM 并追加 PXE ROM 支持配置：
+              - 下载预编译的 iPXE ROM 到 coreboot 根目录 (pxe.rom)
+              - 修复 Makefile 规则，允许单独使用 CONFIG_PXE_ROM=y
+              - CONFIG_EDK2_LOAD_OPTION_ROMS=y
+              - CONFIG_EDK2_NETWORK_PXE_SUPPORT=y
+              - CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y
+              - CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y
+              - CONFIG_PXE=y
+              - CONFIG_PXE_ROM_FILE="pxe.rom" (下载到根目录)
+              - CONFIG_PXE_ROM_ID="10ec,8168" (Realtek RTL8111 网卡)
 
-             同时追加 Intel 芯片组稳定性相关配置（适配 Kaisa 主板）：
-            - CONFIG_SOC_INTEL_COMMON_BLOCK_POWER_LIMIT=y
-            - CONFIG_SOC_INTEL_COMMON_BLOCK_THERMAL=y
-            - CONFIG_SOUTHBRIDGE_INTEL_COMMON_WATCHDOG=y
-            - CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL=y
+              同时追加 Intel 芯片组稳定性相关配置（适配 Kaisa 主板）：
+             - CONFIG_SOC_INTEL_COMMON_BLOCK_POWER_LIMIT=y
+             - CONFIG_SOC_INTEL_COMMON_BLOCK_THERMAL=y
+             - CONFIG_SOUTHBRIDGE_INTEL_COMMON_WATCHDOG=y
+             - CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL=y
 
-            **构建时间**: ${{ github.event.repository.updated_at }}
+             **构建时间**: ${{ github.event.repository.updated_at }}
           files: |
             roms/*.rom
             roms/*.sha1
