@@ -5,9 +5,9 @@ on:
     inputs:
       keep_indexes:
         description: "保留序号（按创建时间降序，从1开始），空格分隔，如: 1 3 5"
-        required: true
+        required: false
         type: string
-        default: "1 2 3"
+        default: ""
 
 permissions:
   contents: write
@@ -59,14 +59,19 @@ jobs:
 
           # 计算删除列表
           to_delete="[]"
-          for idx in $(seq 1 $total); do
-            if echo " $keep_set " | grep -q " $idx "; then
-              continue
-            fi
-            j=$((idx-1))
-            item=$(echo "$filtered" | jq -c ".[$j]")
-            to_delete=$(jq -c --argjson a "$to_delete" --argjson b "$item" -n '$a + [$b]')
-          done
+          if [ -z "$keep_set" ]; then
+            # 全删除
+            to_delete="$filtered"
+          else
+            for idx in $(seq 1 $total); do
+              if echo " $keep_set " | grep -q " $idx "; then
+                continue
+              fi
+              j=$((idx-1))
+              item=$(echo "$filtered" | jq -c ".[$j]")
+              to_delete=$(jq -c --argjson a "$to_delete" --argjson b "$item" -n '$a + [$b]')
+            done
+          fi
 
           del_count=$(echo "$to_delete" | jq 'length')
           echo "计划删除数量: $del_count"

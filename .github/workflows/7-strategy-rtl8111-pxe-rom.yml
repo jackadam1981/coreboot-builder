@@ -100,11 +100,7 @@ jobs:
           body: |
             # 🎯 方案7：Realtek 8111 PXE ROM 集成
 
-            ## ⚠️ 注意事项
-
-            - 刷写固件前请备份原有固件
-            - 确保电源稳定，刷写过程中不要断电
-            - 建议先在测试设备上验证
+            仅三项主要配置，可以保证uefi shell 可以使用ipxe.efi来正确网络引导。
 
             **构建时间**: ${{ github.event.repository.updated_at }}
           files: |
