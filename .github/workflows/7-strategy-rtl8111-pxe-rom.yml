@@ -104,7 +104,7 @@ jobs:
             integration_report.md
 
       - name: 创建 Release / Create Release
-        if: ${{ github.event.inputs.release == 'true' }}
+        if: ${{ (github.event_name == 'workflow_dispatch' && inputs.release) || (github.event_name != 'workflow_dispatch') }}
         uses: softprops/action-gh-release@v1
         with:
           tag_name: kaisa-rtl8111-pxerom-${{ github.run_number }}
