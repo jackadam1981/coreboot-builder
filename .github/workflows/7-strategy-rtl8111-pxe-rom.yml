@@ -38,31 +38,28 @@ jobs:
           echo "📥 下载预编译的 iPXE ROM"
           cd coreboot
           
-          # 创建 3rdparty 目录结构
-          mkdir -p 3rdparty/blobs/mainboard/google/puff/variants/kaisa
-          
-          # 下载预编译的 iPXE ROM for Realtek RTL8111
-          # 尝试多个 iPXE ROM 下载源
-          echo "📥 尝试下载 iPXE ROM..."
+          # 下载预编译的 iPXE ROM 到 coreboot 根目录
+          echo "📥 下载 iPXE ROM 到根目录..."
           
           # 方案1: 使用 iPXE 官方标准 PXE 文件 (337K)
-          curl -L -o 3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom \
+          curl -L -o pxe.rom \
             "https://boot.ipxe.org/ipxe.pxe" || \
-          curl -L -o 3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom \
+          curl -L -o pxe.rom \
             "https://boot.ipxe.org/undionly.kpxe"
           
           # 如果以上都失败，使用通用的 PXE ROM
-          if [ ! -f 3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom ]; then
+          if [ ! -f pxe.rom ]; then
             echo "⚠️  标准 iPXE ROM 下载失败，使用通用 PXE ROM"
             # 下载通用的 PXE ROM
-            curl -L -o 3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom \
+            curl -L -o pxe.rom \
               "https://boot.ipxe.org/undionly.kpxe"
           fi
           
           # 验证 ROM 文件
-          if [ -f 3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom ]; then
+          if [ -f pxe.rom ]; then
             echo "✅ PXE ROM 下载成功"
-            ls -la 3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom
+            ls -la pxe.rom
+            echo "📊 ROM 文件大小: $(du -h pxe.rom | cut -f1)"
           else
             echo "❌ PXE ROM 下载失败"
             exit 1
@@ -80,7 +77,7 @@ jobs:
           echo "CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_PXE=y" >> configs/cml/config.kaisa.uefi
-          echo "CONFIG_PXE_ROM_FILE=\"3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom\"" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_PXE_ROM_FILE=\"pxe.rom\"" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_PXE_ROM_ID=\"10ec,8168\"" >> configs/cml/config.kaisa.uefi
           echo "" >> configs/cml/config.kaisa.uefi
 
@@ -154,13 +151,13 @@ jobs:
             # 🎯 方案7：Realtek 8111 PXE ROM 集成
 
              已在编译前自动下载预编译 iPXE ROM 并追加 PXE ROM 支持配置：
-             - 下载预编译的 iPXE ROM (rtl8111.rom)
+             - 下载预编译的 iPXE ROM 到 coreboot 根目录 (pxe.rom)
              - CONFIG_EDK2_LOAD_OPTION_ROMS=y
              - CONFIG_EDK2_NETWORK_PXE_SUPPORT=y
              - CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y
              - CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y
              - CONFIG_PXE=y
-             - CONFIG_PXE_ROM_FILE="pxe.rom"
+             - CONFIG_PXE_ROM_FILE="pxe.rom" (下载到根目录)
              - CONFIG_PXE_ROM_ID="10ec,8168" (Realtek RTL8111 网卡)
 
              同时追加 Intel 芯片组稳定性相关配置（适配 Kaisa 主板）：
