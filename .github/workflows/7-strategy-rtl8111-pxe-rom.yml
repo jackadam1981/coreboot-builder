@@ -79,6 +79,20 @@ jobs:
           echo "📊 文件大小：$(du -h gbe_pxe_rom_2.70.rom | cut -f1)"
           echo "🎯 PCI ID: 0x10ec:0x8168 (RTL8111H)"
 
+      - name: 🔧 集成 PXE ROM 到源码 / Integrate PXE ROM into Source
+        run: |
+          echo "🔧 将 PXE ROM 集成到 coreboot 源码中"
+          
+          # 创建 3rdparty/blobs 目录结构
+          mkdir -p coreboot/3rdparty/blobs/mainboard/google/puff/puff
+          
+          # 复制 PXE ROM 文件到正确位置
+          cp pxerom_files/gbe_pxe_rom_2.70.rom coreboot/3rdparty/blobs/mainboard/google/puff/puff/pci10ec,8168.rom
+          
+          echo "✅ PXE ROM 已复制到源码目录"
+          echo "📁 文件位置：coreboot/3rdparty/blobs/mainboard/google/puff/puff/pci10ec,8168.rom"
+          echo "📊 文件大小：$(du -h coreboot/3rdparty/blobs/mainboard/google/puff/puff/pci10ec,8168.rom | cut -f1)"
+
       - name: 配置 PXE ROM 支持 / Configure PXE ROM Support
         run: |
           echo "📝 配置 MrChromebox PXE ROM 支持"
@@ -172,9 +186,27 @@ jobs:
                        exit \$BUILD_EXIT_CODE; \
                      fi"
 
-      - name: 🔧 集成 Realtek 8111 PXE ROM / Integrate RTL8111 PXE ROM
+      - name: 📋 验证 PXE ROM 集成 / Verify PXE ROM Integration
         run: |
-          echo "🔧 将 Realtek 8111 PXE ROM 集成到固件中"
+          echo "📋 验证 PXE ROM 是否已正确集成到编译过程中"
+          
+          # 检查 PXE ROM 文件是否存在于源码中
+          if [ -f "coreboot/3rdparty/blobs/mainboard/google/puff/puff/pci10ec,8168.rom" ]; then
+            echo "✅ PXE ROM 文件已存在于源码中"
+            echo "📁 文件位置：coreboot/3rdparty/blobs/mainboard/google/puff/puff/pci10ec,8168.rom"
+            echo "📊 文件大小：$(du -h coreboot/3rdparty/blobs/mainboard/google/puff/puff/pci10ec,8168.rom | cut -f1)"
+          else
+            echo "❌ PXE ROM 文件未找到"
+            exit 1
+          fi
+          
+          # 检查配置是否正确
+          if grep -q "CONFIG_PXE_ROM_FILE=\"pci10ec,8168.rom\"" coreboot/configs/cml/config.kaisa.uefi; then
+            echo "✅ PXE ROM 配置正确"
+          else
+            echo "❌ PXE ROM 配置缺失"
+            exit 1
+          fi
           
           # 查找生成的 ROM 文件
           ROM_FILE=$(ls roms/*.rom | head -1)
@@ -188,93 +220,19 @@ jobs:
           echo "✅ 找到 ROM 文件: $ROM_FILE"
           ROM_BASENAME=$(basename "$ROM_FILE")
           
-          # 备份原始 ROM 文件（集成前）
+          # 备份原始 ROM 文件
           ORIGINAL_ROM_BASENAME="${ROM_BASENAME%.*}_original.rom"
           sudo cp "$ROM_FILE" "roms/$ORIGINAL_ROM_BASENAME"
           sudo chmod 644 "roms/$ORIGINAL_ROM_BASENAME"
           sudo chown runner:runner "roms/$ORIGINAL_ROM_BASENAME"
           echo "📋 原始 ROM 已备份为: $ORIGINAL_ROM_BASENAME"
           
-          # 在 Docker 容器内执行 cbfstool 操作
-          docker run --rm --user root \
-            -v "$(pwd)/coreboot:/home/coreboot/coreboot" \
-            -v "$(pwd)/roms:/home/coreboot/roms" \
-            -v "$(pwd)/pxerom_files:/home/coreboot/pxerom_files" \
-            -w /home/coreboot \
-            coreboot/coreboot-sdk:latest \
-            /bin/bash -c "
-              echo '🔍 当前环境：'
-              pwd
-              ls -la roms/
-              ls -la pxerom_files/
-              
-              echo ''
-              echo '📋 ROM 文件信息（集成前）：'
-              coreboot/build/cbfstool roms/$ROM_BASENAME print
-              
-              echo ''
-              echo '🔧 添加 Realtek 网络启动支持作为 PCI Option ROM...'
-              
-              # 检查 PXE ROM 文件
-              echo '📋 检查 PXE ROM 文件：'
-              ls -la pxerom_files/
-              file pxerom_files/gbe_pxe_rom_2.70.rom
-              echo ''
-              
-              # RTL8111H PCI ID: Vendor=10ec, Device=8168
-              # 命名格式: pci<vendor>,<device>.rom (coreboot 标准格式)
-              
-              # 尝试添加 GBE PXE ROM 作为 PCI Option ROM
-              echo '🔧 尝试添加 PXE ROM（.lom 文件 + optionrom 类型）...'
-              if coreboot/build/cbfstool roms/$ROM_BASENAME add \
-                -f pxerom_files/gbe_pxe_rom_2.70.rom \
-                -n pci10ec,8168.rom \
-                -t optionrom; then
-                echo '✅ GBE PXE ROM 集成成功（.lom + optionrom 类型）'
-              else
-                echo '❌ .lom + optionrom 失败，尝试 .nic + optionrom...'
-                # 尝试使用 .nic 文件
-                cp pxerom_files/BIN/rtegpxe.nic pxerom_files/gbe_pxe_rom_2.70.nic
-                if coreboot/build/cbfstool roms/$ROM_BASENAME add \
-                  -f pxerom_files/gbe_pxe_rom_2.70.nic \
-                  -n pci10ec,8168.rom \
-                  -t optionrom; then
-                  echo '✅ GBE PXE ROM 集成成功（.nic + optionrom 类型）'
-                else
-                  echo '❌ optionrom 类型失败，尝试 raw 类型...'
-                  # 尝试作为 raw 类型
-                  if coreboot/build/cbfstool roms/$ROM_BASENAME add \
-                    -f pxerom_files/gbe_pxe_rom_2.70.nic \
-                    -n pci10ec,8168.rom \
-                    -t raw; then
-                    echo '✅ GBE PXE ROM 集成成功（.nic + raw 类型）'
-                  else
-                    echo '❌ 所有尝试都失败，检查文件格式和 CBFS 空间'
-                    echo '📊 CBFS 空间使用情况：'
-                    coreboot/build/cbfstool roms/$ROM_BASENAME print | grep -E '(Size|Comp|empty)'
-                    echo '📋 尝试的文件：'
-                    ls -la pxerom_files/
-                    echo '📋 文件格式检查：'
-                    file pxerom_files/gbe_pxe_rom_2.70.rom
-                    file pxerom_files/gbe_pxe_rom_2.70.nic
-                  fi
-                fi
-              fi
-              
-              # 重命名集成后的 ROM 文件
-              INTEGRATED_ROM_BASENAME=\"${ROM_BASENAME%.*}_with_pxe_rom.rom\"
-              mv roms/$ROM_BASENAME roms/\$INTEGRATED_ROM_BASENAME
-              
-              # 设置权限
-              chmod 644 roms/\$INTEGRATED_ROM_BASENAME
-              chown 1001:1001 roms/\$INTEGRATED_ROM_BASENAME
-              
-              echo \"✅ 集成后的 ROM 已重命名为: \$INTEGRATED_ROM_BASENAME\"
-              
-              echo ''
-              echo '📋 ROM 文件信息（集成后）：'
-              coreboot/build/cbfstool roms/\$INTEGRATED_ROM_BASENAME print
-            "
+          # 重命名 ROM 文件以区分
+          INTEGRATED_ROM_BASENAME="${ROM_BASENAME%.*}_with_pxe_rom.rom"
+          sudo cp "$ROM_FILE" "roms/$INTEGRATED_ROM_BASENAME"
+          sudo chmod 644 "roms/$INTEGRATED_ROM_BASENAME"
+          sudo chown runner:runner "roms/$INTEGRATED_ROM_BASENAME"
+          echo "📋 集成后的 ROM 已复制为: $INTEGRATED_ROM_BASENAME"
 
       - name: 📦 验证集成结果 / Verify Integration
         run: |
