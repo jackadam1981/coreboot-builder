@@ -188,11 +188,12 @@ jobs:
                        exit \$BUILD_EXIT_CODE; \
                      fi"
 
-      - name: 📋 验证 PXE ROM 集成 / Verify PXE ROM Integration
+      - name: 📦 验证 PXE ROM 集成结果 / Verify PXE ROM Integration
         run: |
-          echo "📋 验证 PXE ROM 是否已正确集成到编译过程中"
+          echo "📦 验证 Realtek 8111 PXE ROM 集成结果"
           
-          # 检查 PXE ROM 文件是否存在于源码中
+          # 1. 检查 PXE ROM 文件是否存在于源码中
+          echo "🔍 检查源码中的 PXE ROM 文件..."
           if [ -f "coreboot/3rdparty/blobs/mainboard/google/puff/puff/pci10ec,8168.rom" ]; then
             echo "✅ PXE ROM 文件已存在于源码中"
             echo "📁 文件位置：coreboot/3rdparty/blobs/mainboard/google/puff/puff/pci10ec,8168.rom"
@@ -202,7 +203,8 @@ jobs:
             exit 1
           fi
           
-          # 检查配置是否正确
+          # 2. 检查配置是否正确
+          echo "🔍 检查 PXE ROM 配置..."
           if grep -q "CONFIG_PXE_ROM_FILE=\"pci10ec,8168.rom\"" coreboot/configs/cml/config.kaisa.uefi; then
             echo "✅ PXE ROM 配置正确"
           else
@@ -210,7 +212,8 @@ jobs:
             exit 1
           fi
           
-          # 查找生成的 ROM 文件
+          # 3. 查找生成的 ROM 文件
+          echo "🔍 查找编译生成的 ROM 文件..."
           ROM_FILE=$(ls roms/*.rom | head -1)
           if [ -z "$ROM_FILE" ]; then
             echo "❌ 未找到 ROM 文件"
@@ -222,52 +225,14 @@ jobs:
           echo "✅ 找到 ROM 文件: $ROM_FILE"
           ROM_BASENAME=$(basename "$ROM_FILE")
           
-          # 备份原始 ROM 文件
-          ORIGINAL_ROM_BASENAME="${ROM_BASENAME%.*}_original.rom"
-          sudo cp "$ROM_FILE" "roms/$ORIGINAL_ROM_BASENAME"
-          sudo chmod 644 "roms/$ORIGINAL_ROM_BASENAME"
-          sudo chown runner:runner "roms/$ORIGINAL_ROM_BASENAME"
-          echo "📋 原始 ROM 已备份为: $ORIGINAL_ROM_BASENAME"
+          # 4. ROM 文件已经是编译时集成了 PXE ROM 的完整固件
+          echo "📋 ROM 文件已包含 PXE ROM 支持: $ROM_BASENAME"
           
-          # 重命名 ROM 文件以区分
-          INTEGRATED_ROM_BASENAME="${ROM_BASENAME%.*}_with_pxe_rom.rom"
-          sudo cp "$ROM_FILE" "roms/$INTEGRATED_ROM_BASENAME"
-          sudo chmod 644 "roms/$INTEGRATED_ROM_BASENAME"
-          sudo chown runner:runner "roms/$INTEGRATED_ROM_BASENAME"
-          echo "📋 集成后的 ROM 已复制为: $INTEGRATED_ROM_BASENAME"
-
-      - name: 📦 验证集成结果 / Verify Integration
-        run: |
-          echo "📦 验证 Realtek 8111 PXE ROM 集成结果"
+          # 5. 使用 cbfstool 验证 PXE ROM 集成
+          echo "🔍 使用 cbfstool 验证 PXE ROM 集成状态..."
           
-          # 查找集成后的 ROM 文件
-          INTEGRATED_ROM_FILE=$(ls roms/*_with_pxe_rom.rom | head -1)
-          ORIGINAL_ROM_FILE=$(ls roms/*_original.rom | head -1)
-          
-          if [ -z "$INTEGRATED_ROM_FILE" ]; then
-            echo "❌ 未找到集成后的 ROM 文件"
-            echo "📋 检查 roms 目录内容："
-            ls -la roms/ 2>/dev/null || echo "⚠️ roms 目录不存在"
-            exit 1
-          fi
-          
-          echo "✅ 找到集成后的 ROM 文件: $(basename "$INTEGRATED_ROM_FILE")"
-          if [ -n "$ORIGINAL_ROM_FILE" ]; then
-            echo "✅ 找到原始 ROM 文件: $(basename "$ORIGINAL_ROM_FILE")"
-          fi
-          
-          echo ""
-          echo "📊 ROM 文件对比："
-          ls -lh "$INTEGRATED_ROM_FILE"
-          if [ -n "$ORIGINAL_ROM_FILE" ]; then
-            ls -lh "$ORIGINAL_ROM_FILE"
-          fi
-          
-          ROM_BASENAME=$(basename "$INTEGRATED_ROM_FILE")
-          
-          # 在 Docker 容器内验证
+          # 在 Docker 容器内验证 - 使用正确的 cbfstool 路径
           docker run --rm --user root \
-            -v "$(pwd)/coreboot:/home/coreboot/coreboot" \
             -v "$(pwd)/roms:/home/coreboot/roms" \
             -w /home/coreboot \
             coreboot/coreboot-sdk:latest \
@@ -275,12 +240,31 @@ jobs:
               echo '🔍 验证 PXE ROM 集成状态：'
               echo ''
               
+              # 尝试不同的 cbfstool 路径
+              CBFS_TOOL=''
+              if command -v cbfstool >/dev/null 2>&1; then
+                CBFS_TOOL='cbfstool'
+              elif [ -f '/usr/local/bin/cbfstool' ]; then
+                CBFS_TOOL='/usr/local/bin/cbfstool'
+              elif [ -f '/usr/bin/cbfstool' ]; then
+                CBFS_TOOL='/usr/bin/cbfstool'
+              else
+                echo '❌ 找不到 cbfstool 工具'
+                echo '📋 检查可用工具：'
+                ls -la /usr/local/bin/cbfs* 2>/dev/null || echo '  /usr/local/bin 中无 cbfs 工具'
+                ls -la /usr/bin/cbfs* 2>/dev/null || echo '  /usr/bin 中无 cbfs 工具'
+                which cbfstool 2>/dev/null || echo '  PATH 中无 cbfstool'
+                exit 1
+              fi
+              
+              echo \"✅ 找到 cbfstool: \$CBFS_TOOL\"
+              
               # 检查 PCI Option ROM
-              if cbfstool roms/$ROM_BASENAME print | grep -q 'pci10ec,8168.rom'; then
+              if \$CBFS_TOOL roms/$ROM_BASENAME print | grep -q 'pci10ec,8168.rom'; then
                 echo '✅ Realtek 网络启动支持已成功集成到固件中'
                 echo ''
                 echo '📋 PCI Option ROM 详细信息：'
-                cbfstool roms/$ROM_BASENAME print | grep -A 3 'pci10ec,8168.rom'
+                \$CBFS_TOOL roms/$ROM_BASENAME print | grep -A 3 'pci10ec,8168.rom'
                 echo ''
                 echo '🎯 集成成功！固件现在支持：'
                 echo '  - RTL8111H 网卡网络启动'
@@ -290,13 +274,13 @@ jobs:
                 echo '❌ Realtek 网络启动支持未找到，可能集成失败'
                 echo ''
                 echo '📋 完整的 CBFS 内容：'
-                cbfstool roms/$ROM_BASENAME print
+                \$CBFS_TOOL roms/$ROM_BASENAME print
                 exit 1
               fi
               
               echo ''
               echo '📊 CBFS 完整内容：'
-              cbfstool roms/$ROM_BASENAME print
+              \$CBFS_TOOL roms/$ROM_BASENAME print
             "
           
           # 生成校验和
@@ -306,38 +290,23 @@ jobs:
           # 使用 sudo 删除旧的校验和文件
           sudo rm -f *.sha1 *.sha256 2>/dev/null || true
           
-          # 为集成后的 ROM 生成校验和
-          sudo bash -c "sha1sum '$(basename "$INTEGRATED_ROM_FILE")' > '$(basename "$INTEGRATED_ROM_FILE").sha1'"
-          sudo bash -c "sha256sum '$(basename "$INTEGRATED_ROM_FILE")' > '$(basename "$INTEGRATED_ROM_FILE").sha256'"
-          
-          # 为原始 ROM 生成校验和（如果存在）
-          if [ -n "$ORIGINAL_ROM_FILE" ]; then
-            sudo bash -c "sha1sum '$(basename "$ORIGINAL_ROM_FILE")' > '$(basename "$ORIGINAL_ROM_FILE").sha1'"
-            sudo bash -c "sha256sum '$(basename "$ORIGINAL_ROM_FILE")' > '$(basename "$ORIGINAL_ROM_FILE").sha256'"
-          fi
+          # 为 ROM 生成校验和
+          sudo bash -c "sha1sum '$ROM_BASENAME' > '$ROM_BASENAME.sha1'"
+          sudo bash -c "sha256sum '$ROM_BASENAME' > '$ROM_BASENAME.sha256'"
           
           echo "✅ 校验和已生成"
           echo ""
-          echo "📊 集成后的 ROM 校验和："
-          cat "$(basename "$INTEGRATED_ROM_FILE").sha1"
-          cat "$(basename "$INTEGRATED_ROM_FILE").sha256"
-          
-          if [ -n "$ORIGINAL_ROM_FILE" ]; then
-            echo ""
-            echo "📊 原始 ROM 校验和："
-            cat "$(basename "$ORIGINAL_ROM_FILE").sha1"
-            cat "$(basename "$ORIGINAL_ROM_FILE").sha256"
-          fi
+          echo "📊 ROM 校验和："
+          cat "$ROM_BASENAME.sha1"
+          cat "$ROM_BASENAME.sha256"
           cd ..
 
       - name: 📝 生成集成报告 / Generate Integration Report
         run: |
           echo "📝 生成方案7集成报告"
           
-          INTEGRATED_ROM_FILE=$(ls roms/*_with_pxe_rom.rom | head -1)
-          ORIGINAL_ROM_FILE=$(ls roms/*_original.rom | head -1)
-          INTEGRATED_ROM_NAME=$(basename "$INTEGRATED_ROM_FILE")
-          ORIGINAL_ROM_NAME=$(basename "$ORIGINAL_ROM_FILE" 2>/dev/null || echo "未找到")
+          ROM_FILE=$(ls roms/*.rom | head -1)
+          ROM_NAME=$(basename "$ROM_FILE")
           
           cat > integration_report.md << EOF
           # 方案7 - Realtek 8111 PXE ROM 集成报告
@@ -345,10 +314,8 @@ jobs:
           ## 📋 构建信息
           
           - **构建日期**: $(date '+%Y-%m-%d %H:%M:%S')
-          - **集成后固件**: $INTEGRATED_ROM_NAME
-          - **集成后大小**: $(du -h "$INTEGRATED_ROM_FILE" | cut -f1)
-          - **原始固件**: $ORIGINAL_ROM_NAME
-          - **原始大小**: $(du -h "$ORIGINAL_ROM_FILE" | cut -f1 2>/dev/null || echo "未找到")
+          - **固件文件**: $ROM_NAME
+          - **固件大小**: $(du -h "$ROM_FILE" | cut -f1)
           - **方案类型**: Realtek 8111 PXE ROM 集成
           
           ## 🎯 方案说明
@@ -373,31 +340,20 @@ jobs:
           
           ### 验证结果
           \`\`\`
-          $(docker run --rm -v "$(pwd)/roms:/home/coreboot/roms" -w /home/coreboot coreboot/coreboot-sdk:latest /bin/bash -c "cbfstool roms/$INTEGRATED_ROM_NAME print | grep -A 3 'pci10ec,8168.rom' || echo 'PXE ROM 未找到'")
+          $(docker run --rm -v "$(pwd)/roms:/home/coreboot/roms" -w /home/coreboot coreboot/coreboot-sdk:latest /bin/bash -c "if command -v cbfstool >/dev/null 2>&1; then cbfstool roms/$ROM_NAME print | grep -A 3 'pci10ec,8168.rom' || echo 'PXE ROM 未找到'; else echo 'cbfstool 工具未找到'; fi")
           \`\`\`
           
           ## 🔐 校验和
           
-          ### 集成后固件
+          ### 固件校验和
           **SHA1**:
           \`\`\`
-          $(cat "$INTEGRATED_ROM_FILE.sha1" 2>/dev/null || echo "未生成")
+          $(cat "$ROM_NAME.sha1" 2>/dev/null || echo "未生成")
           \`\`\`
           
           **SHA256**:
           \`\`\`
-          $(cat "$INTEGRATED_ROM_FILE.sha256" 2>/dev/null || echo "未生成")
-          \`\`\`
-          
-          ### 原始固件
-          **SHA1**:
-          \`\`\`
-          $(cat "$ORIGINAL_ROM_FILE.sha1" 2>/dev/null || echo "未生成")
-          \`\`\`
-          
-          **SHA256**:
-          \`\`\`
-          $(cat "$ORIGINAL_ROM_FILE.sha256" 2>/dev/null || echo "未生成")
+          $(cat "$ROM_NAME.sha256" 2>/dev/null || echo "未生成")
           \`\`\`
           
           ## 📝 使用说明
