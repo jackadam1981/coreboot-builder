@@ -50,7 +50,11 @@ jobs:
           echo "CONFIG_IPXE_SERIAL_CONSOLE=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_IPXE_HAS_HTTPS=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_IPXE_TRUST_CMD=y" >> configs/cml/config.kaisa.uefi
-          echo "CONFIG_COMPRESSED_PAYLOAD_NONE=y" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_COMPRESSED_PAYLOAD_LZMA=y" >> configs/cml/config.kaisa.uefi
+          echo "" >> configs/cml/config.kaisa.uefi
+          echo "# EDK2 载荷大小优化配置" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_EDK2_DISABLE_SERIAL_TERMINAL=y" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_EDK2_DISABLE_USB_SUPPORT=y" >> configs/cml/config.kaisa.uefi
           echo "" >> configs/cml/config.kaisa.uefi
           echo "# Intel 芯片组系统稳定配置（适合 Kaisa 主板）" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_SOC_INTEL_COMMON_BLOCK_POWER_LIMIT=y" >> configs/cml/config.kaisa.uefi
@@ -132,9 +136,11 @@ jobs:
              - CONFIG_IPXE_SERIAL_CONSOLE=y
              - CONFIG_IPXE_HAS_HTTPS=y
              - CONFIG_IPXE_TRUST_CMD=y
-             - CONFIG_COMPRESSED_PAYLOAD_NONE=y
+             - CONFIG_COMPRESSED_PAYLOAD_LZMA=y (启用载荷压缩以节省空间)
+             - CONFIG_EDK2_DISABLE_SERIAL_TERMINAL=y (禁用串口终端以节省空间)
+             - CONFIG_EDK2_DISABLE_USB_SUPPORT=y (禁用USB支持以节省空间)
 
-            同时追加 Intel 芯片组稳定性相关配置（适配 Kaisa 主板）：
+             同时追加 Intel 芯片组稳定性相关配置（适配 Kaisa 主板）：
             - CONFIG_SOC_INTEL_COMMON_BLOCK_POWER_LIMIT=y
             - CONFIG_SOC_INTEL_COMMON_BLOCK_THERMAL=y
             - CONFIG_SOUTHBRIDGE_INTEL_COMMON_WATCHDOG=y
