@@ -80,7 +80,7 @@ jobs:
           echo "CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_PXE=y" >> configs/cml/config.kaisa.uefi
-          echo "CONFIG_PXE_ROM_FILE=\"pxe.rom\"" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_PXE_ROM_FILE=\"3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom\"" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_PXE_ROM_ID=\"10ec,8168\"" >> configs/cml/config.kaisa.uefi
           echo "" >> configs/cml/config.kaisa.uefi
 
