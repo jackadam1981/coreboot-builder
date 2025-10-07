@@ -45,13 +45,11 @@ jobs:
           # 尝试多个 iPXE ROM 下载源
           echo "📥 尝试下载 iPXE ROM..."
           
-          # 方案1: 使用 rom-o-matic 构建服务生成 RTL8111 ROM
+          # 方案1: 使用 iPXE 官方标准 PXE 文件 (337K)
           curl -L -o 3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom \
-            "https://rom-o-matic.net/ipxe.git/build/ipxe.pxe" || \
+            "https://boot.ipxe.org/ipxe.pxe" || \
           curl -L -o 3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom \
-            "https://boot.ipxe.org/undionly.kpxe" || \
-          curl -L -o 3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom \
-            "https://boot.ipxe.org/ipxe.pxe"
+            "https://boot.ipxe.org/undionly.kpxe"
           
           # 如果以上都失败，使用通用的 PXE ROM
           if [ ! -f 3rdparty/blobs/mainboard/google/puff/variants/kaisa/pxe.rom ]; then
