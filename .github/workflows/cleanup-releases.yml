@@ -3,31 +3,11 @@ name: Cleanup Releases
 on:
   workflow_dispatch:
     inputs:
-      keep:
-        description: "保留最新的 Release 数量"
+      keep_indexes:
+        description: "保留序号（按创建时间降序，从1开始），空格分隔，如: 1 3 5"
         required: true
-        type: number
-        default: 5
-      include_prereleases:
-        description: "是否包含预发布 (prereleases)"
-        required: false
-        type: boolean
-        default: true
-      include_drafts:
-        description: "是否包含草稿 (drafts)"
-        required: false
-        type: boolean
-        default: false
-      delete_tags:
-        description: "删除对应的 Git 标签"
-        required: false
-        type: boolean
-        default: true
-      dry_run:
-        description: "模拟执行 (不实际删除)"
-        required: false
-        type: boolean
-        default: false
+        type: string
+        default: "1 2 3"
 
 permissions:
   contents: write
@@ -38,21 +18,13 @@ jobs:
     steps:
       - name: 显示参数 / Show Inputs
         run: |
-          echo "KEEP=${{ inputs.keep }}"
-          echo "INCLUDE_PRERELEASES=${{ inputs.include_prereleases }}"
-          echo "INCLUDE_DRAFTS=${{ inputs.include_drafts }}"
-          echo "DELETE_TAGS=${{ inputs.delete_tags }}"
-          echo "DRY_RUN=${{ inputs.dry_run }}"
+          echo "KEEP_INDEXES='${{ inputs.keep_indexes }}'"
 
       - name: 清理 Releases / Cleanup Releases
         env:
           GH_REPO: ${{ github.repository }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          KEEP: ${{ inputs.keep }}
-          INCLUDE_PRERELEASES: ${{ inputs.include_prereleases }}
-          INCLUDE_DRAFTS: ${{ inputs.include_drafts }}
-          DELETE_TAGS: ${{ inputs.delete_tags }}
-          DRY_RUN: ${{ inputs.dry_run }}
+          KEEP_INDEXES: ${{ inputs.keep_indexes }}
         run: |
           set -euo pipefail
 
@@ -76,25 +48,26 @@ jobs:
 
           echo "共获取到 Releases: $(echo "$releases_json" | jq 'length')"
 
-          # 过滤 drafts / prereleases
-          filter_jq='.'
-          if [ "$INCLUDE_DRAFTS" != "true" ]; then
-            filter_jq+=" | map(select(.draft == false))"
-          fi
-          if [ "$INCLUDE_PRERELEASES" != "true" ]; then
-            filter_jq+=" | map(select(.prerelease == false))"
-          fi
-
-          filtered=$(echo "$releases_json" | jq -c "$filter_jq | sort_by(.created_at) | reverse")
+          # 按创建时间降序
+          filtered=$(echo "$releases_json" | jq -c "sort_by(.created_at) | reverse")
           total=$(echo "$filtered" | jq 'length')
           echo "过滤后数量: $total"
 
-          if [ "$total" -le "$KEEP" ]; then
-            echo "无需清理，数量未超过保留阈值 ($KEEP)";
-            exit 0
-          fi
+          # 解析保留序号（以空格分隔，从1开始）
+          keep_set=$(echo "$KEEP_INDEXES" | xargs -n1 | awk 'NF{print $1}' | sort -n | tr '\n' ' ')
+          echo "保留序号: $keep_set"
 
-          to_delete=$(echo "$filtered" | jq -c ".[$KEEP:]")
+          # 计算删除列表
+          to_delete="[]"
+          for idx in $(seq 1 $total); do
+            if echo " $keep_set " | grep -q " $idx "; then
+              continue
+            fi
+            j=$((idx-1))
+            item=$(echo "$filtered" | jq -c ".[$j]")
+            to_delete=$(jq -c --argjson a "$to_delete" --argjson b "$item" -n '$a + [$b]')
+          done
+
           del_count=$(echo "$to_delete" | jq 'length')
           echo "计划删除数量: $del_count"
 
@@ -107,18 +80,13 @@ jobs:
             prerelease=$(echo "$rel" | jq -r .prerelease)
             echo "— 将删除: id=$id tag=$tag name=$name draft=$draft prerelease=$prerelease"
 
-            if [ "$DRY_RUN" = "true" ]; then
-              echo "DRY_RUN: 跳过删除 release $id / tag $tag"
-              continue
-            fi
-
             # 删除 release
             curl -sS -X DELETE -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
               "$api_base/repos/$owner_repo/releases/$id" | jq -r '.' || true
             echo "已删除 release: $id ($tag)"
 
             # 删除 tag（可选）
-            if [ "$DELETE_TAGS" = "true" ] && [ -n "$tag" ] && [ "$tag" != "null" ]; then
+            if [ -n "$tag" ] && [ "$tag" != "null" ]; then
               # refs/tags/<tag> 需要进行 URL 编码
               ref_path="refs/tags/$(printf %s "$tag" | sed 's#/#%2F#g')"
               curl -sS -X DELETE -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github+json" \
