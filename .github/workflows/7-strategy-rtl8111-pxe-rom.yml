@@ -82,11 +82,24 @@ jobs:
       - name: 替换 Logo / Replace Logo
         run: |
           echo "🎨 替换 coreboot 启动 Logo"
-          cd coreboot
-          if [ -f "Documentation/coreboot_logo.bmp" ]; then
-            # 创建自定义 logo（如果你有的话，可以从仓库复制）
-            # 这里使用默认 logo
-            echo "✅ 使用默认 coreboot logo"
+          
+          # 检查是否有自定义 Logo 文件
+          if [ -f "coreboot_logo.bmp" ]; then
+            echo "✅ 找到自定义 Logo 文件: coreboot_logo.bmp"
+            echo "📊 Logo 文件大小: $(du -h coreboot_logo.bmp | cut -f1)"
+            
+            # 复制自定义 Logo 到 coreboot 源码目录
+            sudo cp coreboot_logo.bmp coreboot/Documentation/coreboot_logo.bmp
+            sudo chmod 644 coreboot/Documentation/coreboot_logo.bmp
+            sudo chown runner:runner coreboot/Documentation/coreboot_logo.bmp
+            
+            echo "✅ 自定义 Logo 已替换到 coreboot 源码中"
+            echo "📋 验证 Logo 文件:"
+            ls -lh coreboot/Documentation/coreboot_logo.bmp
+          else
+            echo "⚠️ 未找到自定义 Logo 文件，使用默认 coreboot logo"
+            echo "📋 可用的 Logo 文件:"
+            ls -la *.bmp 2>/dev/null || echo "无 .bmp 文件"
           fi
 
       - name: 📦 编译 MrChromebox Coreboot 固件 / Build Coreboot
