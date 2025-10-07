@@ -172,7 +172,7 @@ jobs:
                      echo '🔧 使用 MrChromebox build-uefi.sh 编译 kaisa...' && \
                      ./build-uefi.sh kaisa && \
                      echo '📋 查找并复制 ROM 文件...' && \
-                     ROM_FILE=\$(find ~/dev -name '*.rom' -type f 2>/dev/null | head -1) && \
+                     ROM_FILE=\$(find ../roms -name '*.rom' -type f 2>/dev/null | head -1) && \
                      if [ -n \"\$ROM_FILE\" ]; then \
                        ROM_BASENAME=\"coreboot_edk2-kaisa-mrchromebox_\$(date +%Y%m%d).rom\" && \
                        cp \"\$ROM_FILE\" \"/home/coreboot/roms/\$ROM_BASENAME\" && \
