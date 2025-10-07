@@ -177,14 +177,31 @@ jobs:
                      ./build-uefi.sh kaisa; BUILD_EXIT_CODE=\$? && \
                      echo \"📦 编译完成，退出码: \$BUILD_EXIT_CODE\" && \
                      echo '🔍 查找编译输出文件...' && \
+                     echo '  查找 ../roms 目录:' && \
                      find ../roms -name '*.rom' -type f 2>/dev/null | head -5 && \
+                     echo '  查找 ./roms 目录:' && \
                      find ./roms -name '*.rom' -type f 2>/dev/null | head -5 && \
+                     echo '  查找当前目录:' && \
+                     find . -name '*.rom' -type f 2>/dev/null | head -5 && \
+                     echo '  查找 build 目录:' && \
+                     find build -name '*.rom' -type f 2>/dev/null | head -5 && \
+                     echo '  查找 ~/dev 目录:' && \
+                     find ~/dev -name '*.rom' -type f 2>/dev/null | head -5 && \
                      echo '📋 检查输出目录权限...' && \
                      ls -la /home/coreboot/roms/ && \
                      echo '📋 查找 ROM 文件...' && \
                      ROM_FILE=\$(find ../roms -name '*.rom' -type f 2>/dev/null | head -1) && \
                      if [ -z \"\$ROM_FILE\" ]; then \
                        ROM_FILE=\$(find ./roms -name '*.rom' -type f 2>/dev/null | head -1); \
+                     fi && \
+                     if [ -z \"\$ROM_FILE\" ]; then \
+                       ROM_FILE=\$(find . -name '*.rom' -type f 2>/dev/null | head -1); \
+                     fi && \
+                     if [ -z \"\$ROM_FILE\" ]; then \
+                       ROM_FILE=\$(find build -name '*.rom' -type f 2>/dev/null | head -1); \
+                     fi && \
+                     if [ -z \"\$ROM_FILE\" ]; then \
+                       ROM_FILE=\$(find ~/dev -name '*.rom' -type f 2>/dev/null | head -1); \
                      fi && \
                      if [ -n \"\$ROM_FILE\" ]; then \
                        echo \"✅ 找到 ROM 文件: \$ROM_FILE\" && \
@@ -208,8 +225,13 @@ jobs:
         run: |
           echo "📦 验证 Realtek 8111 PXE ROM 集成结果"
           
+          # 修复权限问题
+          echo "🔧 修复权限问题..."
+          chmod -R 777 roms/ 2>/dev/null || true
+          chown -R 1001:1001 roms/ 2>/dev/null || true
+          
           # 检查 ROM 文件（MrChromebox 生成的文件名模式）
-          ROM_FILE=$(ls roms/*.rom | head -1)
+          ROM_FILE=$(ls roms/*.rom 2>/dev/null | head -1)
           if [ -z "$ROM_FILE" ]; then
             echo "❌ 未找到 ROM 文件"
             echo "📋 检查 roms 目录内容："
