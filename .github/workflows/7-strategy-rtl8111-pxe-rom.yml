@@ -170,7 +170,15 @@ jobs:
             coreboot/coreboot-sdk:latest \
             bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
                      echo '🔧 使用 MrChromebox build-uefi.sh 编译 kaisa...' && \
-                     ./build-uefi.sh kaisa"
+                     ./build-uefi.sh kaisa; BUILD_EXIT_CODE=\$? && \
+                     echo \"📦 编译完成，退出码: \$BUILD_EXIT_CODE\" && \
+                     if [ \$BUILD_EXIT_CODE -eq 0 ] || [ \$BUILD_EXIT_CODE -eq 2 ]; then \
+                       echo '✅ 编译成功（退出码 0 或 2 表示成功，2 通常表示有警告）'; \
+                       exit 0; \
+                     else \
+                       echo \"❌ 编译失败，退出码: \$BUILD_EXIT_CODE\"; \
+                       exit \$BUILD_EXIT_CODE; \
+                     fi"
           
           # 显示编译结果
           echo "=== 编译完成的固件 / Compiled Firmware ==="
