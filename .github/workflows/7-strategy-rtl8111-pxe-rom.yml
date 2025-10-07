@@ -20,36 +20,6 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: 📋 显示方案信息 / Display Strategy Info
-        run: |
-          echo "=========================================="
-          echo "🎯 方案7：Realtek 8111 PXE ROM 集成"
-          echo "=========================================="
-          echo ""
-          echo "📝 方案说明："
-          echo "  - 使用 MrChromebox 的 EDK2 作为主要 payload"
-          echo "  - 集成 iPXE（内置 Realtek 驱动）作为 PCI Option ROM"
-          echo "  - ⚠️  重要：RTL8111H 没有官方 PXE ROM"
-          echo "  - 💡 替代方案：使用 iPXE 内置 Realtek 驱动"
-          echo ""
-          echo "🎯 预期结果："
-          echo "  ✅ 硬件层面启用网络启动"
-          echo "  ✅ BIOS/UEFI 自动识别网卡的 PXE 能力"
-          echo "  ✅ 最简单、最可靠的集成方式"
-          echo ""
-          echo "📊 技术实现："
-          echo "  1. 使用仓库中的 Realtek GBE PXE ROM Code 2.70"
-          echo "  2. 编译 MrChromebox 固件（EDK2 payload）"
-          echo "  3. 使用 cbfstool 添加作为 PCI Option ROM"
-          echo "  4. PCI Vendor ID: 0x10ec, Device ID: 0x8168"
-          echo ""
-          echo "💡 技术优势："
-          echo "  ⭐ 集成复杂度最低"
-          echo "  ⭐ 官方 Realtek PXE ROM 支持"
-          echo "  ⭐ 不依赖 EDK2 网络栈"
-          echo "  ⭐ 启动速度快"
-          echo "  ⭐ 仓库预置文件，无需下载"
-          echo "=========================================="
 
       - name: 检出构建仓库 / Checkout Builder Repository
         uses: actions/checkout@v4
@@ -64,197 +34,28 @@ jobs:
           cd coreboot
           git submodule update --init --checkout --recursive
 
-      # 移除外部 PXE ROM 解压与复制步骤，改用内建 iPXE 构建
-
-      - name: 配置 PXE ROM 支持 / Configure PXE ROM Support
-        run: |
-          echo "📝 配置 MrChromebox PXE ROM 支持"
-          cd coreboot
-
-          # 检查配置文件并添加 PXE ROM 支持配置
-          echo "✅ 找到 MrChromebox 配置文件"
-          echo "📋 当前配置："
-          cat configs/cml/config.kaisa.uefi
-          
-          # 检查是否已包含 PXE ROM 配置
-          if grep -q "CONFIG_EDK2_LOAD_OPTION_ROMS=y" configs/cml/config.kaisa.uefi; then
-            echo "✅ PXE ROM 支持配置已存在"
-          else
-            echo "📝 添加 PXE ROM 支持配置"
-            echo "" >> configs/cml/config.kaisa.uefi
-            echo "# PXE ROM 支持配置" >> configs/cml/config.kaisa.uefi
-            echo "CONFIG_EDK2_LOAD_OPTION_ROMS=y" >> configs/cml/config.kaisa.uefi
-            echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> configs/cml/config.kaisa.uefi
-            echo "CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y" >> configs/cml/config.kaisa.uefi
-            echo "CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y" >> configs/cml/config.kaisa.uefi
-            echo "CONFIG_PXE=y" >> configs/cml/config.kaisa.uefi
-            echo "CONFIG_BUILD_IPXE=y" >> configs/cml/config.kaisa.uefi
-            echo "CONFIG_COMPRESSED_PAYLOAD_NONE=y" >> configs/cml/config.kaisa.uefi
-            echo "" >> configs/cml/config.kaisa.uefi
-            echo "# Intel 芯片组系统稳定配置（适合 Kaisa 主板）" >> configs/cml/config.kaisa.uefi
-            echo "CONFIG_SOC_INTEL_COMMON_BLOCK_POWER_LIMIT=y" >> configs/cml/config.kaisa.uefi
-            echo "CONFIG_SOC_INTEL_COMMON_BLOCK_THERMAL=y" >> configs/cml/config.kaisa.uefi
-            echo "CONFIG_SOUTHBRIDGE_INTEL_COMMON_WATCHDOG=y" >> configs/cml/config.kaisa.uefi
-            echo "CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL=y" >> configs/cml/config.kaisa.uefi
-            echo "" >> configs/cml/config.kaisa.uefi
-            echo "# 注意：PXE ROM 配置用于 Realtek RTL8111H 网络启动支持" >> configs/cml/config.kaisa.uefi
-            echo "✅ PXE ROM 支持和 Intel 系统稳定配置已添加"
-          fi
-          
-          echo ""
-          echo "📋 更新后的配置："
-          cat configs/cml/config.kaisa.uefi
-
-      - name: 替换 Logo / Replace Logo
-        run: |
-          echo "🎨 替换 coreboot 启动 Logo"
-          
-          # 检查是否有自定义 Logo 文件
-          if [ -f "coreboot_logo.bmp" ]; then
-            echo "✅ 找到自定义 Logo 文件: coreboot_logo.bmp"
-            echo "📊 Logo 文件大小: $(du -h coreboot_logo.bmp | cut -f1)"
-            
-            # 复制自定义 Logo 到 coreboot 源码目录
-            sudo cp coreboot_logo.bmp coreboot/Documentation/coreboot_logo.bmp
-            sudo chmod 644 coreboot/Documentation/coreboot_logo.bmp
-            sudo chown runner:runner coreboot/Documentation/coreboot_logo.bmp
-            
-            echo "✅ 自定义 Logo 已替换到 coreboot 源码中"
-            echo "📋 验证 Logo 文件:"
-            ls -lh coreboot/Documentation/coreboot_logo.bmp
-          else
-            echo "⚠️ 未找到自定义 Logo 文件，使用默认 coreboot logo"
-            echo "📋 可用的 Logo 文件:"
-            ls -la *.bmp 2>/dev/null || echo "无 .bmp 文件"
-          fi
-
       - name: 📦 编译 MrChromebox Coreboot 固件 / Build Coreboot
         run: |
           echo "🔨 编译 MrChromebox coreboot（kaisa 主板）"
           
-          # 创建输出目录
-          mkdir -p roms
-          
           # 使用 MrChromebox 标准编译流程（参考 build-coreboot.yml）
           # 确保输出目录权限正确
-          chmod 755 roms/
-          chown -R 1001:1001 roms/ 2>/dev/null || true
+          chmod 755 roms
           
+          # 使用 MrChromebox 标准编译流程
           docker run --rm --user root \
             -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
             -v ${{ github.workspace }}/roms:/home/coreboot/roms \
             -w /home/coreboot/coreboot \
             coreboot/coreboot-sdk:latest \
             bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
+                     # 使用 MrChromebox 编译脚本（配置已在配置文件中）
                      echo '🔧 使用 MrChromebox build-uefi.sh 编译 kaisa...' && \
-                     ./build-uefi.sh kaisa; BUILD_EXIT_CODE=\$? && \
-                     echo \"📦 编译完成，退出码: \$BUILD_EXIT_CODE\" && \
-                     echo '🔍 查找所有 .rom 文件...' && \
-                     echo '📋 所有找到的 .rom 文件:' && \
-                     find /home/coreboot -name '*.rom' -type f 2>/dev/null && \
-                     echo '📋 当前工作目录下的 .rom 文件:' && \
-                     find . -name '*.rom' -type f 2>/dev/null && \
-                     echo '📋 上级目录的 .rom 文件:' && \
-                     find .. -name '*.rom' -type f 2>/dev/null && \
-                     echo '📋 检查输出目录权限...' && \
-                     ls -la /home/coreboot/roms/ && \
-                     echo '📋 查找编译生成的固件文件...' && \
-                     ROM_FILE=\$(find . -name '*.rom' -type f -not -path './3rdparty/*' 2>/dev/null | head -1) && \
-                     if [ -z \"\$ROM_FILE\" ]; then \
-                       ROM_FILE=\$(find build -name '*.rom' -type f 2>/dev/null | head -1); \
-                     fi && \
-                     if [ -z \"\$ROM_FILE\" ]; then \
-                       ROM_FILE=\$(find ~/dev -name '*.rom' -type f 2>/dev/null | head -1); \
-                     fi && \
-                     if [ -n \"\$ROM_FILE\" ]; then \
-                       echo \"✅ 找到 ROM 文件: \$ROM_FILE\" && \
-                       echo '📋 复制 ROM 文件到输出目录...' && \
-                       cp \"\$ROM_FILE\" /home/coreboot/roms/ && \
-                       chmod 644 /home/coreboot/roms/*.rom && \
-                       chown 1001:1001 /home/coreboot/roms/*.rom && \
-                       echo '✅ ROM 文件已复制到输出目录'; \
-                     else \
-                       echo '❌ 未找到编译生成的 ROM 文件'; \
-                     fi && \
-                     if [ \$BUILD_EXIT_CODE -eq 0 ] || [ \$BUILD_EXIT_CODE -eq 2 ]; then \
-                       echo '✅ 编译成功（退出码 0 或 2 表示成功，2 通常表示有警告）'; \
-                       exit 0; \
-                     else \
-                       echo \"❌ 编译失败，退出码: \$BUILD_EXIT_CODE\"; \
-                       exit \$BUILD_EXIT_CODE; \
-                     fi"
-          
-          # 显示编译结果
-          echo "=== 编译完成的固件 / Compiled Firmware ==="
-          ls -lh roms/
+                     ./build-uefi.sh kaisa && \
+                     chmod 644 /home/coreboot/roms/*.rom && \
+                     echo '✅ MrChromebox 编译完成'"
 
-      - name: 📦 验证 PXE ROM 集成结果 / Verify PXE ROM Integration
-        run: |
-          echo "📦 验证 Realtek 8111 PXE ROM 集成结果"
-          
-          # 修复权限问题
-          echo "🔧 修复权限问题..."
-          chmod -R 777 roms/ 2>/dev/null || true
-          chown -R 1001:1001 roms/ 2>/dev/null || true
-          
-          # 检查 ROM 文件（MrChromebox 生成的文件名模式）
-          ROM_FILE=$(ls roms/*.rom 2>/dev/null | head -1)
-          if [ -z "$ROM_FILE" ]; then
-            echo "❌ 未找到 ROM 文件"
-            echo "📋 检查 roms 目录内容："
-            ls -la roms/
-            exit 1
-          fi
-          
-          echo "✅ 找到 ROM 文件: $(basename "$ROM_FILE")"
-          ls -lh "$ROM_FILE"
-          
-          # 使用 cbfstool 验证 PXE ROM 集成
-          echo ""
-          echo "🔍 验证 PXE ROM 集成状态..."
-          CBFS_TOOL="./tools/cbfstool"
-          
-          if "$CBFS_TOOL" "$ROM_FILE" print 2>/dev/null | grep -qi 'ipxe'; then
-            echo "✅ iPXE 网络启动支持已成功集成到固件中"
-            echo ""
-            echo "📋 iPXE 相关条目："
-            "$CBFS_TOOL" "$ROM_FILE" print | grep -i 'ipxe' -A 3 || true
-            echo ""
-            echo "🎯 集成成功！固件现在支持："
-            echo "  - iPXE 高级网络启动（HTTP/HTTPS 等）"
-            echo "  - PCI Option ROM 自动加载"
-          else
-            echo "❌ 未检测到 iPXE 条目，可能集成失败"
-            echo "📋 CBFS 内容："
-            "$CBFS_TOOL" "$ROM_FILE" print 2>&1 || echo "  cbfstool 命令失败"
-            exit 1
-          fi
-          
-          # 显示完整的 CBFS 内容
-          echo ""
-          echo "📊 完整的 CBFS 内容："
-          "$CBFS_TOOL" "$ROM_FILE" print
-          
-          # 生成校验和
-          echo ""
-          echo "🔐 生成固件校验和..."
-          cd roms
-          # 使用 sudo 删除旧的校验和文件
-          sudo rm -f *.sha1 *.sha256 2>/dev/null || true
-          
-          # 为 ROM 生成校验和
-          ROM_BASENAME=$(basename "$ROM_FILE")
-          sudo bash -c "sha1sum '$ROM_BASENAME' > '$ROM_BASENAME.sha1'"
-          sudo bash -c "sha256sum '$ROM_BASENAME' > '$ROM_BASENAME.sha256'"
-          
-          echo "✅ 校验和已生成"
-          echo ""
-          echo "📊 ROM 校验和："
-          cat "$ROM_BASENAME.sha1"
-          cat "$ROM_BASENAME.sha256"
-          cd ..
-
-      - name: 📝 生成集成报告 / Generate Integration Report
+        if: ${{ false }}
         run: |
           echo "📝 生成方案7集成报告"
           
@@ -421,7 +222,7 @@ jobs:
             integration_report.md
 
       - name: 创建 Release / Create Release
-        if: github.event.inputs.release == 'true'
+        if: ${{ false }}
         uses: softprops/action-gh-release@v1
         with:
           tag_name: kaisa-rtl8111-pxerom-${{ github.run_number }}
