@@ -183,13 +183,10 @@ jobs:
                      echo '📋 检查输出目录权限...' && \
                      ls -la /home/coreboot/roms/ && \
                      echo '📋 复制 ROM 文件到输出目录...' && \
-                     ROM_FILE=\$(find ~/dev -name '*.rom' -type f 2>/dev/null | head -1) && \
+                     ROM_FILE=\$(find ../roms -name '*.rom' -type f 2>/dev/null | head -1) && \
                      if [ -n \"\$ROM_FILE\" ]; then \
                        echo \"找到 ROM 文件: \$ROM_FILE\" && \
-                       cp \"\$ROM_FILE\" /home/coreboot/roms/ && \
-                       chmod 644 /home/coreboot/roms/*.rom && \
-                       chown 1001:1001 /home/coreboot/roms/*.rom && \
-                       echo '✅ ROM 文件已复制到输出目录'; \
+                       echo '✅ ROM 文件已在正确位置，无需复制'; \
                      else \
                        echo '❌ 未找到编译生成的 ROM 文件'; \
                      fi && \
@@ -209,8 +206,8 @@ jobs:
         run: |
           echo "📦 验证 Realtek 8111 PXE ROM 集成结果"
           
-          # 检查 ROM 文件（参考 build-coreboot.yml）
-          ROM_FILE=$(ls roms/coreboot_*.rom | head -1)
+          # 检查 ROM 文件（MrChromebox 生成的文件名模式）
+          ROM_FILE=$(ls roms/*.rom | head -1)
           if [ -z "$ROM_FILE" ]; then
             echo "❌ 未找到 ROM 文件"
             echo "📋 检查 roms 目录内容："
