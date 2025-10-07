@@ -102,11 +102,13 @@ jobs:
             echo "CONFIG_PXE_ROM_FILE=\"pci10ec,8168.rom\"" >> configs/cml/config.kaisa.uefi
             echo "CONFIG_COMPRESSED_PAYLOAD_NONE=y" >> configs/cml/config.kaisa.uefi
             echo "" >> configs/cml/config.kaisa.uefi
-            echo "# 系统配置" >> configs/cml/config.kaisa.uefi
-            echo "CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL=y" >> configs/cml/config.kaisa.uefi
+            echo "# Intel 芯片组系统稳定配置（适合 Kaisa 主板）" >> configs/cml/config.kaisa.uefi
+            echo "CONFIG_SOC_INTEL_COMMON_BLOCK_POWER_LIMIT=y" >> configs/cml/config.kaisa.uefi
+            echo "CONFIG_SOC_INTEL_COMMON_BLOCK_THERMAL=y" >> configs/cml/config.kaisa.uefi
+            echo "CONFIG_SOUTHBRIDGE_INTEL_COMMON_WATCHDOG=y" >> configs/cml/config.kaisa.uefi
             echo "" >> configs/cml/config.kaisa.uefi
             echo "# 注意：PXE ROM 配置用于 Realtek RTL8111H 网络启动支持" >> configs/cml/config.kaisa.uefi
-            echo "✅ PXE ROM 支持配置已添加"
+            echo "✅ PXE ROM 支持和 Intel 系统稳定配置已添加"
           fi
           
           echo ""
