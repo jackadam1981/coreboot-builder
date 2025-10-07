@@ -79,6 +79,74 @@ jobs:
           echo "📊 文件大小：$(du -h gbe_pxe_rom_2.70.rom | cut -f1)"
           echo "🎯 PCI ID: 0x10ec:0x8168 (RTL8111H)"
 
+      - name: 配置 PXE ROM 支持 / Configure PXE ROM Support
+        run: |
+          echo "📝 配置 MrChromebox PXE ROM 支持"
+          cd coreboot
+
+          # 检查配置文件是否存在
+          if [ -f "configs/cml/config.kaisa.uefi" ]; then
+            echo "✅ 找到现有配置文件"
+            echo "📋 当前配置："
+            cat configs/cml/config.kaisa.uefi
+            
+            # 检查是否已包含 PXE ROM 配置
+            if grep -q "CONFIG_EDK2_LOAD_OPTION_ROMS=y" configs/cml/config.kaisa.uefi; then
+              echo "✅ PXE ROM 支持配置已存在"
+            else
+              echo "📝 添加 PXE ROM 支持配置"
+              echo "" >> configs/cml/config.kaisa.uefi
+              echo "# PXE ROM 支持配置" >> configs/cml/config.kaisa.uefi
+              echo "CONFIG_EDK2_LOAD_OPTION_ROMS=y" >> configs/cml/config.kaisa.uefi
+              echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> configs/cml/config.kaisa.uefi
+              echo "CONFIG_PXE=y" >> configs/cml/config.kaisa.uefi
+              echo "CONFIG_PXE_ROM_FILE=\"pci10ec,8168.rom\"" >> configs/cml/config.kaisa.uefi
+              echo "CONFIG_EDK2_USE_ESCAPE_KEY=y" >> configs/cml/config.kaisa.uefi
+              echo "CONFIG_EDK2_BOOT_MENU_TIMEOUT=5" >> configs/cml/config.kaisa.uefi
+              echo "CONFIG_EDK2_INCLUDE_EFI_SHELL=y" >> configs/cml/config.kaisa.uefi
+              echo "CONFIG_EDK2_PRIORITIZE_INTERNAL_BOOT=y" >> configs/cml/config.kaisa.uefi
+              echo "CONFIG_EDK2_SUPPORT_PS2_KEYBOARD=y" >> configs/cml/config.kaisa.uefi
+              echo "CONFIG_EDK2_UEFI_SECURE_BOOT=y" >> configs/cml/config.kaisa.uefi
+              echo "CONFIG_EDK2_UEFI_NETWORK_PXE_BOOTING=y" >> configs/cml/config.kaisa.uefi
+              echo "CONFIG_EDK2_DISABLE_TPM=y" >> configs/cml/config.kaisa.uefi
+              echo "" >> configs/cml/config.kaisa.uefi
+              echo "# 注意：PXE ROM 配置用于 Realtek RTL8111H 网络启动支持" >> configs/cml/config.kaisa.uefi
+              echo "✅ PXE ROM 支持配置已添加"
+            fi
+            
+            echo ""
+            echo "📋 更新后的配置："
+            cat configs/cml/config.kaisa.uefi
+          else
+            echo "❌ 配置文件不存在，创建新的 PXE ROM 配置"
+            mkdir -p configs/cml
+            cat > configs/cml/config.kaisa.uefi << EOF
+# MrChromebox Kaisa UEFI Configuration with PXE ROM Support
+CONFIG_VENDOR_GOOGLE=y
+CONFIG_BOARD_GOOGLE_KAISA=y
+CONFIG_POWER_STATE_OFF_AFTER_FAILURE=y
+CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL=y
+
+# PXE ROM 支持配置
+CONFIG_EDK2_LOAD_OPTION_ROMS=y
+CONFIG_EDK2_NETWORK_PXE_SUPPORT=y
+CONFIG_PXE=y
+CONFIG_PXE_ROM_FILE="pci10ec,8168.rom"
+CONFIG_EDK2_USE_ESCAPE_KEY=y
+CONFIG_EDK2_BOOT_MENU_TIMEOUT=5
+CONFIG_EDK2_INCLUDE_EFI_SHELL=y
+CONFIG_EDK2_PRIORITIZE_INTERNAL_BOOT=y
+CONFIG_EDK2_SUPPORT_PS2_KEYBOARD=y
+CONFIG_EDK2_UEFI_SECURE_BOOT=y
+CONFIG_EDK2_UEFI_NETWORK_PXE_BOOTING=y
+CONFIG_EDK2_DISABLE_TPM=y
+CONFIG_COMPRESSED_PAYLOAD_NONE=y
+
+# 注意：PXE ROM 配置用于 Realtek RTL8111H 网络启动支持
+EOF
+            echo "✅ 新的 PXE ROM 配置文件已创建"
+          fi
+
       - name: 替换 Logo / Replace Logo
         run: |
           echo "🎨 替换 coreboot 启动 Logo"
