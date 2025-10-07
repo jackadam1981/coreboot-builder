@@ -103,11 +103,8 @@ jobs:
             echo "CONFIG_EDK2_USE_ESCAPE_KEY=y" >> configs/cml/config.kaisa.uefi
             echo "CONFIG_EDK2_BOOT_MENU_TIMEOUT=5" >> configs/cml/config.kaisa.uefi
             echo "CONFIG_EDK2_INCLUDE_EFI_SHELL=y" >> configs/cml/config.kaisa.uefi
-            echo "CONFIG_EDK2_PRIORITIZE_INTERNAL_BOOT=y" >> configs/cml/config.kaisa.uefi
-            echo "CONFIG_EDK2_SUPPORT_PS2_KEYBOARD=y" >> configs/cml/config.kaisa.uefi
-            echo "CONFIG_EDK2_UEFI_SECURE_BOOT=y" >> configs/cml/config.kaisa.uefi
             echo "CONFIG_EDK2_UEFI_NETWORK_PXE_BOOTING=y" >> configs/cml/config.kaisa.uefi
-            echo "CONFIG_EDK2_DISABLE_TPM=y" >> configs/cml/config.kaisa.uefi
+            echo "CONFIG_COMPRESSED_PAYLOAD_NONE=y" >> configs/cml/config.kaisa.uefi
             echo "" >> configs/cml/config.kaisa.uefi
             echo "# 注意：PXE ROM 配置用于 Realtek RTL8111H 网络启动支持" >> configs/cml/config.kaisa.uefi
             echo "✅ PXE ROM 支持配置已添加"
