@@ -76,9 +76,18 @@ jobs:
           CONFIG_VENDOR_GOOGLE=y
           CONFIG_BOARD_GOOGLE_KAISA=y
           
+          # ROM 大小配置（Kaisa 使用 16MB）
+          CONFIG_BOARD_ROMSIZE_KB_16384=y
+          
           # EDK2 Payload 配置（使用官方 EDK2）
           CONFIG_PAYLOAD_EDK2=y
           CONFIG_EDK2_REPO_OFFICIAL=y
+          CONFIG_EDK2_RELEASE=y
+          
+          # EDK2 体积优化（禁用非必要功能）
+          # CONFIG_EDK2_HAVE_EFI_SHELL is not set
+          # CONFIG_EDK2_PS2_SUPPORT is not set
+          # CONFIG_EDK2_SERIAL_SUPPORT is not set
           
           # PXE ROM 支持配置
           CONFIG_PXE=y
@@ -86,8 +95,8 @@ jobs:
           CONFIG_PXE_ROM_FILE="pxe.rom"
           CONFIG_PXE_ROM_ID="10ec,8168"
           
-          # Payload 压缩配置
-          CONFIG_COMPRESSED_PAYLOAD_NONE=y
+          # Payload 压缩配置（使用 LZMA 压缩以减小体积）
+          CONFIG_COMPRESSED_PAYLOAD_LZMA=y
           
           # Intel 芯片组系统稳定配置（适合 Kaisa 主板）
           CONFIG_SOC_INTEL_COMMON_BLOCK_POWER_LIMIT=y
