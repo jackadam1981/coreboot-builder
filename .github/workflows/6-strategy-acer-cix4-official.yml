@@ -1,4 +1,4 @@
-name: Coreboot Mrchromebox build kaisa
+name: Coreboot Official build kaisa
 
 on:
   # 支持推送触发和手动触发
@@ -26,10 +26,10 @@ jobs:
       - name: 拉取 Coreboot SDK 容器 / Pull Coreboot SDK
         run: docker pull coreboot/coreboot-sdk:latest
 
-      - name: 克隆 MrChromebox Coreboot 源码 / Clone Coreboot Source
+      - name: 克隆 Coreboot Official 源码 / Clone Coreboot Source
         run: |
-          echo "📥 克隆 MrChromebox coreboot"
-          git clone https://github.com/MrChromebox/coreboot.git coreboot
+          echo "📥 克隆 coreboot official"
+          git clone https://github.com/coreboot/coreboot.git coreboot
           cd coreboot
           git submodule update --init --checkout --recursive
 
@@ -87,39 +87,35 @@ jobs:
           echo "CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL=y" >> configs/cml/config.kaisa.uefi
           echo "" >> configs/cml/config.kaisa.uefi
 
-      - name: 修复 PXE ROM Makefile 规则 / Fix PXE ROM Makefile Rule
+      - name: 📦 编译 Coreboot Official 固件 / Build Coreboot
         run: |
-          echo "🔧 修复 PXE ROM Makefile 规则"
-          cd coreboot
-          
-          # 修复 Makefile 规则，允许单独使用 CONFIG_PXE_ROM=y
-          # 原规则：cbfs-files-$(CONFIG_PXE_ROM)$(CONFIG_BUILD_IPXE) += pci$(CONFIG_PXE_ROM_ID).rom
-          # 替换为：cbfs-files-y += pci$(CONFIG_PXE_ROM_ID).rom (当 CONFIG_PXE_ROM=y 时)
-          sed -i 's/^cbfs-files-\$(CONFIG_PXE_ROM)\$(CONFIG_BUILD_IPXE) += pci\$(CONFIG_PXE_ROM_ID)\.rom$/# 原规则已修复\nifeq (\$(CONFIG_PXE_ROM),y)\ncbfs-files-y += pci\$(CONFIG_PXE_ROM_ID).rom\nendif\nifeq (\$(CONFIG_BUILD_IPXE),y)\ncbfs-files-y += pci\$(CONFIG_PXE_ROM_ID).rom\nendif/' payloads/external/Makefile.mk
-          
-          echo "✅ Makefile 规则修复完成"
+          echo "🔨 编译 coreboot official（kaisa 主板）"
 
-      - name: 📦 编译 MrChromebox Coreboot 固件 / Build Coreboot
-        run: |
-          echo "🔨 编译 MrChromebox coreboot（kaisa 主板）"
-
-          # 使用 MrChromebox 标准编译流程（参考 build-coreboot.yml）
           # 确保输出目录权限正确
           mkdir -p roms
           chmod 755 roms
 
-          # 使用 MrChromebox 标准编译流程
+          # 使用 coreboot official 标准编译流程
           docker run --rm --user root \
             -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
             -v ${{ github.workspace }}/roms:/home/coreboot/roms \
             -w /home/coreboot/coreboot \
             coreboot/coreboot-sdk:latest \
             bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
-                     # 使用 MrChromebox 编译脚本（配置已在配置文件中）
-                     echo '🔧 使用 MrChromebox build-uefi.sh 编译 kaisa...' && \
-                     ./build-uefi.sh kaisa && \
-                     chmod 644 /home/coreboot/roms/*.rom && \
-                     echo '✅ MrChromebox 编译完成'"
+                     # 检查是否存在 kaisa 配置
+                     if [ -f configs/cml/config.kaisa.uefi ]; then \
+                       echo '✅ 找到 kaisa 配置文件' && \
+                       cp configs/cml/config.kaisa.uefi .config && \
+                       make olddefconfig && \
+                       make -j\$(nproc) && \
+                       cp build/coreboot.rom /home/coreboot/roms/coreboot_official-kaisa_\$(date +%Y%m%d).rom && \
+                       chmod 644 /home/coreboot/roms/*.rom && \
+                       echo '✅ coreboot official 编译完成'; \
+                     else \
+                       echo '❌ 未找到 kaisa 配置文件，尝试查找其他配置' && \
+                       ls -la configs/ && \
+                       exit 1; \
+                     fi"
 
       - name: 验证编译结果 / Verify Build Results
         run: |
@@ -145,7 +141,7 @@ jobs:
       - name: 上传固件 / Upload Firmware
         uses: actions/upload-artifact@v4
         with:
-          name: coreboot-kaisa-rtl8111-pxerom-${{ github.run_number }}
+          name: coreboot-official-kaisa-pxerom-${{ github.run_number }}
           path: |
             roms/*.rom
             roms/*.sha1
@@ -156,14 +152,14 @@ jobs:
         if: ${{ (github.event_name == 'workflow_dispatch' && inputs.release) || (github.event_name != 'workflow_dispatch') }}
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: kaisa-rtl8111-pxerom-${{ github.run_number }}
-          name: "Coreboot Kaisa - 方案7 (RTL8111 PXE ROM) #${{ github.run_number }}"
+          tag_name: kaisa-official-pxerom-${{ github.run_number }}
+          name: "Coreboot Official Kaisa - 方案6 (RTL8111 PXE ROM) #${{ github.run_number }}"
           body: |
-            # 🎯 方案7：Realtek 8111 PXE ROM 集成
+            # 🎯 方案6：Coreboot Official + Realtek 8111 PXE ROM 集成
 
-              已在编译前自动下载预编译 iPXE ROM 并追加 PXE ROM 支持配置：
+              使用 coreboot official 源码编译，已在编译前自动下载预编译 iPXE ROM 并追加 PXE ROM 支持配置：
+              - 源码：https://github.com/coreboot/coreboot (官方仓库)
               - 下载预编译的 iPXE ROM 到 coreboot 根目录 (pxe.rom)
-              - 修复 Makefile 规则，避免重复添加 PXE ROM 到 CBFS
               - CONFIG_EDK2_LOAD_OPTION_ROMS=y
               - CONFIG_EDK2_NETWORK_PXE_SUPPORT=y
               - CONFIG_PXE=y
