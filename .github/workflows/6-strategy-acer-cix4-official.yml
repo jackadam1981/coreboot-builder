@@ -1,4 +1,4 @@
-name: Coreboot Official build kaisa
+name: 6-Kaisa Official (coreboot+tianocore EDK2)
 
 on:
   # 支持推送触发和手动触发

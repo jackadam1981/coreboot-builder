@@ -1,4 +1,4 @@
-name: Build Coreboot Firmware
+name: 0-Kaisa MrChromebox (Runtime iPXE)
 
 on:
   # 支持手动触发
