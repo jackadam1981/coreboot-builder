@@ -65,27 +65,43 @@ jobs:
             exit 1
           fi
 
-      - name: 配置 PXE ROM 支持 / Configure PXE ROM Support
+      - name: 创建 Kaisa 配置文件 / Create Kaisa Config
         run: |
-          echo "📝 添加 PXE ROM 支持配置"
+          echo "📝 创建 coreboot official kaisa 配置"
           cd coreboot
           
-          echo "" >> configs/cml/config.kaisa.uefi
-          echo "# PXE ROM 支持配置" >> configs/cml/config.kaisa.uefi
-          echo "CONFIG_EDK2_LOAD_OPTION_ROMS=y" >> configs/cml/config.kaisa.uefi
-          echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> configs/cml/config.kaisa.uefi
-          echo "CONFIG_PXE=y" >> configs/cml/config.kaisa.uefi
-          echo "CONFIG_PXE_ROM=y" >> configs/cml/config.kaisa.uefi
-          echo "CONFIG_PXE_ROM_FILE=\"pxe.rom\"" >> configs/cml/config.kaisa.uefi
-          echo "CONFIG_PXE_ROM_ID=\"10ec,8168\"" >> configs/cml/config.kaisa.uefi
-          echo "" >> configs/cml/config.kaisa.uefi
-
-          echo "# Intel 芯片组系统稳定配置（适合 Kaisa 主板）" >> configs/cml/config.kaisa.uefi
-          echo "CONFIG_SOC_INTEL_COMMON_BLOCK_POWER_LIMIT=y" >> configs/cml/config.kaisa.uefi
-          echo "CONFIG_SOC_INTEL_COMMON_BLOCK_THERMAL=y" >> configs/cml/config.kaisa.uefi
-          echo "CONFIG_SOUTHBRIDGE_INTEL_COMMON_WATCHDOG=y" >> configs/cml/config.kaisa.uefi
-          echo "CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL=y" >> configs/cml/config.kaisa.uefi
-          echo "" >> configs/cml/config.kaisa.uefi
+          # 创建 kaisa 配置文件（基于官方源码）
+          cat > .config << 'EOF'
+          # Kaisa 主板基础配置
+          CONFIG_VENDOR_GOOGLE=y
+          CONFIG_BOARD_GOOGLE_KAISA=y
+          
+          # EDK2 Payload 配置（使用官方 EDK2）
+          CONFIG_PAYLOAD_EDK2=y
+          CONFIG_EDK2_REPO_OFFICIAL=y
+          
+          # PXE ROM 支持配置
+          CONFIG_PXE=y
+          CONFIG_PXE_ROM=y
+          CONFIG_PXE_ROM_FILE="pxe.rom"
+          CONFIG_PXE_ROM_ID="10ec,8168"
+          
+          # EDK2 网络支持
+          CONFIG_EDK2_LOAD_OPTION_ROMS=y
+          CONFIG_EDK2_NETWORK_PXE_SUPPORT=y
+          
+          # Payload 压缩配置
+          CONFIG_COMPRESSED_PAYLOAD_NONE=y
+          
+          # Intel 芯片组系统稳定配置（适合 Kaisa 主板）
+          CONFIG_SOC_INTEL_COMMON_BLOCK_POWER_LIMIT=y
+          CONFIG_SOC_INTEL_COMMON_BLOCK_THERMAL=y
+          CONFIG_SOUTHBRIDGE_INTEL_COMMON_WATCHDOG=y
+          CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL=y
+          EOF
+          
+          echo "✅ 配置文件创建完成"
+          cat .config
 
       - name: 📦 编译 Coreboot Official 固件 / Build Coreboot
         run: |
@@ -102,20 +118,16 @@ jobs:
             -w /home/coreboot/coreboot \
             coreboot/coreboot-sdk:latest \
             bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
-                     # 检查是否存在 kaisa 配置
-                     if [ -f configs/cml/config.kaisa.uefi ]; then \
-                       echo '✅ 找到 kaisa 配置文件' && \
-                       cp configs/cml/config.kaisa.uefi .config && \
-                       make olddefconfig && \
-                       make -j\$(nproc) && \
-                       cp build/coreboot.rom /home/coreboot/roms/coreboot_official-kaisa_\$(date +%Y%m%d).rom && \
-                       chmod 644 /home/coreboot/roms/*.rom && \
-                       echo '✅ coreboot official 编译完成'; \
-                     else \
-                       echo '❌ 未找到 kaisa 配置文件，尝试查找其他配置' && \
-                       ls -la configs/ && \
-                       exit 1; \
-                     fi"
+                     echo '📝 检查配置文件' && \
+                     cat .config && \
+                     echo '🔧 运行 make olddefconfig' && \
+                     make olddefconfig && \
+                     echo '🔨 开始编译' && \
+                     make -j\$(nproc) && \
+                     echo '📦 复制编译结果' && \
+                     cp build/coreboot.rom /home/coreboot/roms/coreboot_official-kaisa_\$(date +%Y%m%d).rom && \
+                     chmod 644 /home/coreboot/roms/*.rom && \
+                     echo '✅ coreboot official 编译完成'"
 
       - name: 验证编译结果 / Verify Build Results
         run: |
