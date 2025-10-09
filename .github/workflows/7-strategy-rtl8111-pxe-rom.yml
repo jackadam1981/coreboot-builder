@@ -30,35 +30,17 @@ jobs:
           cd coreboot
           git submodule update --init --checkout --recursive
 
-      - name: 下载预编译 PXE ROM / Download Pre-built PXE ROM
+      - name: 下载预编译 UEFI iPXE / Download Pre-built UEFI iPXE
         run: |
-          echo "📥 下载预编译的 iPXE ROM"
+          echo "📥 下载预编译的 iPXE EFI 文件"
           cd coreboot
           
-          # 下载预编译的 iPXE ROM 到 coreboot 根目录
-          echo "📥 下载 iPXE ROM 到根目录..."
+          curl -L -o ipxe.efi "https://boot.ipxe.org/ipxe.efi"
           
-          # 方案1: 使用 iPXE 官方标准 PXE 文件 (337K)
-          curl -L -o pxe.rom \
-            "https://boot.ipxe.org/ipxe.pxe" || \
-          curl -L -o pxe.rom \
-            "https://boot.ipxe.org/undionly.kpxe"
-          
-          # 如果以上都失败，使用通用的 PXE ROM
-          if [ ! -f pxe.rom ]; then
-            echo "⚠️  标准 iPXE ROM 下载失败，使用通用 PXE ROM"
-            # 下载通用的 PXE ROM
-            curl -L -o pxe.rom \
-              "https://boot.ipxe.org/undionly.kpxe"
-          fi
-          
-          # 验证 ROM 文件
-          if [ -f pxe.rom ]; then
-            echo "✅ PXE ROM 下载成功"
-            ls -la pxe.rom
-            echo "📊 ROM 文件大小: $(du -h pxe.rom | cut -f1)"
+          if [ -f ipxe.efi ]; then
+            echo "✅ iPXE EFI 下载成功，大小: $(du -h ipxe.efi | cut -f1)"
           else
-            echo "❌ PXE ROM 下载失败"
+            echo "❌ 下载失败"
             exit 1
           fi
 
@@ -75,6 +57,8 @@ jobs:
           echo "CONFIG_PXE_ROM=y" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_PXE_ROM_FILE=\"pxe.rom\"" >> configs/cml/config.kaisa.uefi
           echo "CONFIG_PXE_ROM_ID=\"10ec,8168\"" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y" >> configs/cml/config.kaisa.uefi
+          echo "CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y" >> configs/cml/config.kaisa.uefi
           echo "" >> configs/cml/config.kaisa.uefi
 
           echo "# Intel 芯片组系统稳定配置（适合 Kaisa 主板）" >> configs/cml/config.kaisa.uefi
@@ -139,6 +123,20 @@ jobs:
           chmod +x "$CBFSTOOL" 2>/dev/null || true
           "$CBFSTOOL" "$ROM_FILE" print || echo "⚠️ cbfstool 打印失败（不影响构建产物上传）"
 
+      - name: 添加 iPXE EFI 到 ROM / Add iPXE EFI to ROM
+        run: |
+          echo "🔧 使用 cbfstool 添加 ipxe.efi 到 CBFS"
+          ROM_FILE=$(ls roms/coreboot_*.rom | head -1)
+          
+          # 复制 cbfstool 到当前目录（假设仓库有 tools/cbfstool）
+          cp ${{ github.workspace }}/tools/cbfstool cbfstool
+          chmod +x cbfstool
+          
+          ./cbfstool "$ROM_FILE" add -f coreboot/ipxe.efi -n ipxe.efi -t raw
+          ./cbfstool "$ROM_FILE" print  # 验证
+          
+          echo "✅ iPXE EFI 已添加"
+
       - name: 上传固件 / Upload Firmware
         uses: actions/upload-artifact@v4
         with:
@@ -156,17 +154,19 @@ jobs:
           tag_name: kaisa-rtl8111-pxerom-${{ github.run_number }}
           name: "Coreboot Kaisa - 方案7 (RTL8111 PXE ROM) #${{ github.run_number }}"
           body: |
-            # 🎯 方案7：Realtek 8111 PXE ROM 集成
+            # 🎯 方案7：Realtek 8111 UEFI iPXE 集成 (EFI 版本)
 
-              已在编译前自动下载预编译 iPXE ROM 并追加 PXE ROM 支持配置：
-              - 下载预编译的 iPXE ROM 到 coreboot 根目录 (pxe.rom)
-              - 修复 Makefile 规则，允许单独使用 CONFIG_PXE_ROM=y
+              已在编译前自动下载预编译 ipxe.efi (UEFI 兼容) 并追加 PXE ROM 支持配置：
+              - 下载预编译的 ipxe.efi (UEFI 兼容) 到 coreboot 根目录 (ipxe.efi)
+              - 添加到 CBFS 作为 ipxe.efi
               - CONFIG_EDK2_LOAD_OPTION_ROMS=y
               - CONFIG_EDK2_NETWORK_PXE_SUPPORT=y
               - CONFIG_PXE=y
               - CONFIG_PXE_ROM=y
               - CONFIG_PXE_ROM_FILE="pxe.rom" (下载到根目录)
               - CONFIG_PXE_ROM_ID="10ec,8168" (Realtek RTL8111 网卡)
+              - CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y
+              - CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y
 
               同时追加 Intel 芯片组稳定性相关配置（适配 Kaisa 主板）：
              - CONFIG_SOC_INTEL_COMMON_BLOCK_POWER_LIMIT=y
