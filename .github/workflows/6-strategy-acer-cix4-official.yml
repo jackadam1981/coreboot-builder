@@ -83,9 +83,9 @@ jobs:
           CONFIG_PAYLOAD_EDK2=y
           CONFIG_EDK2_REPO_OFFICIAL=y
           CONFIG_EDK2_RELEASE=y
+          CONFIG_EDK2_HAVE_EFI_SHELL=y
           
           # EDK2 体积优化（禁用非必要功能）
-          # CONFIG_EDK2_HAVE_EFI_SHELL is not set
           # CONFIG_EDK2_PS2_SUPPORT is not set
           # CONFIG_EDK2_SERIAL_SUPPORT is not set
           
