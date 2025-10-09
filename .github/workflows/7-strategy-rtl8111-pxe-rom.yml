@@ -1,9 +1,6 @@
 name: 7-Kaisa MrChromebox (PXE ROM)
 
 on:
-  # 支持推送触发和手动触发
-  push:
-    branches: [main, master]
   workflow_dispatch:
     inputs:
       release:
