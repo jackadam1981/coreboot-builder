@@ -94,8 +94,8 @@ jobs:
           
           # 修复 Makefile 规则，允许单独使用 CONFIG_PXE_ROM=y
           # 原规则：cbfs-files-$(CONFIG_PXE_ROM)$(CONFIG_BUILD_IPXE) += pci$(CONFIG_PXE_ROM_ID).rom
-          # 添加新规则：cbfs-files-$(CONFIG_PXE_ROM) += pci$(CONFIG_PXE_ROM_ID).rom
-          sed -i '369a\\n# 修复：允许单独使用 CONFIG_PXE_ROM=y\ncbfs-files-$(CONFIG_PXE_ROM) += pci$(CONFIG_PXE_ROM_ID).rom' payloads/external/Makefile.mk
+          # 替换为：cbfs-files-y += pci$(CONFIG_PXE_ROM_ID).rom (当 CONFIG_PXE_ROM=y 时)
+          sed -i 's/^cbfs-files-\$(CONFIG_PXE_ROM)\$(CONFIG_BUILD_IPXE) += pci\$(CONFIG_PXE_ROM_ID)\.rom$/# 原规则已修复\nifeq (\$(CONFIG_PXE_ROM),y)\ncbfs-files-y += pci\$(CONFIG_PXE_ROM_ID).rom\nendif\nifeq (\$(CONFIG_BUILD_IPXE),y)\ncbfs-files-y += pci\$(CONFIG_PXE_ROM_ID).rom\nendif/' payloads/external/Makefile.mk
           
           echo "✅ Makefile 规则修复完成"
 
