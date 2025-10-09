@@ -95,8 +95,8 @@ jobs:
           CONFIG_PXE_ROM_FILE="pxe.rom"
           CONFIG_PXE_ROM_ID="10ec,8168"
           
-          # Payload 压缩配置（使用 LZMA 压缩以减小体积）
-          CONFIG_COMPRESSED_PAYLOAD_LZMA=y
+          # Payload 压缩配置（暂不压缩，测试空间是否足够）
+          CONFIG_COMPRESSED_PAYLOAD_NONE=y
           
           # Intel 芯片组系统稳定配置（适合 Kaisa 主板）
           CONFIG_SOC_INTEL_COMMON_BLOCK_POWER_LIMIT=y
