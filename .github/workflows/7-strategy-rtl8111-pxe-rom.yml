@@ -124,11 +124,11 @@ jobs:
           # 若存在旧的 Legacy PXE ROM 条目则删除以释放空间
           ./cbfstool "$ROM_FILE" remove -n pci10ec,8168.rom || true
           
-          # 添加并启用 LZMA 压缩，减小占用
-          ./cbfstool "$ROM_FILE" add -f coreboot/ipxe.efi -n ipxe.efi -t raw -c lzma
+          # 添加为未压缩 raw
+          ./cbfstool "$ROM_FILE" add -f coreboot/ipxe.efi -n ipxe.efi -t raw
           ./cbfstool "$ROM_FILE" print  # 验证
           
-          echo "✅ iPXE EFI 已添加（压缩）"
+          echo "✅ iPXE EFI 已添加（未压缩）"
 
       - name: 上传固件 / Upload Firmware
         uses: actions/upload-artifact@v4
