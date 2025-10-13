@@ -32,13 +32,14 @@ jobs:
 
       - name: 下载预编译 UEFI iPXE / Download Pre-built UEFI iPXE
         run: |
-          echo "📥 下载预编译的 iPXE EFI 文件"
+          echo "📥 下载预编译的 iPXE EFI 文件 (snponly.efi 更小)"
           cd coreboot
           
-          curl -L -o ipxe.efi "https://boot.ipxe.org/ipxe.efi"
+          # 下载更小的 UEFI 版本（依赖固件提供的 SNP 驱动）
+          curl -L -o ipxe.efi "https://boot.ipxe.org/snponly.efi"
           
           if [ -f ipxe.efi ]; then
-            echo "✅ iPXE EFI 下载成功，大小: $(du -h ipxe.efi | cut -f1)"
+            echo "✅ iPXE EFI (snponly.efi) 下载成功，大小: $(du -h ipxe.efi | cut -f1)"
           else
             echo "❌ 下载失败"
             exit 1
@@ -120,10 +121,14 @@ jobs:
           cp ${{ github.workspace }}/tools/cbfstool cbfstool
           chmod +x cbfstool
           
-          ./cbfstool "$ROM_FILE" add -f coreboot/ipxe.efi -n ipxe.efi -t raw
+          # 若存在旧的 Legacy PXE ROM 条目则删除以释放空间
+          ./cbfstool "$ROM_FILE" remove -n pci10ec,8168.rom || true
+          
+          # 添加并启用 LZMA 压缩，减小占用
+          ./cbfstool "$ROM_FILE" add -f coreboot/ipxe.efi -n ipxe.efi -t raw -c lzma
           ./cbfstool "$ROM_FILE" print  # 验证
           
-          echo "✅ iPXE EFI 已添加"
+          echo "✅ iPXE EFI 已添加（压缩）"
 
       - name: 上传固件 / Upload Firmware
         uses: actions/upload-artifact@v4
