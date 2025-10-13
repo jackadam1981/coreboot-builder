@@ -112,6 +112,10 @@ jobs:
           echo "🔧 使用 cbfstool 添加 ipxe.efi 到 CBFS"
           ROM_FILE=$(ls roms/coreboot_*.rom | head -1)
           
+          # 修复权限：GitHub Runner 上文件可能由 root 创建
+          sudo chown $USER:$USER "$ROM_FILE" || true
+          sudo chmod a+rw "$ROM_FILE" || true
+          
           # 复制 cbfstool 到当前目录（假设仓库有 tools/cbfstool）
           cp ${{ github.workspace }}/tools/cbfstool cbfstool
           chmod +x cbfstool
