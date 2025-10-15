@@ -160,6 +160,16 @@ jobs:
           (cd roms && sha1sum "$ROM_BASE" > "${ROM_BASE}.sha1")
           (cd roms && sha256sum "$ROM_BASE" > "${ROM_BASE}.sha256")
           
+          # 调试输出：打印计算得到的 SHA1 与文件内记录的 SHA1，用于校验比对
+          COMPUTED_SHA1=$(cd roms && sha1sum "$ROM_BASE" | awk '{print $1}')
+          FILE_SHA1=$(awk '{print $1}' "roms/${ROM_BASE}.sha1")
+          echo "🔎 DEBUG SHA1 computed=${COMPUTED_SHA1} file=${FILE_SHA1}"
+          if [ "$COMPUTED_SHA1" = "$FILE_SHA1" ]; then
+            echo "✅ SHA1 一致"
+          else
+            echo "❗ SHA1 不一致（请检查生成流程）"
+          fi
+          
           echo "✅ 已生成: roms/${ROM_BASE}.sha1 与 roms/${ROM_BASE}.sha256"
 
       - name: 上传固件 / Upload Firmware
