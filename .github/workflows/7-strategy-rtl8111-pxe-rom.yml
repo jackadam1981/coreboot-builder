@@ -143,6 +143,25 @@ jobs:
           ./cbfstool "$ROM_FILE" print  # 验证
           echo "✅ iPXE EFI 已添加（raw 或 lzma）"
 
+      - name: 重新生成校验文件 / Regenerate Checksums
+        run: |
+          echo "🧮 重新生成 ROM 校验 (SHA1/SHA256)"
+          ROM_FILE=$(ls roms/coreboot_*.rom | head -1)
+          if [ -z "$ROM_FILE" ]; then
+            echo "❌ 未找到 ROM 文件，无法生成校验"
+            exit 1
+          fi
+          ROM_BASE=$(basename "$ROM_FILE")
+          
+          # 清理旧的校验文件，避免引用未修改前的校验
+          rm -f "roms/${ROM_BASE}.sha1" "roms/${ROM_BASE}.sha256" || true
+          
+          # 在 roms/ 目录下生成标准 sha1sum/sha256sum 输出格式
+          (cd roms && sha1sum "$ROM_BASE" > "${ROM_BASE}.sha1")
+          (cd roms && sha256sum "$ROM_BASE" > "${ROM_BASE}.sha256")
+          
+          echo "✅ 已生成: roms/${ROM_BASE}.sha1 与 roms/${ROM_BASE}.sha256"
+
       - name: 上传固件 / Upload Firmware
         uses: actions/upload-artifact@v4
         with:
