@@ -79,15 +79,34 @@ jobs:
           echo "" >> configs/cml/config.kaisa.uefi
           
           # 写入 Intel 芯片组系统稳定配置
-          echo "# Intel 芯片组系统稳定配置（适合 Kaisa 主板）" >> configs/cml/config.kaisa.uefi
-          for config in "${INTEL_CONFIGS[@]}"; do
-            echo "$config" >> configs/cml/config.kaisa.uefi
-          done
-          echo "" >> configs/cml/config.kaisa.uefi
+          if [ ${#INTEL_CONFIGS[@]} -gt 0 ]; then
+            echo "# Intel 芯片组系统稳定配置（适合 Kaisa 主板）" >> configs/cml/config.kaisa.uefi
+            for config in "${INTEL_CONFIGS[@]}"; do
+              echo "$config" >> configs/cml/config.kaisa.uefi
+            done
+            echo "" >> configs/cml/config.kaisa.uefi
+          fi
           
           # 保存配置到环境变量供后续使用
           echo "PXE_CONFIGS=${PXE_CONFIGS[*]}" >> $GITHUB_ENV
           echo "INTEL_CONFIGS=${INTEL_CONFIGS[*]}" >> $GITHUB_ENV
+          
+          # 为 Release body 生成格式化的配置列表
+          PXE_CONFIG_LIST=""
+          for config in "${PXE_CONFIGS[@]}"; do
+            PXE_CONFIG_LIST="${PXE_CONFIG_LIST}- ${config}\n"
+          done
+          echo "PXE_CONFIG_LIST=${PXE_CONFIG_LIST%\\n}" >> $GITHUB_ENV
+          
+          INTEL_CONFIG_LIST=""
+          if [ ${#INTEL_CONFIGS[@]} -gt 0 ]; then
+            for config in "${INTEL_CONFIGS[@]}"; do
+              INTEL_CONFIG_LIST="${INTEL_CONFIG_LIST}- ${config}\n"
+            done
+            echo "INTEL_CONFIG_LIST=${INTEL_CONFIG_LIST%\\n}" >> $GITHUB_ENV
+          else
+            echo "INTEL_CONFIG_LIST=" >> $GITHUB_ENV
+          fi
 
       - name: 📦 编译 MrChromebox Coreboot 固件 / Build Coreboot
         run: |
@@ -217,12 +236,10 @@ jobs:
             
             - 下载预编译的 ipxe.efi (UEFI 兼容)
             - 添加到 CBFS 作为 ipxe.efi
-            - ${{ env.PXE_CONFIGS }}
+            ${{ env.PXE_CONFIG_LIST }}
             
             注意：移除失败的 Legacy PXE ROM 支持，专注于 UEFI 版本
-            
-            同时追加 Intel 芯片组稳定性相关配置（适配 Kaisa 主板）：
-            - ${{ env.INTEL_CONFIGS }}
+            ${{ env.INTEL_CONFIG_LIST != '' && format('同时追加 Intel 芯片组稳定性相关配置（适配 Kaisa 主板）：\n{0}', env.INTEL_CONFIG_LIST) || '' }}
 
             **构建时间**: ${{ github.event.repository.updated_at }}
           files: |
