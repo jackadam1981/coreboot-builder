@@ -57,17 +57,13 @@ jobs:
           
           # 定义配置项数组
           PXE_CONFIGS=(
-            "CONFIG_EDK2_LOAD_OPTION_ROMS=y"
             "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y"
             "CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y"
             "CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y"
           )
           
           INTEL_CONFIGS=(
-            "CONFIG_SOC_INTEL_COMMON_BLOCK_POWER_LIMIT=y"
-            "CONFIG_SOC_INTEL_COMMON_BLOCK_THERMAL=y"
-            "CONFIG_SOUTHBRIDGE_INTEL_COMMON_WATCHDOG=y"
-            "CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL=y"
+
           )
           
           # 写入 PXE ROM 支持配置
