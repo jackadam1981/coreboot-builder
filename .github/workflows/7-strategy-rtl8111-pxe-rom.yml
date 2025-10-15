@@ -8,6 +8,11 @@ on:
         required: false
         type: boolean
         default: true
+      release_name:
+        description: "Release 名称 / Release Name"
+        required: false
+        type: string
+        default: "Coreboot Kaisa - 方案7 (RTL8111 PXE ROM)"
 
 permissions:
   contents: write
@@ -187,7 +192,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: kaisa-rtl8111-pxerom-${{ github.run_number }}
-          name: "Coreboot Kaisa - 方案7 (RTL8111 PXE ROM) #${{ github.run_number }}"
+          name: "${{ inputs.release_name || 'Coreboot Kaisa - 方案7 (RTL8111 PXE ROM)' }} #${{ github.run_number }}"
           body: |
             # 🎯 方案7：UEFI iPXE 集成 (ipxe.efi)
             
