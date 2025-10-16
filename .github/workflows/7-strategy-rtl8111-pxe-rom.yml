@@ -157,6 +157,25 @@ jobs:
           CBFSTOOL="${{ github.workspace }}/tools/cbfstool"
           chmod +x "$CBFSTOOL" 2>/dev/null || true
           "$CBFSTOOL" "$ROM_FILE" print || echo "⚠️ cbfstool 打印失败（不影响构建产物上传）"
+          
+          # 分析 ROM 空间使用情况
+          echo "🔍 分析 ROM 空间使用情况"
+          ROM_SIZE=$(stat -c%s "$ROM_FILE")
+          ROM_SIZE_MB=$((ROM_SIZE / 1024 / 1024))
+          echo "ROM 总大小: ${ROM_SIZE} 字节 (${ROM_SIZE_MB} MB)"
+          
+          # 使用 cbfstool 获取更详细的空间信息
+          echo "📊 CBFS 空间分析:"
+          "$CBFSTOOL" "$ROM_FILE" print | grep -E "(COREBOOT|empty|null)" | head -20 || echo "⚠️ 无法获取详细空间信息"
+          
+          # 计算剩余空间（如果有 empty 或 null 条目）
+          EMPTY_SIZE=$( "$CBFSTOOL" "$ROM_FILE" print 2>/dev/null | grep -E "empty|null" | awk '{sum += $4} END {print sum+0}' || echo "0" )
+          if [ "$EMPTY_SIZE" -gt 0 ]; then
+            EMPTY_SIZE_KB=$((EMPTY_SIZE / 1024))
+            echo "💾 可用空间: ${EMPTY_SIZE} 字节 (${EMPTY_SIZE_KB} KB)"
+          else
+            echo "⚠️ 无法计算剩余空间"
+          fi
 
       - name: 添加 iPXE EFI 到 ROM / Add iPXE EFI to ROM
         run: |
