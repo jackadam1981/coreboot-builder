@@ -35,53 +35,31 @@ jobs:
           cd coreboot
           git submodule update --init --checkout --recursive
 
-      - name: 下载预编译 UEFI iPXE / Download Pre-built UEFI iPXE
+      - name: 准备 iPXE EFI 文件 / Prepare iPXE EFI Files
         run: |
-          echo "📥 下载预编译的 iPXE EFI 文件"
+          echo "📥 准备 iPXE EFI 文件"
           cd coreboot
           
-          # 下载完整版本 iPXE (包含常见驱动)
-          echo "📦 下载完整版 iPXE (ipxe.efi)"
-          curl -L -o ipxe.efi "https://boot.ipxe.org/ipxe.efi"
-          
-          # 下载精简版本 iPXE (依赖固件驱动)
-          echo "📦 下载精简版 iPXE (snponly.efi)"
-          curl -L -o snponly.efi "https://boot.ipxe.org/snponly.efi"
-          
-          # 下载专用 RTL8168 iPXE 驱动 (如果有的话)
-          echo "📦 尝试下载专用 RTL8168 iPXE 驱动"
-          curl -L -o rtl8168.efi "https://boot.ipxe.org/rtl8168.efi" || echo "⚠️ 专用驱动下载失败，将使用其他版本"
-          
-          # 如果下载失败，尝试使用本地编译的版本
-          if [ ! -f "rtl8168.efi" ] && [ -f "/root/ipxe/src/bin-x86_64-efi/rtl8168.efi" ]; then
-            echo "📦 使用本地编译的 RTL8168 驱动"
+          # 复制本地编译的 RTL8168 专用驱动
+          echo "📦 复制本地编译的 RTL8168 专用驱动"
+          if [ -f "/root/ipxe/src/bin-x86_64-efi/rtl8168.efi" ]; then
             cp /root/ipxe/src/bin-x86_64-efi/rtl8168.efi rtl8168.efi
-          fi
-          
-          if [ -f ipxe.efi ]; then
-            IPXE_SIZE=$(stat -c%s "ipxe.efi")
-            IPXE_SIZE_KB=$((IPXE_SIZE / 1024))
-            echo "✅ 完整版 iPXE 下载成功: ${IPXE_SIZE} 字节 (${IPXE_SIZE_KB} KB)"
+            RTL8168_SIZE=$(stat -c%s "rtl8168.efi")
+            RTL8168_SIZE_KB=$((RTL8168_SIZE / 1024))
+            echo "✅ RTL8168 专用驱动准备完成: ${RTL8168_SIZE} 字节 (${RTL8168_SIZE_KB} KB)"
           else
-            echo "❌ 完整版 iPXE 下载失败"
+            echo "❌ 未找到本地 RTL8168 驱动文件"
             exit 1
           fi
           
-          if [ -f snponly.efi ]; then
-            SNPONLY_SIZE=$(stat -c%s "snponly.efi")
-            SNPONLY_SIZE_KB=$((SNPONLY_SIZE / 1024))
-            echo "✅ 精简版 iPXE 下载成功: ${SNPONLY_SIZE} 字节 (${SNPONLY_SIZE_KB} KB)"
-          else
-            echo "⚠️ 精简版 iPXE 下载失败，将只使用完整版"
-          fi
+          # 可选：下载其他版本作为备选
+          echo "📦 下载备选 iPXE 版本"
+          curl -L -o ipxe.efi "https://boot.ipxe.org/ipxe.efi" || echo "⚠️ 完整版下载失败"
+          curl -L -o snponly.efi "https://boot.ipxe.org/snponly.efi" || echo "⚠️ 精简版下载失败"
           
-          if [ -f rtl8168.efi ]; then
-            RTL8168_SIZE=$(stat -c%s "rtl8168.efi")
-            RTL8168_SIZE_KB=$((RTL8168_SIZE / 1024))
-            echo "✅ RTL8168 专用驱动下载成功: ${RTL8168_SIZE} 字节 (${RTL8168_SIZE_KB} KB)"
-          else
-            echo "⚠️ RTL8168 专用驱动下载失败，将使用其他版本"
-          fi
+          # 显示所有可用文件
+          echo "📋 可用的 iPXE 文件："
+          ls -lh *.efi 2>/dev/null || echo "⚠️ 未找到 EFI 文件"
 
       - name: 配置 PXE ROM 支持 / Configure PXE ROM Support
         run: |
@@ -259,66 +237,37 @@ jobs:
           # 若存在旧的 Legacy PXE ROM 条目则删除以释放空间
           ./cbfstool "$ROM_FILE" remove -n pci10ec,8168.rom || true
           
-          # 检查可用空间并选择合适的 iPXE 版本
-          echo "🔍 检查空间并选择合适的 iPXE 版本"
+          # 直接使用 RTL8168 专用驱动
+          echo "🔍 使用本地编译的 RTL8168 专用 iPXE 驱动"
           
-          # 获取 iPXE 文件大小
-          if [ -f "coreboot/ipxe.efi" ]; then
-            IPXE_SIZE=$(stat -c%s "coreboot/ipxe.efi")
-            IPXE_SIZE_KB=$((IPXE_SIZE / 1024))
-            echo "📦 完整版 iPXE 大小: ${IPXE_SIZE} 字节 (${IPXE_SIZE_KB} KB)"
+          # 检查 RTL8168 驱动文件
+          if [ ! -f "coreboot/rtl8168.efi" ]; then
+            echo "❌ 未找到 RTL8168 专用驱动文件"
+            exit 1
           fi
           
-          if [ -f "coreboot/snponly.efi" ]; then
-            SNPONLY_SIZE=$(stat -c%s "coreboot/snponly.efi")
-            SNPONLY_SIZE_KB=$((SNPONLY_SIZE / 1024))
-            echo "📦 精简版 iPXE 大小: ${SNPONLY_SIZE} 字节 (${SNPONLY_SIZE_KB} KB)"
-          fi
+          RTL8168_SIZE=$(stat -c%s "coreboot/rtl8168.efi")
+          RTL8168_SIZE_KB=$((RTL8168_SIZE / 1024))
+          echo "📦 RTL8168 专用驱动大小: ${RTL8168_SIZE} 字节 (${RTL8168_SIZE_KB} KB)"
           
-          if [ -f "coreboot/rtl8168.efi" ]; then
-            RTL8168_SIZE=$(stat -c%s "coreboot/rtl8168.efi")
-            RTL8168_SIZE_KB=$((RTL8168_SIZE / 1024))
-            echo "📦 RTL8168 专用驱动大小: ${RTL8168_SIZE} 字节 (${RTL8168_SIZE_KB} KB)"
-          fi
-          
-          # 获取最大可用空间
+          # 检查空间是否足够
           LARGEST_EMPTY=$("$CBFSTOOL" "$ROM_FILE" print 2>/dev/null | grep -E "(empty|null)" | awk '{print $4}' | sort -nr | head -1)
           if [ -n "$LARGEST_EMPTY" ] && [ "$LARGEST_EMPTY" -gt 0 ]; then
             LARGEST_EMPTY_KB=$((LARGEST_EMPTY / 1024))
             echo "💾 最大可用块: ${LARGEST_EMPTY} 字节 (${LARGEST_EMPTY_KB} KB)"
             
-            # 选择合适的 iPXE 版本（优先级：RTL8168专用 > 完整版 > 精简版）
-            if [ -f "coreboot/rtl8168.efi" ] && [ "$RTL8168_SIZE" -le "$LARGEST_EMPTY" ]; then
-              echo "✅ 空间充足，使用 RTL8168 专用 iPXE 驱动"
+            if [ "$RTL8168_SIZE" -le "$LARGEST_EMPTY" ]; then
+              echo "✅ 空间充足，使用 RTL8168 专用 iPXE 驱动（未压缩）"
               SELECTED_IPXE="coreboot/rtl8168.efi"
               USE_COMPRESSION=false
-            elif [ -f "coreboot/ipxe.efi" ] && [ "$IPXE_SIZE" -le "$LARGEST_EMPTY" ]; then
-              echo "✅ 空间充足，使用完整版 iPXE"
-              SELECTED_IPXE="coreboot/ipxe.efi"
-              USE_COMPRESSION=false
-            elif [ -f "coreboot/snponly.efi" ] && [ "$SNPONLY_SIZE" -le "$LARGEST_EMPTY" ]; then
-              echo "⚠️ 完整版太大，使用精简版 iPXE"
-              SELECTED_IPXE="coreboot/snponly.efi"
-              USE_COMPRESSION=false
-            elif [ -f "coreboot/rtl8168.efi" ]; then
+            else
               echo "⚠️ 空间不足，使用 RTL8168 专用驱动 + LZMA 压缩"
               SELECTED_IPXE="coreboot/rtl8168.efi"
               USE_COMPRESSION=true
-            elif [ -f "coreboot/ipxe.efi" ]; then
-              echo "⚠️ 空间不足，使用完整版 iPXE + LZMA 压缩"
-              SELECTED_IPXE="coreboot/ipxe.efi"
-              USE_COMPRESSION=true
-            elif [ -f "coreboot/snponly.efi" ]; then
-              echo "⚠️ 空间不足，使用精简版 iPXE + LZMA 压缩"
-              SELECTED_IPXE="coreboot/snponly.efi"
-              USE_COMPRESSION=true
-            else
-              echo "❌ 没有可用的 iPXE 文件"
-              exit 1
             fi
           else
-            echo "⚠️ 无法确定可用空间，使用完整版 iPXE + 压缩"
-            SELECTED_IPXE="coreboot/ipxe.efi"
+            echo "⚠️ 无法确定可用空间，使用 RTL8168 专用驱动 + 压缩"
+            SELECTED_IPXE="coreboot/rtl8168.efi"
             USE_COMPRESSION=true
           fi
           
@@ -402,14 +351,16 @@ jobs:
           tag_name: kaisa-rtl8111-pxerom-${{ github.run_number }}
           name: "${{ inputs.release_name || 'Coreboot Kaisa - 方案7 (RTL8111 PXE ROM)' }} #${{ github.run_number }}"
           body: |
-            # 🎯 方案7：UEFI iPXE 集成 (ipxe.efi)
-            
-            - 下载预编译的 ipxe.efi (UEFI 兼容)
-            - 添加到 CBFS 作为 ipxe.efi
-            ${{ env.PXE_CONFIG_LIST }}
-            
-            注意：移除失败的 Legacy PXE ROM 支持，专注于 UEFI 版本
-            ${{ env.INTEL_CONFIG_LIST != '' && format('同时追加 Intel 芯片组稳定性相关配置（适配 Kaisa 主板）：\n{0}', env.INTEL_CONFIG_LIST) || '' }}
+          # 🎯 方案7：RTL8168 专用 iPXE 集成 (rtl8168.efi)
+          
+          - 使用本地编译的 RTL8168 专用 iPXE 驱动 (257 KB)
+          - 包含完整的 RTL8111 网卡驱动支持
+          - 添加到 CBFS 作为 efi/boot/bootx64.efi 或 ipxe.efi
+          - 智能空间检测，自动选择压缩策略
+          ${{ env.PXE_CONFIG_LIST }}
+          
+          优势：专用驱动体积小、功能完整、无需依赖固件驱动
+          ${{ env.INTEL_CONFIG_LIST != '' && format('同时追加 Intel 芯片组稳定性相关配置（适配 Kaisa 主板）：\n{0}', env.INTEL_CONFIG_LIST) || '' }}
             
             **构建时间**: ${{ github.event.repository.updated_at }}
           files: |
