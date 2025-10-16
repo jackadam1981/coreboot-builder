@@ -244,7 +244,7 @@ jobs:
         with:
           tag_name: kaisa-edk2-pxe-${{ github.run_number }}
           name: "${{ inputs.release_name || 'Coreboot Kaisa - 方案7 (EDK2 PXE)' }} #${{ github.run_number }}"
-         body: |
+          body: |
            # 🎯 方案7：MrChromebox EDK2 内置 PXE/HTTP 网络启动
            
            ## 🔧 启用的固件网络功能
