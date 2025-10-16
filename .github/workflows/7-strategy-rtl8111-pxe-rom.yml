@@ -1,4 +1,4 @@
-name: 7-Kaisa MrChromebox (Integrated iPXE)
+name: 7-Kaisa MrChromebox (EDK2 PXE)
 
 on:
   workflow_dispatch:
@@ -35,31 +35,8 @@ jobs:
           cd coreboot
           git submodule update --init --checkout --recursive
 
-      - name: 准备 iPXE EFI 文件 / Prepare iPXE EFI Files
-        run: |
-          echo "📥 准备 iPXE EFI 文件"
-          cd coreboot
-          
-          # 复制本地编译的 RTL8168 专用驱动
-          echo "📦 复制本地编译的 RTL8168 专用驱动"
-          if [ -f "/root/ipxe/src/bin-x86_64-efi/rtl8168.efi" ]; then
-            cp /root/ipxe/src/bin-x86_64-efi/rtl8168.efi rtl8168.efi
-            RTL8168_SIZE=$(stat -c%s "rtl8168.efi")
-            RTL8168_SIZE_KB=$((RTL8168_SIZE / 1024))
-            echo "✅ RTL8168 专用驱动准备完成: ${RTL8168_SIZE} 字节 (${RTL8168_SIZE_KB} KB)"
-          else
-            echo "❌ 未找到本地 RTL8168 驱动文件"
-            exit 1
-          fi
-          
-          # 可选：下载其他版本作为备选
-          echo "📦 下载备选 iPXE 版本"
-          curl -L -o ipxe.efi "https://boot.ipxe.org/ipxe.efi" || echo "⚠️ 完整版下载失败"
-          curl -L -o snponly.efi "https://boot.ipxe.org/snponly.efi" || echo "⚠️ 精简版下载失败"
-          
-          # 显示所有可用文件
-          echo "📋 可用的 iPXE 文件："
-          ls -lh *.efi 2>/dev/null || echo "⚠️ 未找到 EFI 文件"
+      # 由于改用 EDK2 内置 PXE/HTTP 网络支持，不再准备或注入外部 iPXE 文件
+      # 这里保留构建前的源码拉取与配置步骤
 
       - name: 配置 PXE ROM 支持 / Configure PXE ROM Support
         run: |
@@ -70,7 +47,7 @@ jobs:
           PXE_CONFIGS=(
             "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y"
             "CONFIG_EDK2_LOAD_OPTION_ROMS=y"
-            "CONFIG_EDK2_CUSTOM_BUILD_PARAMS=\"-D NETWORK_IP6_ENABLE=FALSE -D NETWORK_HTTP_BOOT_ENABLE=TRUE -D NETWORK_ALLOW_HTTP_CONNECTIONS=TRUE\""
+            "CONFIG_EDK2_CUSTOM_BUILD_PARAMS=\"-D NETWORK_DRIVER_ENABLE=TRUE -D NETWORK_IP6_ENABLE=FALSE -D NETWORK_HTTP_BOOT_ENABLE=TRUE -D NETWORK_PXE_BOOT_ENABLE=TRUE -D NETWORK_ALLOW_HTTP_CONNECTIONS=TRUE\""
           )
           
           INTEL_CONFIGS=(
@@ -220,108 +197,7 @@ jobs:
             echo "❌ 无法获取 CBFS 信息"
           fi
 
-      - name: 添加 iPXE EFI 到 ROM / Add iPXE EFI to ROM
-        run: |
-          echo "🔧 使用 cbfstool 添加 ipxe.efi 到 CBFS"
-          ROM_FILE=$(ls roms/coreboot_*.rom | head -1)
-          
-          # 修复权限：GitHub Runner 上文件可能由 root 创建
-          sudo chown $USER:$USER "$ROM_FILE" || true
-          sudo chmod a+rw "$ROM_FILE" || true
-          
-          # 复制 cbfstool 到当前目录（假设仓库有 tools/cbfstool）
-          cp ${{ github.workspace }}/tools/cbfstool cbfstool
-          chmod +x cbfstool
-          
-          # 若存在旧的 Legacy PXE ROM 条目则删除以释放空间
-          ./cbfstool "$ROM_FILE" remove -n pci10ec,8168.rom || true
-          
-          # 直接使用 RTL8168 专用驱动
-          echo "🔍 使用本地编译的 RTL8168 专用 iPXE 驱动"
-          
-          # 检查 RTL8168 驱动文件
-          if [ ! -f "coreboot/rtl8168.efi" ]; then
-            echo "❌ 未找到 RTL8168 专用驱动文件"
-            exit 1
-          fi
-          
-          RTL8168_SIZE=$(stat -c%s "coreboot/rtl8168.efi")
-          RTL8168_SIZE_KB=$((RTL8168_SIZE / 1024))
-          echo "📦 RTL8168 专用驱动大小: ${RTL8168_SIZE} 字节 (${RTL8168_SIZE_KB} KB)"
-          
-          # 检查空间是否足够
-          LARGEST_EMPTY=$("$CBFSTOOL" "$ROM_FILE" print 2>/dev/null | grep -E "(empty|null)" | awk '{print $4}' | sort -nr | head -1)
-          if [ -n "$LARGEST_EMPTY" ] && [ "$LARGEST_EMPTY" -gt 0 ]; then
-            LARGEST_EMPTY_KB=$((LARGEST_EMPTY / 1024))
-            echo "💾 最大可用块: ${LARGEST_EMPTY} 字节 (${LARGEST_EMPTY_KB} KB)"
-            
-            if [ "$RTL8168_SIZE" -le "$LARGEST_EMPTY" ]; then
-              echo "✅ 空间充足，使用 RTL8168 专用 iPXE 驱动（未压缩）"
-              SELECTED_IPXE="coreboot/rtl8168.efi"
-              USE_COMPRESSION=false
-            else
-              echo "⚠️ 空间不足，使用 RTL8168 专用驱动 + LZMA 压缩"
-              SELECTED_IPXE="coreboot/rtl8168.efi"
-              USE_COMPRESSION=true
-            fi
-          else
-            echo "⚠️ 无法确定可用空间，使用 RTL8168 专用驱动 + 压缩"
-            SELECTED_IPXE="coreboot/rtl8168.efi"
-            USE_COMPRESSION=true
-          fi
-          
-          # 添加 RTL8168 iPXE 驱动到 CBFS
-          echo "🚀 添加 RTL8168 iPXE 驱动到 CBFS"
-          echo "📁 主要路径: ipxe.efi (可在 EFI Shell 中执行)"
-          echo "💡 注意：CBFS 中的文件不会自动出现在启动菜单中"
-          echo "💡 需要通过 EFI Shell 手动执行：fs0:\\ipxe.efi"
-          
-          if [ "$USE_COMPRESSION" = true ]; then
-            echo "🗜️ 使用 LZMA 压缩添加"
-            set +e
-            ./cbfstool "$ROM_FILE" add -f "$SELECTED_IPXE" -n ipxe.efi -t raw -c lzma
-            ADD_RC=$?
-            set -e
-          else
-            echo "📦 添加未压缩版本"
-            set +e
-            ./cbfstool "$ROM_FILE" add -f "$SELECTED_IPXE" -n ipxe.efi -t raw
-            ADD_RC=$?
-            if [ $ADD_RC -ne 0 ]; then
-              echo "⚠️ 未压缩添加失败，回退到 LZMA 压缩"
-              ./cbfstool "$ROM_FILE" add -f "$SELECTED_IPXE" -n ipxe.efi -t raw -c lzma
-              ADD_RC=$?
-            fi
-            set -e
-          fi
-          
-          if [ $ADD_RC -ne 0 ]; then
-            echo "❌ 添加 iPXE 失败"
-            exit 1
-          fi
-
-          ./cbfstool "$ROM_FILE" print  # 验证
-          echo "✅ RTL8168 iPXE 驱动已添加到 CBFS"
-          echo "📁 存储路径: ipxe.efi"
-          echo "🚀 使用方法："
-          echo "   1. 进入 EFI Shell"
-          echo "   2. 执行: fs0:\\ipxe.efi"
-          echo "   3. 或者: ipxe.efi"
-          echo ""
-          # 添加 UEFI 启动项设置脚本
-          echo "📝 添加 UEFI 启动项设置脚本"
-          if [ -f "uefi-boot-setup.nsh" ]; then
-            ./cbfstool "$ROM_FILE" add -f uefi-boot-setup.nsh -n uefi-boot-setup.nsh -t raw || echo "⚠️ 脚本添加失败（不影响主要功能）"
-            echo "✅ UEFI 启动项设置脚本已添加"
-          else
-            echo "⚠️ 未找到 uefi-boot-setup.nsh 脚本"
-          fi
-          
-          echo "💡 UEFI 启动项集成建议："
-          echo "   在 EFI Shell 中执行以下命令将 iPXE 添加到启动菜单："
-          echo "   bcfg boot add 0 fs0:\\ipxe.efi \"iPXE Network Boot\""
-          echo "   或者运行: fs0:\\uefi-boot-setup.nsh"
-          echo "   这样 iPXE 就会出现在 UEFI 启动菜单中"
+      # 删除外部 iPXE 注入步骤：改为完全依赖 EDK2 内置网络栈
 
       - name: 重新生成校验文件 / Regenerate Checksums
         run: |
@@ -355,7 +231,7 @@ jobs:
       - name: 上传固件 / Upload Firmware
         uses: actions/upload-artifact@v4
         with:
-          name: coreboot-kaisa-rtl8111-pxerom-${{ github.run_number }}
+          name: coreboot-kaisa-edk2-pxe-${{ github.run_number }}
           path: |
             roms/*.rom
             roms/*.sha1
@@ -366,37 +242,23 @@ jobs:
         if: ${{ (github.event_name == 'workflow_dispatch' && inputs.release) || (github.event_name != 'workflow_dispatch') }}
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: kaisa-rtl8111-pxerom-${{ github.run_number }}
-          name: "${{ inputs.release_name || 'Coreboot Kaisa - 方案7 (RTL8111 PXE ROM)' }} #${{ github.run_number }}"
-          body: |
-           # 🎯 方案7：MrChromebox EDK2 内置网络支持
+          tag_name: kaisa-edk2-pxe-${{ github.run_number }}
+          name: "${{ inputs.release_name || 'Coreboot Kaisa - 方案7 (EDK2 PXE)' }} #${{ github.run_number }}"
+         body: |
+           # 🎯 方案7：MrChromebox EDK2 内置 PXE/HTTP 网络启动
            
-           ## 🔧 MrChromebox EDK2 网络配置
+           ## 🔧 启用的固件网络功能
            - **网络驱动启用**：NETWORK_DRIVER_ENABLE=TRUE
-           - **PXE 启动支持**：NETWORK_PXE_BOOT=TRUE
+           - **PXE 启动支持**：NETWORK_PXE_BOOT_ENABLE=TRUE
            - **HTTP 启动支持**：NETWORK_HTTP_BOOT_ENABLE=TRUE
            - **HTTP 连接允许**：NETWORK_ALLOW_HTTP_CONNECTIONS=TRUE
            - **IPv6 禁用**：NETWORK_IP6_ENABLE=FALSE（节省空间）
-           - **USB 网卡支持**：Realtek USB, ASIX USB2/USB3
            - **Option ROM 加载**：支持 PCIe 设备 Option ROM
-           
-           ## 📦 增强 iPXE 驱动（备选方案）
-           - 使用本地编译的 RTL8168 专用 iPXE 驱动 (257 KB)
-           - 包含完整的 RTL8111 网卡驱动支持
-           - 智能空间检测，自动选择压缩策略
-           - 提供 UEFI 启动项集成脚本
            
            ${{ env.PXE_CONFIG_LIST }}
            
-           ## 🎯 双重保障方案
-           - **主要方案**：MrChromebox EDK2 内置网络支持
-           - **备选方案**：RTL8168 专用 iPXE 驱动
-           - **优势**：专门针对 coreboot 优化，支持 PCIe 和 USB 网卡
-           
            ## 🚀 使用方法
-           1. **固件原生**：网络启动选项直接出现在 UEFI 启动菜单
-           2. **增强 iPXE**：在 EFI Shell 中运行 `fs0:\ipxe.efi`
-           3. **自动设置**：运行 `fs0:\uefi-boot-setup.nsh`
+           - 刷入固件后，在 UEFI 启动菜单中选择 Network/PXE/HTTP 相关选项即可
            
            ${{ env.INTEL_CONFIG_LIST != '' && format('同时追加 Intel 芯片组稳定性相关配置（适配 Kaisa 主板）：\n{0}', env.INTEL_CONFIG_LIST) || '' }}
             
