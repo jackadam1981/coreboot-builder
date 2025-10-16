@@ -271,16 +271,19 @@ jobs:
             USE_COMPRESSION=true
           fi
           
-          # 根据选择添加 iPXE
-          echo "🚀 添加选定的 iPXE 版本: $(basename "$SELECTED_IPXE")"
+          # 根据选择添加 iPXE（优先使用标准 EFI 启动路径）
+          echo "🚀 添加 RTL8168 iPXE 驱动到标准 EFI 启动路径"
+          echo "📁 目标路径: efi/boot/bootx64.efi (标准 EFI 启动路径)"
+          echo "💡 此路径更容易被系统识别为可启动的 EFI 应用程序"
+          
           if [ "$USE_COMPRESSION" = true ]; then
             echo "🗜️ 使用 LZMA 压缩添加"
             set +e
             ./cbfstool "$ROM_FILE" add -f "$SELECTED_IPXE" -n efi/boot/bootx64.efi -t raw -c lzma
             ADD_RC=$?
             if [ $ADD_RC -ne 0 ]; then
-              echo "⚠️ 作为 bootx64.efi 添加失败，尝试作为普通文件名添加"
-              ./cbfstool "$ROM_FILE" add -f "$SELECTED_IPXE" -n "$(basename "$SELECTED_IPXE")" -t raw -c lzma
+              echo "⚠️ 作为 bootx64.efi 添加失败，尝试作为 ipxe.efi 添加"
+              ./cbfstool "$ROM_FILE" add -f "$SELECTED_IPXE" -n ipxe.efi -t raw -c lzma
               ADD_RC=$?
             fi
             set -e
@@ -298,12 +301,18 @@ jobs:
           fi
           
           if [ $ADD_RC -ne 0 ]; then
-            echo "❌ 添加 ipxe.efi 失败"
+            echo "❌ 添加 iPXE 失败"
             exit 1
           fi
 
+          # 额外尝试：也添加为 ipxe.efi 作为备选
+          echo "🔄 额外添加 iPXE 作为备选启动选项"
+          ./cbfstool "$ROM_FILE" add -f "$SELECTED_IPXE" -n ipxe.efi -t raw || echo "⚠️ 备选添加失败（不影响主要功能）"
+
           ./cbfstool "$ROM_FILE" print  # 验证
-          echo "✅ iPXE EFI 已添加（尝试作为 bootx64.efi 或普通 ipxe.efi）"
+          echo "✅ RTL8168 iPXE 驱动已添加"
+          echo "📁 主要路径: efi/boot/bootx64.efi (标准 EFI 启动路径)"
+          echo "📁 备选路径: ipxe.efi (可在 EFI Shell 中手动执行)"
 
       - name: 重新生成校验文件 / Regenerate Checksums
         run: |
