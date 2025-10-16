@@ -60,6 +60,7 @@ jobs:
             "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y"
             "CONFIG_EDK2_NETWORK_HTTP_BOOT_SUPPORT=y"
             "CONFIG_EDK2_NETWORK_ISCSI_SUPPORT=y"
+            "CONFIG_EDK2_LOAD_OPTION_ROMS=y"
           )
           
           INTEL_CONFIGS=(
@@ -173,16 +174,30 @@ jobs:
           # 若存在旧的 Legacy PXE ROM 条目则删除以释放空间
           ./cbfstool "$ROM_FILE" remove -n pci10ec,8168.rom || true
           
+          # 将 iPXE 添加到 EFI 启动路径，这样它可能出现在启动菜单中
           # 先尝试未压缩 raw，失败则回退为 LZMA 压缩
           set +e
-          ./cbfstool "$ROM_FILE" add -f coreboot/ipxe.efi -n ipxe.efi -t raw
+          ./cbfstool "$ROM_FILE" add -f coreboot/ipxe.efi -n efi/boot/bootx64.efi -t raw
           ADD_RC=$?
           if [ $ADD_RC -ne 0 ]; then
-            echo "⚠️ 未压缩添加失败，尝试使用 LZMA 压缩后再添加"
-            ./cbfstool "$ROM_FILE" add -f coreboot/ipxe.efi -n ipxe.efi -t raw -c lzma
+            echo "⚠️ 作为 bootx64.efi 添加失败，尝试使用 LZMA 压缩后再添加"
+            ./cbfstool "$ROM_FILE" add -f coreboot/ipxe.efi -n efi/boot/bootx64.efi -t raw -c lzma
             ADD_RC=$?
           fi
           set -e
+          
+          if [ $ADD_RC -ne 0 ]; then
+            echo "⚠️ 作为 bootx64.efi 添加失败，尝试作为普通 ipxe.efi 添加"
+            set +e
+            ./cbfstool "$ROM_FILE" add -f coreboot/ipxe.efi -n ipxe.efi -t raw
+            ADD_RC=$?
+            if [ $ADD_RC -ne 0 ]; then
+              echo "⚠️ 未压缩添加失败，尝试使用 LZMA 压缩后再添加"
+              ./cbfstool "$ROM_FILE" add -f coreboot/ipxe.efi -n ipxe.efi -t raw -c lzma
+              ADD_RC=$?
+            fi
+            set -e
+          fi
           
           if [ $ADD_RC -ne 0 ]; then
             echo "❌ 添加 ipxe.efi 失败"
@@ -190,7 +205,7 @@ jobs:
           fi
 
           ./cbfstool "$ROM_FILE" print  # 验证
-          echo "✅ iPXE EFI 已添加（raw 或 lzma）"
+          echo "✅ iPXE EFI 已添加（尝试作为 bootx64.efi 或普通 ipxe.efi）"
 
       - name: 重新生成校验文件 / Regenerate Checksums
         run: |
