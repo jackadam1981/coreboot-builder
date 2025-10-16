@@ -107,6 +107,12 @@ jobs:
           else
             echo "INTEL_CONFIG_LIST=" >> $GITHUB_ENV
           fi
+          
+          # 打印最终的配置文件内容
+          echo "📋 最终配置文件内容:"
+          echo "===================="
+          cat configs/cml/config.kaisa.uefi
+          echo "===================="
 
       - name: 📦 编译 MrChromebox Coreboot 固件 / Build Coreboot
         run: |
