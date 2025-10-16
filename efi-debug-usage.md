@@ -22,31 +22,33 @@ efi-debug-script.nsh
 ```
 
 ### 3. 收集的信息
-脚本会自动收集以下信息到 U 盘的 `debug` 文件夹：
+脚本会自动收集所有信息到一个统一的报告文件：
 
-| 文件名 | 内容描述 |
-|--------|----------|
-| `devices.txt` | 所有设备列表 |
-| `drivers.txt` | 已加载的驱动列表 |
-| `network_interfaces.txt` | 网络接口信息 |
-| `ping_test.txt` | 网络连通性测试结果 |
-| `filesystem_map.txt` | 文件系统映射 |
-| `ipxe_search.txt` | iPXE 文件搜索结果 |
-| `boot_config.txt` | 启动配置信息 |
-| `memory_map.txt` | 内存映射信息 |
-| `pci_devices.txt` | PCI 设备列表 |
-| `efi_variables.txt` | EFI 变量信息 |
-| `ipxe_launch.txt` | iPXE 启动尝试结果 |
-| `summary.txt` | 收集信息汇总 |
+**主要输出文件**：
+- `efi-debug-report.txt` - **统一调试报告**（包含所有信息）
+
+**报告内容结构**：
+1. 设备信息（设备和驱动列表）
+2. 设备重新连接状态
+3. 网络接口信息
+4. 网络连通性测试
+5. 文件系统映射
+6. iPXE 文件搜索
+7. 启动配置信息
+8. 内存映射信息
+9. PCI 设备列表
+10. EFI 变量信息
+11. iPXE 启动测试
+12. 调试总结
 
 ### 4. 分析结果
 1. 将 U 盘连接到其他计算机
-2. 查看 `debug` 文件夹中的日志文件
-3. 重点关注：
-   - `ipxe_search.txt` - 是否找到 iPXE 文件
-   - `ipxe_launch.txt` - iPXE 启动是否成功
-   - `network_interfaces.txt` - 网卡是否被识别
-   - `boot_config.txt` - 启动菜单配置
+2. 打开 `debug/efi-debug-report.txt` 文件
+3. 重点关注以下部分：
+   - **第6部分** - iPXE 文件搜索：是否找到 iPXE 文件
+   - **第11部分** - iPXE 启动测试：启动是否成功
+   - **第3部分** - 网络接口信息：网卡是否被识别
+   - **第7部分** - 启动配置信息：启动菜单配置
 
 ## 故障排除
 
@@ -58,9 +60,9 @@ efi-debug-script.nsh
 ### 如果找不到 iPXE 文件
 1. 检查 ROM 是否正确刷入
 2. 使用 `cbfstool` 验证 ROM 内容
-3. 尝试手动查找：`ls -l fs*:\`
+3. 查看报告第6部分 - iPXE 文件搜索结果
 
 ### 如果网络不工作
-1. 检查网卡驱动是否加载：查看 `drivers.txt`
-2. 检查网络接口状态：查看 `network_interfaces.txt`
-3. 尝试手动连接：`connect -r`
+1. 检查网卡驱动是否加载：查看报告第1.2部分 - 驱动信息
+2. 检查网络接口状态：查看报告第3部分 - 网络接口信息
+3. 查看报告第4部分 - 网络连通性测试结果
