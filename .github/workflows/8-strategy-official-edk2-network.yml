@@ -59,7 +59,7 @@ jobs:
           "CONFIG_EDK2_TAG_OR_REV=\"origin/master\""
           "CONFIG_EDK2_RELEASE=y"
           "CONFIG_EDK2_HAVE_EFI_SHELL=y"
-          "CONFIG_EDK2_CUSTOM_BUILD_PARAMS=\"-D NETWORK_ENABLE=TRUE -D NETWORK_IP6_ENABLE=FALSE\""
+          "CONFIG_EDK2_CUSTOM_BUILD_PARAMS=\"-D NETWORK_DRIVER_ENABLE=TRUE -D NETWORK_IP6_ENABLE=FALSE -D NETWORK_HTTP_BOOT_ENABLE=TRUE -D NETWORK_PXE_BOOT_ENABLE=TRUE -D NETWORK_ALLOW_HTTP_CONNECTIONS=TRUE\""
         )
         
         INTEL_CONFIGS=(
@@ -226,7 +226,10 @@ jobs:
           
           ## 🔧 原版 EDK2 配置
           - **使用官方 EDK2 仓库**：tianocore/edk2
-          - **网络功能启用**：NETWORK_ENABLE=TRUE
+          - **网络驱动启用**：NETWORK_DRIVER_ENABLE=TRUE
+          - **PXE 启动支持**：NETWORK_PXE_BOOT_ENABLE=TRUE
+          - **HTTP 启动支持**：NETWORK_HTTP_BOOT_ENABLE=TRUE
+          - **HTTP 连接允许**：NETWORK_ALLOW_HTTP_CONNECTIONS=TRUE
           - **IPv6 禁用**：NETWORK_IP6_ENABLE=FALSE（节省空间）
           - **EFI Shell 包含**：用于网络功能测试
           ${{ env.EDK2_CONFIG_LIST }}
