@@ -260,6 +260,11 @@ jobs:
            ## 🚀 使用方法
            - 刷入固件后，在 UEFI 启动菜单中选择 Network/PXE/HTTP 相关选项即可
            
+           ## 🔧 调试工具
+           - **efi-debug-script-v2.nsh**：增强版 EFI Shell 调试脚本，专门优化网络启动诊断
+           - **network-boot-diagnostics.nsh**：专业网络启动诊断脚本，专注于 PXE/HTTP Boot 问题排查
+           - **uefi-boot-setup.nsh**：iPXE 启动菜单设置脚本（备选方案）
+           
            ${{ env.INTEL_CONFIG_LIST != '' && format('同时追加 Intel 芯片组稳定性相关配置（适配 Kaisa 主板）：\n{0}', env.INTEL_CONFIG_LIST) || '' }}
             
             **构建时间**: ${{ github.event.repository.updated_at }}
@@ -268,5 +273,8 @@ jobs:
             roms/*.sha1
             roms/*.sha256
             integration_report.md
+            efi-debug-script-v2.nsh
+            network-boot-diagnostics.nsh
+            uefi-boot-setup.nsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
