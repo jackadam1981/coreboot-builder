@@ -7,7 +7,7 @@ echo ""
 
 # Set output directory to USB drive (usually fs0:)
 set OUTPUT_PATH=fs0:\debug
-set OUTPUT_FILE=%OUTPUT_PATH%\efi-debug-report.txt
+set OUTPUT_FILE=fs0:\debug\efi-debug-report.txt
 mkdir %OUTPUT_PATH% 2>nul
 echo "Output directory: %OUTPUT_PATH%"
 echo "Unified report file: %OUTPUT_FILE%"
