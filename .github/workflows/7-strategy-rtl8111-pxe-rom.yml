@@ -158,23 +158,56 @@ jobs:
           chmod +x "$CBFSTOOL" 2>/dev/null || true
           "$CBFSTOOL" "$ROM_FILE" print || echo "⚠️ cbfstool 打印失败（不影响构建产物上传）"
           
-          # 分析 ROM 空间使用情况
-          echo "🔍 分析 ROM 空间使用情况"
+          # 使用 cbfstool 获取准确的空间信息
+          echo "🔍 使用 cbfstool 分析 ROM 空间使用情况"
+          
+          # 获取 ROM 总大小
           ROM_SIZE=$(stat -c%s "$ROM_FILE")
           ROM_SIZE_MB=$((ROM_SIZE / 1024 / 1024))
-          echo "ROM 总大小: ${ROM_SIZE} 字节 (${ROM_SIZE_MB} MB)"
+          echo "📦 ROM 总大小: ${ROM_SIZE} 字节 (${ROM_SIZE_MB} MB)"
           
-          # 使用 cbfstool 获取更详细的空间信息
-          echo "📊 CBFS 空间分析:"
-          "$CBFSTOOL" "$ROM_FILE" print | grep -E "(COREBOOT|empty|null)" | head -20 || echo "⚠️ 无法获取详细空间信息"
+          # 使用 cbfstool 获取 COREBOOT 区域的容量和使用情况
+          echo "📊 CBFS (COREBOOT) 空间分析:"
+          CBFS_INFO=$("$CBFSTOOL" "$ROM_FILE" print 2>/dev/null || echo "")
           
-          # 计算剩余空间（如果有 empty 或 null 条目）
-          EMPTY_SIZE=$( "$CBFSTOOL" "$ROM_FILE" print 2>/dev/null | grep -E "empty|null" | awk '{sum += $4} END {print sum+0}' || echo "0" )
-          if [ "$EMPTY_SIZE" -gt 0 ]; then
-            EMPTY_SIZE_KB=$((EMPTY_SIZE / 1024))
-            echo "💾 可用空间: ${EMPTY_SIZE} 字节 (${EMPTY_SIZE_KB} KB)"
+          if [ -n "$CBFS_INFO" ]; then
+            # 提取 COREBOOT 区域容量信息
+            CBFS_CAPACITY=$(echo "$CBFS_INFO" | grep "CBFS.*capacity" | awk '{print $NF}' | head -1)
+            if [ -n "$CBFS_CAPACITY" ]; then
+              CBFS_CAPACITY_KB=$((CBFS_CAPACITY / 1024))
+              echo "🏗️  CBFS 总容量: ${CBFS_CAPACITY} 字节 (${CBFS_CAPACITY_KB} KB)"
+            fi
+            
+            # 计算已使用空间（所有非 empty/null 条目）
+            USED_SIZE=$(echo "$CBFS_INFO" | grep -v -E "(empty|null|CBFS.*capacity)" | awk '{sum += $4} END {print sum+0}')
+            if [ -n "$USED_SIZE" ] && [ "$USED_SIZE" -gt 0 ]; then
+              USED_SIZE_KB=$((USED_SIZE / 1024))
+              echo "📈 已使用空间: ${USED_SIZE} 字节 (${USED_SIZE_KB} KB)"
+            fi
+            
+            # 计算可用空间（empty 和 null 条目）
+            EMPTY_SIZE=$(echo "$CBFS_INFO" | grep -E "(empty|null)" | awk '{sum += $4} END {print sum+0}')
+            if [ -n "$EMPTY_SIZE" ] && [ "$EMPTY_SIZE" -gt 0 ]; then
+              EMPTY_SIZE_KB=$((EMPTY_SIZE / 1024))
+              echo "💾 可用空间: ${EMPTY_SIZE} 字节 (${EMPTY_SIZE_KB} KB)"
+              
+              # 计算使用率
+              if [ -n "$CBFS_CAPACITY" ] && [ "$CBFS_CAPACITY" -gt 0 ]; then
+                USAGE_PERCENT=$(( (USED_SIZE * 100) / CBFS_CAPACITY ))
+                echo "📊 空间使用率: ${USAGE_PERCENT}%"
+              fi
+            else
+              echo "⚠️  未发现可用空间条目"
+            fi
+            
+            # 显示最大的可用空间块
+            LARGEST_EMPTY=$(echo "$CBFS_INFO" | grep -E "(empty|null)" | awk '{print $4}' | sort -nr | head -1)
+            if [ -n "$LARGEST_EMPTY" ] && [ "$LARGEST_EMPTY" -gt 0 ]; then
+              LARGEST_EMPTY_KB=$((LARGEST_EMPTY / 1024))
+              echo "🎯 最大可用块: ${LARGEST_EMPTY} 字节 (${LARGEST_EMPTY_KB} KB)"
+            fi
           else
-            echo "⚠️ 无法计算剩余空间"
+            echo "❌ 无法获取 CBFS 信息"
           fi
 
       - name: 添加 iPXE EFI 到 ROM / Add iPXE EFI to ROM
