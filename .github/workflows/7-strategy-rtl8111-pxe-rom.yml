@@ -308,6 +308,21 @@ jobs:
           echo "   1. 进入 EFI Shell"
           echo "   2. 执行: fs0:\\ipxe.efi"
           echo "   3. 或者: ipxe.efi"
+          echo ""
+          # 添加 UEFI 启动项设置脚本
+          echo "📝 添加 UEFI 启动项设置脚本"
+          if [ -f "uefi-boot-setup.nsh" ]; then
+            ./cbfstool "$ROM_FILE" add -f uefi-boot-setup.nsh -n uefi-boot-setup.nsh -t raw || echo "⚠️ 脚本添加失败（不影响主要功能）"
+            echo "✅ UEFI 启动项设置脚本已添加"
+          else
+            echo "⚠️ 未找到 uefi-boot-setup.nsh 脚本"
+          fi
+          
+          echo "💡 UEFI 启动项集成建议："
+          echo "   在 EFI Shell 中执行以下命令将 iPXE 添加到启动菜单："
+          echo "   bcfg boot add 0 fs0:\\ipxe.efi \"iPXE Network Boot\""
+          echo "   或者运行: fs0:\\uefi-boot-setup.nsh"
+          echo "   这样 iPXE 就会出现在 UEFI 启动菜单中"
 
       - name: 重新生成校验文件 / Regenerate Checksums
         run: |
@@ -355,16 +370,23 @@ jobs:
           tag_name: kaisa-rtl8111-pxerom-${{ github.run_number }}
           name: "${{ inputs.release_name || 'Coreboot Kaisa - 方案7 (RTL8111 PXE ROM)' }} #${{ github.run_number }}"
           body: |
-          # 🎯 方案7：RTL8168 专用 iPXE 集成 (rtl8168.efi)
-          
-          - 使用本地编译的 RTL8168 专用 iPXE 驱动 (257 KB)
-          - 包含完整的 RTL8111 网卡驱动支持
-          - 添加到 CBFS 作为 efi/boot/bootx64.efi 或 ipxe.efi
-          - 智能空间检测，自动选择压缩策略
-          ${{ env.PXE_CONFIG_LIST }}
-          
-          优势：专用驱动体积小、功能完整、无需依赖固件驱动
-          ${{ env.INTEL_CONFIG_LIST != '' && format('同时追加 Intel 芯片组稳定性相关配置（适配 Kaisa 主板）：\n{0}', env.INTEL_CONFIG_LIST) || '' }}
+           # 🎯 方案7：RTL8168 专用 iPXE 集成 (rtl8168.efi)
+           
+           - 使用本地编译的 RTL8168 专用 iPXE 驱动 (257 KB)
+           - 包含完整的 RTL8111 网卡驱动支持
+           - 添加到 CBFS 作为 ipxe.efi
+           - 智能空间检测，自动选择压缩策略
+           - 提供 UEFI 启动项集成脚本
+           ${{ env.PXE_CONFIG_LIST }}
+           
+           优势：专用驱动体积小、功能完整、无需依赖固件驱动
+           
+           ## 🚀 使用方法
+           1. **直接执行**：在 EFI Shell 中运行 `fs0:\ipxe.efi`
+           2. **添加到启动菜单**：运行 `fs0:\uefi-boot-setup.nsh`
+           3. **手动添加**：`bcfg boot add 0 fs0:\ipxe.efi "iPXE Network Boot"`
+           
+           ${{ env.INTEL_CONFIG_LIST != '' && format('同时追加 Intel 芯片组稳定性相关配置（适配 Kaisa 主板）：\n{0}', env.INTEL_CONFIG_LIST) || '' }}
             
             **构建时间**: ${{ github.event.repository.updated_at }}
           files: |
