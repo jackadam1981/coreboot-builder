@@ -12,7 +12,7 @@ on:
         description: "Release 名称 / Release Name"
         required: false
         type: string
-               default: "Coreboot Kaisa - 方案7 (Integrated iPXE)"
+        default: "Coreboot Kaisa - 方案7 (Integrated iPXE)"
 
 permissions:
   contents: write
