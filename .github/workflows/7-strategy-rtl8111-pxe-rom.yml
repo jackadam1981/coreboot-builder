@@ -90,16 +90,20 @@ jobs:
           # 为 Release body 生成格式化的配置列表
           PXE_CONFIG_LIST=""
           for config in "${PXE_CONFIGS[@]}"; do
-            PXE_CONFIG_LIST="${PXE_CONFIG_LIST}- ${config}\n"
+            PXE_CONFIG_LIST="${PXE_CONFIG_LIST}- ${config}"$'\n'
           done
-          echo "PXE_CONFIG_LIST=${PXE_CONFIG_LIST%\\n}" >> $GITHUB_ENV
+          echo "PXE_CONFIG_LIST<<EOF" >> $GITHUB_ENV
+          echo "${PXE_CONFIG_LIST}" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
           
           INTEL_CONFIG_LIST=""
           if [ ${#INTEL_CONFIGS[@]} -gt 0 ]; then
             for config in "${INTEL_CONFIGS[@]}"; do
-              INTEL_CONFIG_LIST="${INTEL_CONFIG_LIST}- ${config}\n"
+              INTEL_CONFIG_LIST="${INTEL_CONFIG_LIST}- ${config}"$'\n'
             done
-            echo "INTEL_CONFIG_LIST=${INTEL_CONFIG_LIST%\\n}" >> $GITHUB_ENV
+            echo "INTEL_CONFIG_LIST<<EOF" >> $GITHUB_ENV
+            echo "${INTEL_CONFIG_LIST}" >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
           else
             echo "INTEL_CONFIG_LIST=" >> $GITHUB_ENV
           fi
