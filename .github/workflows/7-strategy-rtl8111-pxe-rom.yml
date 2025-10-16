@@ -371,16 +371,15 @@ jobs:
           tag_name: kaisa-rtl8111-pxerom-${{ github.run_number }}
           name: "${{ inputs.release_name || 'Coreboot Kaisa - 方案7 (RTL8111 PXE ROM)' }} #${{ github.run_number }}"
           body: |
-           # 🎯 方案7：固件集成 iPXE 网络启动
+           # 🎯 方案7：混合 iPXE 网络启动方案
            
-           ## 🔧 固件集成功能
-           - **EDK2 内置 PXE 支持**：启用 UEFI 原生网络启动
+           ## 🔧 固件配置（实验性）
+           - **EDK2 网络支持**：启用 UEFI 网络功能（主要支持 USB 网卡）
            - **HTTP 启动支持**：支持 HTTP/HTTPS 网络启动
            - **iSCSI SAN 启动**：支持 iSCSI 存储区域网络启动
            - **Option ROM 加载**：支持 PCIe 设备 Option ROM
-           - **自定义构建参数**：优化网络功能配置
            
-           ## 📦 外部 iPXE 增强
+           ## 📦 主要方案：RTL8168 专用 iPXE
            - 使用本地编译的 RTL8168 专用 iPXE 驱动 (257 KB)
            - 包含完整的 RTL8111 网卡驱动支持
            - 智能空间检测，自动选择压缩策略
@@ -388,12 +387,15 @@ jobs:
            
            ${{ env.PXE_CONFIG_LIST }}
            
-           优势：固件原生支持 + 专用驱动增强，双重保障
+           ## ⚠️ 重要说明
+           - EDK2 网络支持主要针对 USB 网卡，RTL8168 是 PCIe 网卡
+           - 主要依赖 RTL8168 专用 iPXE 驱动进行网络启动
+           - EDK2 配置作为实验性功能，实际效果需要验证
            
            ## 🚀 使用方法
-           1. **固件原生**：网络启动选项直接出现在 UEFI 启动菜单
-           2. **增强 iPXE**：在 EFI Shell 中运行 `fs0:\ipxe.efi`
-           3. **自动设置**：运行 `fs0:\uefi-boot-setup.nsh`
+           1. **推荐方式**：在 EFI Shell 中运行 `fs0:\ipxe.efi`
+           2. **自动设置**：运行 `fs0:\uefi-boot-setup.nsh`
+           3. **实验功能**：检查 UEFI 启动菜单是否有网络启动选项
            
            ${{ env.INTEL_CONFIG_LIST != '' && format('同时追加 Intel 芯片组稳定性相关配置（适配 Kaisa 主板）：\n{0}', env.INTEL_CONFIG_LIST) || '' }}
             
