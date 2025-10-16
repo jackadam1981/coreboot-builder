@@ -20,7 +20,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    
     steps:
       - name: 检出构建仓库 / Checkout Builder Repository
         uses: actions/checkout@v4
@@ -37,24 +37,39 @@ jobs:
 
       - name: 下载预编译 UEFI iPXE / Download Pre-built UEFI iPXE
         run: |
-          echo "📥 下载预编译的 iPXE EFI 文件 (ipxe.efi 含常见驱动)"
+          echo "📥 下载预编译的 iPXE EFI 文件"
           cd coreboot
           
-          # 优先下载包含常见网卡驱动的 UEFI 版本
+          # 下载完整版本 iPXE (包含常见驱动)
+          echo "📦 下载完整版 iPXE (ipxe.efi)"
           curl -L -o ipxe.efi "https://boot.ipxe.org/ipxe.efi"
           
+          # 下载精简版本 iPXE (依赖固件驱动)
+          echo "📦 下载精简版 iPXE (snponly.efi)"
+          curl -L -o snponly.efi "https://boot.ipxe.org/snponly.efi"
+          
           if [ -f ipxe.efi ]; then
-            echo "✅ iPXE EFI (ipxe.efi) 下载成功，大小: $(du -h ipxe.efi | cut -f1)"
+            IPXE_SIZE=$(stat -c%s "ipxe.efi")
+            IPXE_SIZE_KB=$((IPXE_SIZE / 1024))
+            echo "✅ 完整版 iPXE 下载成功: ${IPXE_SIZE} 字节 (${IPXE_SIZE_KB} KB)"
           else
-            echo "❌ 下载失败"
+            echo "❌ 完整版 iPXE 下载失败"
             exit 1
+          fi
+          
+          if [ -f snponly.efi ]; then
+            SNPONLY_SIZE=$(stat -c%s "snponly.efi")
+            SNPONLY_SIZE_KB=$((SNPONLY_SIZE / 1024))
+            echo "✅ 精简版 iPXE 下载成功: ${SNPONLY_SIZE} 字节 (${SNPONLY_SIZE_KB} KB)"
+          else
+            echo "⚠️ 精简版 iPXE 下载失败，将只使用完整版"
           fi
 
       - name: 配置 PXE ROM 支持 / Configure PXE ROM Support
         run: |
           echo "📝 添加 PXE ROM 支持配置"
           cd coreboot
-          
+
           # 定义配置项数组
           PXE_CONFIGS=(
             "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y"
@@ -68,12 +83,12 @@ jobs:
           )
           
           # 写入 PXE ROM 支持配置
-          echo "" >> configs/cml/config.kaisa.uefi
-          echo "# PXE ROM 支持配置" >> configs/cml/config.kaisa.uefi
+            echo "" >> configs/cml/config.kaisa.uefi
+            echo "# PXE ROM 支持配置" >> configs/cml/config.kaisa.uefi
           for config in "${PXE_CONFIGS[@]}"; do
             echo "$config" >> configs/cml/config.kaisa.uefi
           done
-          echo "" >> configs/cml/config.kaisa.uefi
+            echo "" >> configs/cml/config.kaisa.uefi
           
           # 写入 Intel 芯片组系统稳定配置
           if [ ${#INTEL_CONFIGS[@]} -gt 0 ]; then
@@ -118,12 +133,12 @@ jobs:
       - name: 📦 编译 MrChromebox Coreboot 固件 / Build Coreboot
         run: |
           echo "🔨 编译 MrChromebox coreboot（kaisa 主板）"
-
+          
           # 使用 MrChromebox 标准编译流程（参考 build-coreboot.yml）
           # 确保输出目录权限正确
           mkdir -p roms
           chmod 755 roms
-
+          
           # 使用 MrChromebox 标准编译流程
           docker run --rm --user root \
             -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
@@ -134,7 +149,7 @@ jobs:
                      # 使用 MrChromebox 编译脚本（配置已在配置文件中）
                      echo '🔧 使用 MrChromebox build-uefi.sh 编译 kaisa...' && \
                      ./build-uefi.sh kaisa && \
-                     chmod 644 /home/coreboot/roms/*.rom && \
+                       chmod 644 /home/coreboot/roms/*.rom && \
                      echo '✅ MrChromebox 编译完成'"
 
       - name: 验证编译结果 / Verify Build Results
@@ -148,10 +163,10 @@ jobs:
             ls -la roms/
             exit 1
           fi
-
+          
           echo "✅ 找到 ROM 文件: $(basename "$ROM_FILE")"
           ls -lh "$ROM_FILE"
-
+          
           # 使用仓库内 tools/cbfstool 打印 ROM 结构（仅展示，不作为成败依据）
           echo "📦 使用本仓库 tools/cbfstool 打印 ROM 结构"
           CBFSTOOL="${{ github.workspace }}/tools/cbfstool"
@@ -226,26 +241,76 @@ jobs:
           # 若存在旧的 Legacy PXE ROM 条目则删除以释放空间
           ./cbfstool "$ROM_FILE" remove -n pci10ec,8168.rom || true
           
-          # 将 iPXE 添加到 EFI 启动路径，这样它可能出现在启动菜单中
-          # 先尝试未压缩 raw，失败则回退为 LZMA 压缩
-          set +e
-          ./cbfstool "$ROM_FILE" add -f coreboot/ipxe.efi -n efi/boot/bootx64.efi -t raw
-          ADD_RC=$?
-          if [ $ADD_RC -ne 0 ]; then
-            echo "⚠️ 作为 bootx64.efi 添加失败，尝试使用 LZMA 压缩后再添加"
-            ./cbfstool "$ROM_FILE" add -f coreboot/ipxe.efi -n efi/boot/bootx64.efi -t raw -c lzma
-            ADD_RC=$?
-          fi
-          set -e
+          # 检查可用空间并选择合适的 iPXE 版本
+          echo "🔍 检查空间并选择合适的 iPXE 版本"
           
-          if [ $ADD_RC -ne 0 ]; then
-            echo "⚠️ 作为 bootx64.efi 添加失败，尝试作为普通 ipxe.efi 添加"
+          # 获取 iPXE 文件大小
+          if [ -f "coreboot/ipxe.efi" ]; then
+            IPXE_SIZE=$(stat -c%s "coreboot/ipxe.efi")
+            IPXE_SIZE_KB=$((IPXE_SIZE / 1024))
+            echo "📦 完整版 iPXE 大小: ${IPXE_SIZE} 字节 (${IPXE_SIZE_KB} KB)"
+          fi
+          
+          if [ -f "coreboot/snponly.efi" ]; then
+            SNPONLY_SIZE=$(stat -c%s "coreboot/snponly.efi")
+            SNPONLY_SIZE_KB=$((SNPONLY_SIZE / 1024))
+            echo "📦 精简版 iPXE 大小: ${SNPONLY_SIZE} 字节 (${SNPONLY_SIZE_KB} KB)"
+          fi
+          
+          # 获取最大可用空间
+          LARGEST_EMPTY=$("$CBFSTOOL" "$ROM_FILE" print 2>/dev/null | grep -E "(empty|null)" | awk '{print $4}' | sort -nr | head -1)
+          if [ -n "$LARGEST_EMPTY" ] && [ "$LARGEST_EMPTY" -gt 0 ]; then
+            LARGEST_EMPTY_KB=$((LARGEST_EMPTY / 1024))
+            echo "💾 最大可用块: ${LARGEST_EMPTY} 字节 (${LARGEST_EMPTY_KB} KB)"
+            
+            # 选择合适的 iPXE 版本
+            if [ -f "coreboot/ipxe.efi" ] && [ "$IPXE_SIZE" -le "$LARGEST_EMPTY" ]; then
+              echo "✅ 空间充足，使用完整版 iPXE"
+              SELECTED_IPXE="coreboot/ipxe.efi"
+              USE_COMPRESSION=false
+            elif [ -f "coreboot/snponly.efi" ] && [ "$SNPONLY_SIZE" -le "$LARGEST_EMPTY" ]; then
+              echo "⚠️ 完整版太大，使用精简版 iPXE"
+              SELECTED_IPXE="coreboot/snponly.efi"
+              USE_COMPRESSION=false
+            elif [ -f "coreboot/ipxe.efi" ]; then
+              echo "⚠️ 空间不足，使用完整版 iPXE + LZMA 压缩"
+              SELECTED_IPXE="coreboot/ipxe.efi"
+              USE_COMPRESSION=true
+            elif [ -f "coreboot/snponly.efi" ]; then
+              echo "⚠️ 空间不足，使用精简版 iPXE + LZMA 压缩"
+              SELECTED_IPXE="coreboot/snponly.efi"
+              USE_COMPRESSION=true
+            else
+              echo "❌ 没有可用的 iPXE 文件"
+              exit 1
+            fi
+          else
+            echo "⚠️ 无法确定可用空间，使用完整版 iPXE + 压缩"
+            SELECTED_IPXE="coreboot/ipxe.efi"
+            USE_COMPRESSION=true
+          fi
+          
+          # 根据选择添加 iPXE
+          echo "🚀 添加选定的 iPXE 版本: $(basename "$SELECTED_IPXE")"
+          if [ "$USE_COMPRESSION" = true ]; then
+            echo "🗜️ 使用 LZMA 压缩添加"
             set +e
-            ./cbfstool "$ROM_FILE" add -f coreboot/ipxe.efi -n ipxe.efi -t raw
+            ./cbfstool "$ROM_FILE" add -f "$SELECTED_IPXE" -n efi/boot/bootx64.efi -t raw -c lzma
             ADD_RC=$?
             if [ $ADD_RC -ne 0 ]; then
-              echo "⚠️ 未压缩添加失败，尝试使用 LZMA 压缩后再添加"
-              ./cbfstool "$ROM_FILE" add -f coreboot/ipxe.efi -n ipxe.efi -t raw -c lzma
+              echo "⚠️ 作为 bootx64.efi 添加失败，尝试作为普通文件名添加"
+              ./cbfstool "$ROM_FILE" add -f "$SELECTED_IPXE" -n "$(basename "$SELECTED_IPXE")" -t raw -c lzma
+              ADD_RC=$?
+            fi
+            set -e
+          else
+            echo "📦 添加未压缩版本"
+            set +e
+            ./cbfstool "$ROM_FILE" add -f "$SELECTED_IPXE" -n efi/boot/bootx64.efi -t raw
+            ADD_RC=$?
+            if [ $ADD_RC -ne 0 ]; then
+              echo "⚠️ 未压缩添加失败，回退到 LZMA 压缩"
+              ./cbfstool "$ROM_FILE" add -f "$SELECTED_IPXE" -n efi/boot/bootx64.efi -t raw -c lzma
               ADD_RC=$?
             fi
             set -e
@@ -313,7 +378,7 @@ jobs:
             
             注意：移除失败的 Legacy PXE ROM 支持，专注于 UEFI 版本
             ${{ env.INTEL_CONFIG_LIST != '' && format('同时追加 Intel 芯片组稳定性相关配置（适配 Kaisa 主板）：\n{0}', env.INTEL_CONFIG_LIST) || '' }}
-
+            
             **构建时间**: ${{ github.event.repository.updated_at }}
           files: |
             roms/*.rom
