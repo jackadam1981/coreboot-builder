@@ -54,9 +54,7 @@ jobs:
           EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_ENABLE=TRUE"
           EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_IP4_ENABLE=TRUE"
           EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_IP6_ENABLE=FALSE"
-          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_HTTP_BOOT_ENABLE=TRUE"
           EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_PXE_BOOT_ENABLE=TRUE"
-          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_ALLOW_HTTP_CONNECTIONS=TRUE"
           EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_RTEK_PCI=TRUE"
           
           # 添加到配置数组
@@ -257,15 +255,13 @@ jobs:
           tag_name: kaisa-edk2-pxe-${{ github.run_number }}
           name: "${{ inputs.release_name || 'Coreboot Kaisa - 方案7 (EDK2 PXE)' }} #${{ github.run_number }}"
           body: |
-           # 🎯 方案7：MrChromebox EDK2 内置 PXE/HTTP 网络启动
+           # 🎯 方案7：MrChromebox EDK2 内置 PXE 网络启动
            
            ## 🔧 启用的固件网络功能
            - **网络驱动启用**：NETWORK_DRIVER_ENABLE=TRUE
            - **网络功能启用**：NETWORK_ENABLE=TRUE
            - **IPv4 网络支持**：NETWORK_IP4_ENABLE=TRUE
            - **PXE 启动支持**：NETWORK_PXE_BOOT_ENABLE=TRUE
-           - **HTTP 启动支持**：NETWORK_HTTP_BOOT_ENABLE=TRUE
-           - **HTTP 连接允许**：NETWORK_ALLOW_HTTP_CONNECTIONS=TRUE
            - **RTL8168 PCI 网卡**：NETWORK_RTEK_PCI=TRUE（支持 RTL8111/8168/8169）
            - **IPv6 禁用**：NETWORK_IP6_ENABLE=FALSE（节省空间）
            - **Option ROM 加载**：支持 PCIe 设备 Option ROM
@@ -273,7 +269,7 @@ jobs:
            ${{ env.PXE_CONFIG_LIST }}
            
            ## 🚀 使用方法
-           - 刷入固件后，在 UEFI 启动菜单中选择 Network/PXE/HTTP 相关选项即可
+           - 刷入固件后，在 UEFI 启动菜单中选择 Network/PXE 相关选项即可
            
            ## 🔧 调试工具
            - **efi-debug-script-v2.nsh**：增强版 EFI Shell 调试脚本，专门优化网络启动诊断
