@@ -1,4 +1,4 @@
-name: 7-Kaisa MrChromebox (EDK2 PXE)
+name: 7-Kaisa MrChromebox (EDK2 PXE + iPXE)
 
 on:
   workflow_dispatch:
@@ -119,6 +119,29 @@ jobs:
           cat configs/cml/config.kaisa.uefi
           echo "===================="
 
+      - name: 准备 iPXE EFI 文件
+        run: |
+          echo "=== 准备 iPXE EFI 文件 ==="
+          echo "复制自编译的 rtl8168.efi 到 coreboot 目录..."
+          echo ""
+          
+          # 检查 iPXE 文件是否存在
+          if [ -f "/root/ipxe/src/bin-x86_64-efi/rtl8168.efi" ]; then
+            echo "✅ 找到自编译的 rtl8168.efi"
+            ls -lh /root/ipxe/src/bin-x86_64-efi/rtl8168.efi
+            
+            # 复制到 coreboot 目录
+            cp /root/ipxe/src/bin-x86_64-efi/rtl8168.efi ./coreboot/rtl8168.efi
+            echo "✅ rtl8168.efi 已复制到 coreboot 目录"
+          else
+            echo "❌ 未找到 /root/ipxe/src/bin-x86_64-efi/rtl8168.efi"
+            echo "请确保 iPXE 已正确编译"
+            exit 1
+          fi
+          
+          echo ""
+          echo "iPXE 文件准备完成"
+
       - name: 📦 编译 MrChromebox Coreboot 固件 / Build Coreboot
         run: |
           echo "🔨 编译 MrChromebox coreboot（kaisa 主板）"
@@ -140,6 +163,81 @@ jobs:
                      ./build-uefi.sh kaisa && \
                        chmod 644 /home/coreboot/roms/*.rom && \
                      echo '✅ MrChromebox 编译完成'"
+
+      - name: 集成 iPXE 到 ROM
+        run: |
+          echo "=== 集成 iPXE 到 ROM ==="
+          echo "将 rtl8168.efi 添加到 ROM 中..."
+          echo ""
+          
+          # 检查 ROM 文件
+          ROM_FILE=$(ls roms/coreboot_*.rom | head -1)
+          if [ -z "$ROM_FILE" ]; then
+            echo "❌ 未找到 ROM 文件"
+            exit 1
+          fi
+          
+          echo "✅ 找到 ROM 文件: $(basename "$ROM_FILE")"
+          
+          # 检查 iPXE 文件
+          if [ ! -f "./coreboot/rtl8168.efi" ]; then
+            echo "❌ 未找到 rtl8168.efi 文件"
+            exit 1
+          fi
+          
+          echo "✅ 找到 iPXE 文件: rtl8168.efi"
+          ls -lh ./coreboot/rtl8168.efi
+          
+          # 使用 cbfstool 添加 iPXE 到 ROM
+          CBFSTOOL="${{ github.workspace }}/tools/cbfstool"
+          chmod +x "$CBFSTOOL"
+          
+          echo ""
+          echo "🔧 添加 iPXE 到 ROM..."
+          
+          # 尝试添加 iPXE 到 ROM（使用 ipxe.efi 作为文件名）
+          if "$CBFSTOOL" "$ROM_FILE" add -f ./coreboot/rtl8168.efi -n ipxe.efi -t raw; then
+            echo "✅ iPXE 已成功添加到 ROM"
+          else
+            echo "⚠️ 直接添加失败，尝试 LZMA 压缩..."
+            if "$CBFSTOOL" "$ROM_FILE" add -f ./coreboot/rtl8168.efi -n ipxe.efi -t raw -c lzma; then
+              echo "✅ iPXE 已成功添加到 ROM（LZMA 压缩）"
+            else
+              echo "❌ iPXE 添加失败"
+              exit 1
+            fi
+          fi
+          
+          # 添加 UEFI 启动设置脚本
+          echo ""
+          echo "🔧 添加 UEFI 启动设置脚本..."
+          if [ -f "./uefi-boot-setup.nsh" ]; then
+            if "$CBFSTOOL" "$ROM_FILE" add -f ./uefi-boot-setup.nsh -n uefi-boot-setup.nsh -t raw; then
+              echo "✅ UEFI 启动设置脚本已添加"
+            else
+              echo "⚠️ UEFI 启动设置脚本添加失败"
+            fi
+          fi
+          
+          # 添加调试脚本
+          if [ -f "./efi-debug-script-v2.nsh" ]; then
+            if "$CBFSTOOL" "$ROM_FILE" add -f ./efi-debug-script-v2.nsh -n efi-debug-script-v2.nsh -t raw; then
+              echo "✅ 调试脚本已添加"
+            else
+              echo "⚠️ 调试脚本添加失败"
+            fi
+          fi
+          
+          if [ -f "./network-boot-diagnostics.nsh" ]; then
+            if "$CBFSTOOL" "$ROM_FILE" add -f ./network-boot-diagnostics.nsh -n network-boot-diagnostics.nsh -t raw; then
+              echo "✅ 网络诊断脚本已添加"
+            else
+              echo "⚠️ 网络诊断脚本添加失败"
+            fi
+          fi
+          
+          echo ""
+          echo "✅ iPXE 集成完成"
 
       - name: 验证编译结果 / Verify Build Results
         run: |
@@ -259,10 +357,10 @@ jobs:
         if: ${{ (github.event_name == 'workflow_dispatch' && inputs.release) || (github.event_name != 'workflow_dispatch') }}
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: kaisa-edk2-pxe-${{ github.run_number }}
-          name: "${{ inputs.release_name || 'Coreboot Kaisa - 方案7 (EDK2 PXE)' }} #${{ github.run_number }}"
+          tag_name: kaisa-edk2-pxe-ipxe-${{ github.run_number }}
+          name: "${{ inputs.release_name || 'Coreboot Kaisa - 方案7 (EDK2 PXE + iPXE)' }} #${{ github.run_number }}"
           body: |
-           # 🎯 方案7：MrChromebox EDK2 内置 PXE 网络启动
+           # 🎯 方案7：MrChromebox EDK2 + iPXE 混合网络启动
            
            ## 🔧 启用的固件网络功能
            - **网络驱动启用**：NETWORK_DRIVER_ENABLE=TRUE
@@ -275,10 +373,33 @@ jobs:
            - **IPv6 禁用**：NETWORK_IP6_ENABLE=FALSE（节省空间）
            - **Option ROM 加载**：支持 PCIe 设备 Option ROM
            
+           ## 🔧 iPXE 集成功能
+           - **自编译 iPXE**：使用您编译的 rtl8168.efi 驱动
+           - **CBFS 集成**：iPXE 已集成到固件 ROM 中
+           - **多种启动方式**：支持 UEFI 启动菜单、EFI Shell 手动启动
+           - **调试工具**：包含完整的网络诊断和启动设置脚本
+           
            ${{ env.PXE_CONFIG_LIST }}
            
            ## 🚀 使用方法
-           - 刷入固件后，在 UEFI 启动菜单中选择 Network/PXE 相关选项即可
+           
+           ### 方法1：UEFI 启动菜单（推荐）
+           1. 刷入固件后，在 UEFI 启动菜单中选择 Network/PXE 相关选项
+           2. 如果 PXE 启动失败，可以尝试方法2
+           
+           ### 方法2：EFI Shell 手动启动
+           1. 在 UEFI 启动菜单中选择 "UEFI Shell"
+           2. 在 EFI Shell 中执行：
+              ```
+              fs0:\uefi-boot-setup.nsh
+              ```
+           3. 重启系统，在启动菜单中选择 "iPXE Network Boot"
+           
+           ### 方法3：直接执行 iPXE
+           1. 在 EFI Shell 中执行：
+              ```
+              fs0:\ipxe.efi
+              ```
            
            ## 🔧 调试工具
            - **efi-debug-script-v2.nsh**：增强版 EFI Shell 调试脚本，专门优化网络启动诊断
