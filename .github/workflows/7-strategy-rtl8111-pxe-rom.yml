@@ -162,6 +162,16 @@ jobs:
           
           echo "✅ 找到 ROM 文件: $(basename "$ROM_FILE")"
           
+          # 修复 ROM 文件权限
+          echo "🔧 修复 ROM 文件权限..."
+          chmod 644 "$ROM_FILE"
+          chmod 755 roms/
+          ls -lh "$ROM_FILE"
+          
+          # 确保当前用户有写权限
+          echo "🔧 确保写权限..."
+          chown -R $(whoami):$(whoami) roms/ 2>/dev/null || true
+          
           # 检查 iPXE 文件
           if [ ! -f "./rtl8168.efi" ]; then
             echo "❌ 未找到 rtl8168.efi 文件"
