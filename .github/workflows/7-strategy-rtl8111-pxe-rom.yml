@@ -202,9 +202,10 @@ jobs:
           fi
           
           echo ""
-          echo "ℹ️ 注意：iPXE 已添加到 CBFS 中，需要通过以下方式使用："
-          echo "   1. 在 EFI Shell 中执行：fs0:\uefi-boot-setup.nsh"
+          echo "ℹ️ 注意：iPXE 已添加到 CBFS 中"
+          echo "   1. 在 EFI Shell 中执行：fs0:\uefi-boot-setup.nsh（推荐）"
           echo "   2. 或直接执行：fs0:\ipxe.efi"
+          echo "   3. 或通过 UEFI 启动菜单选择 iPXE"
           
           # 添加 UEFI 启动设置脚本
           echo ""
@@ -231,6 +232,15 @@ jobs:
               echo "✅ 网络诊断脚本已添加"
             else
               echo "⚠️ 网络诊断脚本添加失败"
+            fi
+          fi
+          
+          # 添加自动 iPXE 设置脚本
+          if [ -f "./auto-ipxe-setup.nsh" ]; then
+            if "$CBFSTOOL" "$ROM_COPY" add -f ./auto-ipxe-setup.nsh -n auto-ipxe-setup.nsh -t raw; then
+              echo "✅ 自动 iPXE 设置脚本已添加"
+            else
+              echo "⚠️ 自动 iPXE 设置脚本添加失败"
             fi
           fi
           
@@ -406,21 +416,28 @@ jobs:
            
            ## 🚀 使用方法
            
-           ### 方法1：EFI Shell 设置启动项（推荐）
+           ### 方法1：自动设置（推荐）
            1. 刷入固件后，在 UEFI 启动菜单中选择 "UEFI Shell"
            2. 在 EFI Shell 中执行：
               ```
-              fs0:\uefi-boot-setup.nsh
+              fs0:\auto-ipxe-setup.nsh
               ```
            3. 重启系统，在启动菜单中选择 "iPXE Network Boot"
            
-           ### 方法2：直接执行 iPXE
+           ### 方法2：手动设置
+           1. 在 EFI Shell 中执行：
+              ```
+              fs0:\uefi-boot-setup.nsh
+              ```
+           2. 重启系统，在启动菜单中选择 "iPXE Network Boot"
+           
+           ### 方法3：直接执行 iPXE
            1. 在 EFI Shell 中执行：
               ```
               fs0:\ipxe.efi
               ```
            
-           ### 方法3：手动添加启动项
+           ### 方法4：手动添加启动项
            1. 在 EFI Shell 中执行：
               ```
               bcfg boot add 0 fs0:\ipxe.efi "iPXE Network Boot"
@@ -428,9 +445,10 @@ jobs:
            2. 重启系统，在启动菜单中选择 "iPXE Network Boot"
            
            ## 🔧 调试工具
+           - **auto-ipxe-setup.nsh**：自动 iPXE 设置脚本，智能检测和配置网络启动
+           - **uefi-boot-setup.nsh**：手动 iPXE 启动菜单设置脚本
            - **efi-debug-script-v2.nsh**：增强版 EFI Shell 调试脚本，专门优化网络启动诊断
            - **network-boot-diagnostics.nsh**：专业网络启动诊断脚本，专注于 PXE/HTTP Boot 问题排查
-           - **uefi-boot-setup.nsh**：iPXE 启动菜单设置脚本（备选方案）
            
            ${{ env.INTEL_CONFIG_LIST != '' && format('同时追加 Intel 芯片组稳定性相关配置（适配 Kaisa 主板）：\n{0}', env.INTEL_CONFIG_LIST) || '' }}
             
