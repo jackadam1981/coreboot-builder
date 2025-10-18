@@ -162,15 +162,12 @@ jobs:
           
           echo "✅ 找到 ROM 文件: $(basename "$ROM_FILE")"
           
-          # 修复 ROM 文件权限
-          echo "🔧 修复 ROM 文件权限..."
-          chmod 644 "$ROM_FILE"
-          chmod 755 roms/
-          ls -lh "$ROM_FILE"
-          
-          # 确保当前用户有写权限
-          echo "🔧 确保写权限..."
-          chown -R $(whoami):$(whoami) roms/ 2>/dev/null || true
+          # 创建可写的 ROM 副本
+          echo "🔧 创建可写的 ROM 副本..."
+          ROM_COPY="./coreboot_edk2-kaisa-mrchromebox_work.rom"
+          cp "$ROM_FILE" "$ROM_COPY"
+          chmod 644 "$ROM_COPY"
+          ls -lh "$ROM_COPY"
           
           # 检查 iPXE 文件
           if [ ! -f "./rtl8168.efi" ]; then
@@ -192,16 +189,16 @@ jobs:
           echo "🔧 添加 iPXE 到标准 EFI 启动路径..."
           
           # 方法1：添加到 efi/boot/bootx64.efi（标准 EFI 启动路径）
-          if "$CBFSTOOL" "$ROM_FILE" add -f ./rtl8168.efi -n efi/boot/bootx64.efi -t raw; then
+          if "$CBFSTOOL" "$ROM_COPY" add -f ./rtl8168.efi -n efi/boot/bootx64.efi -t raw; then
             echo "✅ iPXE 已添加到 efi/boot/bootx64.efi"
           else
             echo "⚠️ 标准路径添加失败，尝试 LZMA 压缩..."
-            if "$CBFSTOOL" "$ROM_FILE" add -f ./rtl8168.efi -n efi/boot/bootx64.efi -t raw -c lzma; then
+            if "$CBFSTOOL" "$ROM_COPY" add -f ./rtl8168.efi -n efi/boot/bootx64.efi -t raw -c lzma; then
               echo "✅ iPXE 已添加到 efi/boot/bootx64.efi（LZMA 压缩）"
             else
               echo "⚠️ 标准路径失败，尝试备用路径..."
               # 方法2：添加到 ipxe.efi（备用路径）
-              if "$CBFSTOOL" "$ROM_FILE" add -f ./rtl8168.efi -n ipxe.efi -t raw; then
+              if "$CBFSTOOL" "$ROM_COPY" add -f ./rtl8168.efi -n ipxe.efi -t raw; then
                 echo "✅ iPXE 已添加到 ipxe.efi（备用路径）"
               else
                 echo "❌ iPXE 添加失败"
@@ -214,7 +211,7 @@ jobs:
           echo ""
           echo "🔧 添加 UEFI 启动设置脚本..."
           if [ -f "./uefi-boot-setup.nsh" ]; then
-            if "$CBFSTOOL" "$ROM_FILE" add -f ./uefi-boot-setup.nsh -n uefi-boot-setup.nsh -t raw; then
+            if "$CBFSTOOL" "$ROM_COPY" add -f ./uefi-boot-setup.nsh -n uefi-boot-setup.nsh -t raw; then
               echo "✅ UEFI 启动设置脚本已添加"
             else
               echo "⚠️ UEFI 启动设置脚本添加失败"
@@ -223,7 +220,7 @@ jobs:
           
           # 添加调试脚本
           if [ -f "./efi-debug-script-v2.nsh" ]; then
-            if "$CBFSTOOL" "$ROM_FILE" add -f ./efi-debug-script-v2.nsh -n efi-debug-script-v2.nsh -t raw; then
+            if "$CBFSTOOL" "$ROM_COPY" add -f ./efi-debug-script-v2.nsh -n efi-debug-script-v2.nsh -t raw; then
               echo "✅ 调试脚本已添加"
             else
               echo "⚠️ 调试脚本添加失败"
@@ -231,12 +228,22 @@ jobs:
           fi
           
           if [ -f "./network-boot-diagnostics.nsh" ]; then
-            if "$CBFSTOOL" "$ROM_FILE" add -f ./network-boot-diagnostics.nsh -n network-boot-diagnostics.nsh -t raw; then
+            if "$CBFSTOOL" "$ROM_COPY" add -f ./network-boot-diagnostics.nsh -n network-boot-diagnostics.nsh -t raw; then
               echo "✅ 网络诊断脚本已添加"
             else
               echo "⚠️ 网络诊断脚本添加失败"
             fi
           fi
+          
+          # 将修改后的 ROM 复制回原位置
+          echo ""
+          echo "🔧 将修改后的 ROM 复制回原位置..."
+          cp "$ROM_COPY" "$ROM_FILE"
+          echo "✅ 修改后的 ROM 已复制回原位置"
+          
+          # 清理临时文件
+          rm -f "$ROM_COPY"
+          echo "✅ 临时文件已清理"
           
           echo ""
           echo "✅ iPXE 集成完成"
