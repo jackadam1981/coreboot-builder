@@ -234,11 +234,17 @@ jobs:
             fi
           fi
           
-          # 将修改后的 ROM 复制回原位置
+          # 将修改后的 ROM 移动到 roms 目录
           echo ""
-          echo "🔧 将修改后的 ROM 复制回原位置..."
-          cp "$ROM_COPY" "$ROM_FILE"
-          echo "✅ 修改后的 ROM 已复制回原位置"
+          echo "🔧 将修改后的 ROM 移动到 roms 目录..."
+          ROM_FINAL="roms/coreboot_edk2-kaisa-mrchromebox_with_ipxe.rom"
+          cp "$ROM_COPY" "$ROM_FINAL"
+          echo "✅ 修改后的 ROM 已保存为: $(basename "$ROM_FINAL")"
+          
+          # 显示文件信息
+          echo ""
+          echo "📦 最终 ROM 文件信息:"
+          ls -lh "$ROM_FINAL"
           
           # 清理临时文件
           rm -f "$ROM_COPY"
@@ -251,34 +257,44 @@ jobs:
         run: |
           echo "📦 验证编译结果"
 
-          # 检查 ROM 文件
-          ROM_FILE=$(ls roms/coreboot_*.rom | head -1)
+          # 检查原始 ROM 文件
+          ROM_FILE=$(ls roms/coreboot_edk2-kaisa-mrchromebox_*.rom | grep -v with_ipxe | head -1)
           if [ -z "$ROM_FILE" ]; then
-            echo "❌ 未找到 ROM 文件"
+            echo "❌ 未找到原始 ROM 文件"
             ls -la roms/
             exit 1
           fi
           
-          echo "✅ 找到 ROM 文件: $(basename "$ROM_FILE")"
+          echo "✅ 找到原始 ROM 文件: $(basename "$ROM_FILE")"
           ls -lh "$ROM_FILE"
           
+          # 检查集成 iPXE 的 ROM 文件
+          ROM_IPXE_FILE="roms/coreboot_edk2-kaisa-mrchromebox_with_ipxe.rom"
+          if [ -f "$ROM_IPXE_FILE" ]; then
+            echo "✅ 找到集成 iPXE 的 ROM 文件: $(basename "$ROM_IPXE_FILE")"
+            ls -lh "$ROM_IPXE_FILE"
+          else
+            echo "❌ 未找到集成 iPXE 的 ROM 文件"
+            exit 1
+          fi
+          
           # 使用仓库内 tools/cbfstool 打印 ROM 结构（仅展示，不作为成败依据）
-          echo "📦 使用本仓库 tools/cbfstool 打印 ROM 结构"
+          echo "📦 使用本仓库 tools/cbfstool 打印集成 iPXE 的 ROM 结构"
           CBFSTOOL="${{ github.workspace }}/tools/cbfstool"
           chmod +x "$CBFSTOOL" 2>/dev/null || true
-          "$CBFSTOOL" "$ROM_FILE" print || echo "⚠️ cbfstool 打印失败（不影响构建产物上传）"
+          "$CBFSTOOL" "$ROM_IPXE_FILE" print || echo "⚠️ cbfstool 打印失败（不影响构建产物上传）"
           
           # 使用 cbfstool 获取准确的空间信息
           echo "🔍 使用 cbfstool 分析 ROM 空间使用情况"
           
           # 获取 ROM 总大小
-          ROM_SIZE=$(stat -c%s "$ROM_FILE")
+          ROM_SIZE=$(stat -c%s "$ROM_IPXE_FILE")
           ROM_SIZE_MB=$((ROM_SIZE / 1024 / 1024))
           echo "📦 ROM 总大小: ${ROM_SIZE} 字节 (${ROM_SIZE_MB} MB)"
           
           # 使用 cbfstool 获取 COREBOOT 区域的容量和使用情况
           echo "📊 CBFS (COREBOOT) 空间分析:"
-          CBFS_INFO=$("$CBFSTOOL" "$ROM_FILE" print 2>/dev/null || echo "")
+          CBFS_INFO=$("$CBFSTOOL" "$ROM_IPXE_FILE" print 2>/dev/null || echo "")
           
           if [ -n "$CBFS_INFO" ]; then
             # 提取 COREBOOT 区域容量信息
@@ -378,8 +394,13 @@ jobs:
            ## 🔧 iPXE 集成功能
            - **自编译 iPXE**：使用您编译的 rtl8168.efi 驱动
            - **CBFS 集成**：iPXE 已集成到固件 ROM 中
+           - **独立 ROM 文件**：提供集成 iPXE 的独立 ROM 文件
            - **多种启动方式**：支持 UEFI 启动菜单、EFI Shell 手动启动
            - **调试工具**：包含完整的网络诊断和启动设置脚本
+           
+           ## 📦 文件说明
+           - **原始 ROM**：`coreboot_edk2-kaisa-mrchromebox_*.rom`（不含 iPXE）
+           - **集成 iPXE ROM**：`coreboot_edk2-kaisa-mrchromebox_with_ipxe.rom`（推荐使用）
            
            ${{ env.PXE_CONFIG_LIST }}
            
