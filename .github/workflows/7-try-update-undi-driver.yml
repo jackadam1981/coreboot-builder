@@ -114,8 +114,6 @@ jobs:
               "CONFIG_EDK2_LOAD_OPTION_ROMS=y"
               "# 启用 ERI 寄存器写入，确保 MAC 地址在网卡重置后保持"
               "CONFIG_RT8168_PUT_MAC_TO_ERI=y"
-              "# 添加调试输出，查看 MAC 地址编程过程"
-              "CONFIG_DEBUG_RT8168=y"
             )
             
             # 构建 EDK2 自定义构建参数（逐行添加，便于维护）
