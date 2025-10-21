@@ -112,6 +112,8 @@ jobs:
             PXE_CONFIGS=(
               "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y"
               "CONFIG_EDK2_LOAD_OPTION_ROMS=y"
+              "# 禁用从 VPD 获取 MAC 地址，改为从 CBFS 获取"
+              "# CONFIG_RT8168_GET_MAC_FROM_VPD is not set"
             )
             
             # 构建 EDK2 自定义构建参数（逐行添加，便于维护）
