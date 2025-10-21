@@ -219,6 +219,46 @@ else
     "$TOOLS_DIR/cbfstool" coreboot.rom write -r RO_VPD -f vpd.bin
     log_info "VPD 注入完成"
     
+    # 步骤 4.5: 写入 MAC 地址到 rt8168-macaddress CBFS 条目
+    log_info "步骤 4.5/6: 写入 MAC 地址到 CBFS / Step 4.5/6: Writing MAC address to CBFS"
+    
+    # 从 VPD 中提取 MAC 地址
+    MAC_FROM_VPD=$(strings vpd.bin | grep -E "^[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}$" | head -1)
+    
+    if [ -n "$MAC_FROM_VPD" ]; then
+        log_info "从 VPD 中提取到 MAC 地址: $MAC_FROM_VPD"
+        
+        # 将 MAC 地址写入临时文件
+        echo -n "$MAC_FROM_VPD" > rt8168-macaddress.bin
+        
+        # 写入到 CBFS
+        if "$TOOLS_DIR/cbfstool" coreboot.rom add -f rt8168-macaddress.bin -n rt8168-macaddress -t raw 2>/dev/null; then
+            log_info "MAC 地址已写入 rt8168-macaddress CBFS 条目"
+        else
+            log_warn "写入 rt8168-macaddress CBFS 条目失败，尝试替换现有条目"
+            "$TOOLS_DIR/cbfstool" coreboot.rom remove -n rt8168-macaddress 2>/dev/null || true
+            "$TOOLS_DIR/cbfstool" coreboot.rom add -f rt8168-macaddress.bin -n rt8168-macaddress -t raw
+            log_info "MAC 地址已替换 rt8168-macaddress CBFS 条目"
+        fi
+        
+        # 验证写入结果
+        if "$TOOLS_DIR/cbfstool" coreboot.rom extract -n rt8168-macaddress -f rt8168-macaddress-verify.bin 2>/dev/null; then
+            VERIFIED_MAC=$(cat rt8168-macaddress-verify.bin)
+            if [ "$VERIFIED_MAC" = "$MAC_FROM_VPD" ]; then
+                log_info "✅ MAC 地址验证成功: $VERIFIED_MAC"
+            else
+                log_warn "⚠️ MAC 地址验证失败: 期望 $MAC_FROM_VPD，实际 $VERIFIED_MAC"
+            fi
+            rm -f rt8168-macaddress-verify.bin
+        else
+            log_warn "⚠️ 无法验证 MAC 地址写入结果"
+        fi
+        
+        rm -f rt8168-macaddress.bin
+    else
+        log_warn "⚠️ 无法从 VPD 中提取 MAC 地址，跳过 CBFS 写入"
+    fi
+    
     echo ""
     
     # 步骤 5: 提取并注入 HWID
