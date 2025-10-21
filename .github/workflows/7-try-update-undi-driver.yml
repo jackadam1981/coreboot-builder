@@ -136,13 +136,29 @@ jobs:
 
           )
           
-          # 写入 PXE ROM 支持配置
-            echo "" >> configs/cml/config.kaisa.uefi
-            echo "# PXE ROM 支持配置" >> configs/cml/config.kaisa.uefi
+          # 将长参数分行写入配置文件，提高可读性
+          echo "CONFIG_EDK2_CUSTOM_BUILD_PARAMS=\\" >> configs/cml/config.kaisa.uefi
+          echo "  -D NETWORK_DRIVER_ENABLE=TRUE \\" >> configs/cml/config.kaisa.uefi
+          echo "  -D NETWORK_ENABLE=TRUE \\" >> configs/cml/config.kaisa.uefi
+          echo "  -D NETWORK_IP4_ENABLE=TRUE \\" >> configs/cml/config.kaisa.uefi
+          echo "  -D NETWORK_IP6_ENABLE=FALSE \\" >> configs/cml/config.kaisa.uefi
+          echo "  -D NETWORK_PXE_BOOT_ENABLE=TRUE \\" >> configs/cml/config.kaisa.uefi
+          echo "  -D NETWORK_HTTP_BOOT_ENABLE=FALSE \\" >> configs/cml/config.kaisa.uefi
+          echo "  -D NETWORK_SNP_ENABLE=TRUE \\" >> configs/cml/config.kaisa.uefi
+          echo "  -D NETWORK_RTEK_PCI=TRUE \\" >> configs/cml/config.kaisa.uefi
+          echo "  -D NETWORK_TLS_ENABLE=FALSE \\" >> configs/cml/config.kaisa.uefi
+          echo "  -D NETWORK_ISCSI_ENABLE=FALSE \\" >> configs/cml/config.kaisa.uefi
+          echo "  -D NETWORK_RTEK_USB=FALSE \\" >> configs/cml/config.kaisa.uefi
+          echo "  -D NETWORK_ASIX_USB3=FALSE \\" >> configs/cml/config.kaisa.uefi
+          echo "  -D NETWORK_ASIX_USB2=FALSE\"" >> configs/cml/config.kaisa.uefi
+          
+          # 写入 PXE ROM 支持配置到文件尾部
+          echo "" >> configs/cml/config.kaisa.uefi
+          echo "# PXE ROM 支持配置" >> configs/cml/config.kaisa.uefi
           for config in "${PXE_CONFIGS[@]}"; do
             echo "$config" >> configs/cml/config.kaisa.uefi
           done
-            echo "" >> configs/cml/config.kaisa.uefi
+          echo "" >> configs/cml/config.kaisa.uefi
           
           # 写入 Intel 芯片组系统稳定配置
           if [ ${#INTEL_CONFIGS[@]} -gt 0 ]; then
