@@ -184,15 +184,15 @@ jobs:
           cat configs/cml/config.kaisa.uefi
           echo "===================="
 
-      - name: 📦 编译 MrChromebox Coreboot 固件 / Build Coreboot
+      - name: 🔨 首次编译（下载 EDK2）/ First Build (Download EDK2)
         run: |
-          echo "🔨 编译 MrChromebox coreboot（kaisa 主板）"
+          echo "🔨 首次编译 MrChromebox coreboot（下载 EDK2）"
           
           # 确保输出目录权限正确
           mkdir -p roms
           chmod 755 roms
           
-          # 使用 MrChromebox 标准编译流程，在构建过程中替换 RTL 驱动
+          # 首次编译，触发 EDK2 下载
           docker run --rm --user root \
             -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
             -v ${{ github.workspace }}/roms:/home/coreboot/roms \
@@ -206,30 +206,56 @@ jobs:
                      echo 'CONFIG_LOCALVERSION=\"\$(git describe --tags --dirty)\"' >> .config && \
                      make clean && \
                      make olddefconfig && \
-                     # 开始构建（这会触发 EDK2 下载）
-                     echo '🔧 开始构建 coreboot（会自动下载 EDK2）...' && \
+                     # 开始首次构建（这会触发 EDK2 下载）
+                     echo '🔧 开始首次构建 coreboot（会自动下载 EDK2）...' && \
                      make -j\$(nproc) || true && \
-                     # 检查 EDK2 是否已下载
+                     echo '✅ 首次构建完成（EDK2 已下载）'"
+
+      - name: 🔄 替换 RTL 驱动 / Replace RTL Driver
+        run: |
+          echo "🔄 替换 RTL UNDI 驱动"
+          
+          # 在构建环境中替换 RTL 驱动
+          docker run --rm --user root \
+            -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+            -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+            -w /home/coreboot/coreboot \
+            coreboot/coreboot-sdk:latest \
+            bash -c "echo '🔍 检查 EDK2 是否已下载...' && \
                      if [ -d 'payloads/external/edk2/workspace' ]; then \
                        echo '✅ EDK2 已下载，准备替换 RTL 驱动...'; \
                        EDK2_DRIVER_PATH=\$(find payloads/external/edk2/workspace -name 'RtkUndiDxe.efi' 2>/dev/null | head -1); \
-                       if [ -n \"\$EDK2_DRIVER_PATH\" ] && [ -f '/home/coreboot/coreboot/rtl_undi_driver_updated.efi' ]; then \
+                       if [ -n \"\$EDK2_DRIVER_PATH\" ]; then \
                          echo \"📦 找到 EDK2 RTL 驱动: \$EDK2_DRIVER_PATH\"; \
-                         echo \"🔄 替换为新版本驱动...\"; \
-                         cp /home/coreboot/coreboot/rtl_undi_driver_updated.efi \"\$EDK2_DRIVER_PATH\"; \
-                         echo '✅ RTL 驱动已替换'; \
-                         # 清理 EDK2 构建缓存，强制重新构建
-                         rm -rf payloads/external/edk2/workspace/Build; \
-                         echo '🔄 重新构建 coreboot（使用新的 RTL 驱动）...'; \
-                         make -j\$(nproc); \
+                         if [ -f '/home/coreboot/coreboot/rtl_undi_driver_updated.efi' ]; then \
+                           echo \"🔄 替换为新版本驱动...\"; \
+                           cp /home/coreboot/coreboot/rtl_undi_driver_updated.efi \"\$EDK2_DRIVER_PATH\"; \
+                           echo '✅ RTL 驱动已替换'; \
+                           # 清理 EDK2 构建缓存，强制重新构建
+                           rm -rf payloads/external/edk2/workspace/Build; \
+                           echo '🧹 EDK2 构建缓存已清理'; \
+                         else \
+                           echo '⚠️ 未找到新驱动文件，使用原有驱动'; \
+                         fi; \
                        else \
-                         echo '⚠️ 未找到 EDK2 RTL 驱动或新驱动文件，继续原有构建'; \
-                         make -j\$(nproc); \
+                         echo '⚠️ 未找到 EDK2 RTL 驱动文件'; \
                        fi; \
                      else \
-                       echo '⚠️ EDK2 未下载，继续原有构建'; \
-                       make -j\$(nproc); \
-                     fi && \
+                       echo '❌ EDK2 未下载，无法替换驱动'; \
+                     fi"
+
+      - name: 🔨 重新编译（使用新驱动）/ Rebuild with New Driver
+        run: |
+          echo "🔨 重新编译 coreboot（使用新的 RTL 驱动）"
+          
+          # 重新编译，使用替换后的驱动
+          docker run --rm --user root \
+            -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+            -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+            -w /home/coreboot/coreboot \
+            coreboot/coreboot-sdk:latest \
+            bash -c "echo '🔧 重新构建 coreboot（使用新的 RTL 驱动）...' && \
+                     make -j\$(nproc) && \
                      chmod 644 /home/coreboot/roms/*.rom && \
                      echo '✅ MrChromebox 编译完成'"
 
