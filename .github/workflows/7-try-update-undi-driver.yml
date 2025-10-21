@@ -105,89 +105,89 @@ jobs:
 
       - name: 配置 PXE ROM 支持 / Configure PXE ROM Support
         run: |
-            echo "📝 添加 PXE ROM 支持配置"
-            cd coreboot
+          echo "📝 添加 PXE ROM 支持配置"
+          cd coreboot
 
-            # 定义配置项数组
-            PXE_CONFIGS=(
-              "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y"
-              "CONFIG_EDK2_LOAD_OPTION_ROMS=y"
-              "# 启用 ERI 寄存器写入，确保 MAC 地址在网卡重置后保持"
-              "CONFIG_RT8168_PUT_MAC_TO_ERI=y"
-            )
-            
-            # 构建 EDK2 自定义构建参数（逐行添加，便于维护）
-            EDK2_BUILD_PARAMS="-D NETWORK_DRIVER_ENABLE=TRUE"
-            EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_ENABLE=TRUE"
-            EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_IP4_ENABLE=TRUE"
-            EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_IP6_ENABLE=FALSE"
-            EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_PXE_BOOT_ENABLE=TRUE"
-            EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_HTTP_BOOT_ENABLE=FALSE"
-            EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_SNP_ENABLE=TRUE"
-            EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_RTEK_PCI=TRUE"
-            EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_TLS_ENABLE=FALSE"
-            EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_ISCSI_ENABLE=FALSE"
-            EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_RTEK_USB=FALSE"
-            EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_ASIX_USB3=FALSE"
-            EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_ASIX_USB2=FALSE"
-            
-            # 添加到配置数组
-            PXE_CONFIGS+=("CONFIG_EDK2_CUSTOM_BUILD_PARAMS=\"$EDK2_BUILD_PARAMS\"")
-            
-            INTEL_CONFIGS=(
-              "CONFIG_SOC_INTEL_COMMON_BLOCK_POWER_LIMIT=y"
-              "CONFIG_SOC_INTEL_COMMON_BLOCK_THERMAL=y"
-              "CONFIG_SOUTHBRIDGE_INTEL_COMMON_WATCHDOG=y"
-              "CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL=y"
-            )
-            
-            # 写入 PXE ROM 支持配置
-            echo "" >> configs/cml/config.kaisa.uefi
-            echo "# PXE ROM 支持配置" >> configs/cml/config.kaisa.uefi
-            for config in "${PXE_CONFIGS[@]}"; do
+          # 定义配置项数组
+          PXE_CONFIGS=(
+            "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y"
+            "CONFIG_EDK2_LOAD_OPTION_ROMS=y"
+            "# 启用 ERI 寄存器写入，确保 MAC 地址在网卡重置后保持"
+            "CONFIG_RT8168_PUT_MAC_TO_ERI=y"
+          )
+
+          # 构建 EDK2 自定义构建参数（逐行添加，便于维护）
+          EDK2_BUILD_PARAMS="-D NETWORK_DRIVER_ENABLE=TRUE"
+          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_ENABLE=TRUE"
+          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_IP4_ENABLE=TRUE"
+          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_IP6_ENABLE=FALSE"
+          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_PXE_BOOT_ENABLE=TRUE"
+          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_HTTP_BOOT_ENABLE=FALSE"
+          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_SNP_ENABLE=TRUE"
+          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_RTEK_PCI=TRUE"
+          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_TLS_ENABLE=FALSE"
+          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_ISCSI_ENABLE=FALSE"
+          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_RTEK_USB=FALSE"
+          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_ASIX_USB3=FALSE"
+          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_ASIX_USB2=FALSE"
+
+          # 添加到配置数组
+          PXE_CONFIGS+=("CONFIG_EDK2_CUSTOM_BUILD_PARAMS=\"$EDK2_BUILD_PARAMS\"")
+
+          INTEL_CONFIGS=(
+            "CONFIG_SOC_INTEL_COMMON_BLOCK_POWER_LIMIT=y"
+            "CONFIG_SOC_INTEL_COMMON_BLOCK_THERMAL=y"
+            "CONFIG_SOUTHBRIDGE_INTEL_COMMON_WATCHDOG=y"
+            "CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL=y"
+          )
+
+          # 写入 PXE ROM 支持配置
+          echo "" >> configs/cml/config.kaisa.uefi
+          echo "# PXE ROM 支持配置" >> configs/cml/config.kaisa.uefi
+          for config in "${PXE_CONFIGS[@]}"; do
+            echo "$config" >> configs/cml/config.kaisa.uefi
+          done
+          echo "" >> configs/cml/config.kaisa.uefi
+
+          # 写入 Intel 芯片组系统稳定配置
+          if [ ${#INTEL_CONFIGS[@]} -gt 0 ]; then
+            echo "# Intel 芯片组系统稳定配置（适合 Kaisa 主板）" >> configs/cml/config.kaisa.uefi
+            for config in "${INTEL_CONFIGS[@]}"; do
               echo "$config" >> configs/cml/config.kaisa.uefi
             done
             echo "" >> configs/cml/config.kaisa.uefi
-            
-            # 写入 Intel 芯片组系统稳定配置
-            if [ ${#INTEL_CONFIGS[@]} -gt 0 ]; then
-              echo "# Intel 芯片组系统稳定配置（适合 Kaisa 主板）" >> configs/cml/config.kaisa.uefi
-              for config in "${INTEL_CONFIGS[@]}"; do
-                echo "$config" >> configs/cml/config.kaisa.uefi
-              done
-              echo "" >> configs/cml/config.kaisa.uefi
-            fi
-            
-            # 保存配置到环境变量供后续使用
-            echo "PXE_CONFIGS=${PXE_CONFIGS[*]}" >> $GITHUB_ENV
-            echo "INTEL_CONFIGS=${INTEL_CONFIGS[*]}" >> $GITHUB_ENV
-            
-            # 为 Release body 生成格式化的配置列表
-            PXE_CONFIG_LIST=""
-            for config in "${PXE_CONFIGS[@]}"; do
-              PXE_CONFIG_LIST="${PXE_CONFIG_LIST}- ${config}"$'\n'
+          fi
+
+          # 保存配置到环境变量供后续使用
+          echo "PXE_CONFIGS=${PXE_CONFIGS[*]}" >> $GITHUB_ENV
+          echo "INTEL_CONFIGS=${INTEL_CONFIGS[*]}" >> $GITHUB_ENV
+
+          # 为 Release body 生成格式化的配置列表
+          PXE_CONFIG_LIST=""
+          for config in "${PXE_CONFIGS[@]}"; do
+            PXE_CONFIG_LIST="${PXE_CONFIG_LIST}- ${config}"$'\n'
+          done
+          echo "PXE_CONFIG_LIST<<EOF" >> $GITHUB_ENV
+          echo "${PXE_CONFIG_LIST}" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+          INTEL_CONFIG_LIST=""
+          if [ ${#INTEL_CONFIGS[@]} -gt 0 ]; then
+            for config in "${INTEL_CONFIGS[@]}"; do
+              INTEL_CONFIG_LIST="${INTEL_CONFIG_LIST}- ${config}"$'\n'
             done
-            echo "PXE_CONFIG_LIST<<EOF" >> $GITHUB_ENV
-            echo "${PXE_CONFIG_LIST}" >> $GITHUB_ENV
+            echo "INTEL_CONFIG_LIST<<EOF" >> $GITHUB_ENV
+            echo "${INTEL_CONFIG_LIST}" >> $GITHUB_ENV
             echo "EOF" >> $GITHUB_ENV
-            
-            INTEL_CONFIG_LIST=""
-            if [ ${#INTEL_CONFIGS[@]} -gt 0 ]; then
-              for config in "${INTEL_CONFIGS[@]}"; do
-                INTEL_CONFIG_LIST="${INTEL_CONFIG_LIST}- ${config}"$'\n'
-              done
-              echo "INTEL_CONFIG_LIST<<EOF" >> $GITHUB_ENV
-              echo "${INTEL_CONFIG_LIST}" >> $GITHUB_ENV
-              echo "EOF" >> $GITHUB_ENV
-            else
-              echo "INTEL_CONFIG_LIST=" >> $GITHUB_ENV
-            fi
-            
-            # 打印最终的配置文件内容
-            echo "📋 最终配置文件内容:"
-            echo "===================="
-            cat configs/cml/config.kaisa.uefi
-            echo "===================="
+          else
+            echo "INTEL_CONFIG_LIST=" >> $GITHUB_ENV
+          fi
+
+          # 打印最终的配置文件内容
+          echo "📋 最终配置文件内容:"
+          echo "===================="
+          cat configs/cml/config.kaisa.uefi
+          echo "===================="
 
       - name: 🔨 首次编译（下载 EDK2）/ First Build (Download EDK2)
         run: |
@@ -243,6 +243,32 @@ jobs:
                        fi; \
                      else \
                        echo '❌ EDK2 未下载'; \
+                     fi"
+
+      - name: 🔧 修改 RTL8168 驱动支持 RTL8111H / Modify RTL8168 Driver for RTL8111H
+        run: |
+          echo "🔧 修改 RTL8168 驱动支持 RTL8111H"
+
+          # 在构建环境中修改 RTL8168 驱动
+          docker run --rm --user root \
+            -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+            -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+            -w /home/coreboot/coreboot \
+            coreboot/coreboot-sdk:latest \
+            bash -c "echo '🔧 修改 RTL8168 驱动支持 RTL8111H...' && \
+                     RTL8168_DRIVER_PATH='src/drivers/net/r8168.c' && \
+                     if [ -f \"\$RTL8168_DRIVER_PATH\" ]; then \
+                       echo '📦 找到 RTL8168 驱动文件: \$RTL8168_DRIVER_PATH'; \
+                       # 复制并运行 Python 脚本
+                       cp /home/coreboot/coreboot/modify_rtl8168.py . && \
+                       chmod +x modify_rtl8168.py && \
+                       python3 modify_rtl8168.py && \
+                       rm modify_rtl8168.py && \
+                       # 验证修改结果
+                       echo '🔍 验证修改结果:'; \
+                       grep -A 5 -B 5 'RTL8111H support' \"\$RTL8168_DRIVER_PATH\"; \
+                     else \
+                       echo '⚠️ 未找到 RTL8168 驱动文件'; \
                      fi"
 
       - name: 🔄 替换 RTL 驱动 / Replace RTL Driver
