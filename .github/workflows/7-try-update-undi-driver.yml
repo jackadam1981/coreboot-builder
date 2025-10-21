@@ -348,20 +348,24 @@ jobs:
         run: |
           echo "📦 验证编译结果"
 
-          # 检查 ROM 文件（可能在 roms/ 或 build/ 目录）
-          ROM_FILE=""
-          if [ -f "roms/coreboot.rom" ]; then
-            ROM_FILE="roms/coreboot.rom"
-          elif [ -f "coreboot/build/coreboot.rom" ]; then
-            ROM_FILE="coreboot/build/coreboot.rom"
-          else
-            echo "❌ 未找到 ROM 文件"
-            echo "检查 roms/ 目录:"
-            ls -la roms/ 2>/dev/null || echo "roms/ 目录不存在"
-            echo "检查 coreboot/build/ 目录:"
-            ls -la coreboot/build/ 2>/dev/null || echo "coreboot/build/ 目录不存在"
-            exit 1
+          # 确保 ROM 文件在 roms/ 目录中
+          if [ ! -f "roms/coreboot.rom" ]; then
+            echo "⚠️ ROM 文件不在 roms/ 目录，尝试从 build/ 目录复制..."
+            if [ -f "coreboot/build/coreboot.rom" ]; then
+              cp coreboot/build/coreboot.rom roms/
+              chmod 644 roms/coreboot.rom
+              echo "✅ ROM 文件已复制到 roms/ 目录"
+            else
+              echo "❌ 未找到 ROM 文件"
+              echo "检查 roms/ 目录:"
+              ls -la roms/ 2>/dev/null || echo "roms/ 目录不存在"
+              echo "检查 coreboot/build/ 目录:"
+              ls -la coreboot/build/ 2>/dev/null || echo "coreboot/build/ 目录不存在"
+              exit 1
+            fi
           fi
+          
+          ROM_FILE="roms/coreboot.rom"
           
           echo "✅ 找到 ROM 文件: $(basename "$ROM_FILE")"
           ls -lh "$ROM_FILE"
@@ -429,9 +433,11 @@ jobs:
       - name: 重新生成校验文件 / Regenerate Checksums
         run: |
           echo "🧮 重新生成 ROM 校验 (SHA1/SHA256)"
-          ROM_FILE=$(ls roms/coreboot_*.rom | head -1)
-          if [ -z "$ROM_FILE" ]; then
-            echo "❌ 未找到 ROM 文件，无法生成校验"
+          ROM_FILE="roms/coreboot.rom"
+          if [ ! -f "$ROM_FILE" ]; then
+            echo "❌ 未找到 ROM 文件: $ROM_FILE"
+            echo "检查 roms/ 目录内容:"
+            ls -la roms/ 2>/dev/null || echo "roms/ 目录不存在"
             exit 1
           fi
           ROM_BASE=$(basename "$ROM_FILE")
