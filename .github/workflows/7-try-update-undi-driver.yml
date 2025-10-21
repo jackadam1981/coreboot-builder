@@ -103,8 +103,8 @@ jobs:
             echo "📝 MrChromebox EDK2 仓库中的 RTL 驱动将被使用"
           fi
 
-          - name: 配置 PXE ROM 支持 / Configure PXE ROM Support
-          run: |
+      - name: 配置 PXE ROM 支持 / Configure PXE ROM Support
+        run: |
             echo "📝 添加 PXE ROM 支持配置"
             cd coreboot
 
