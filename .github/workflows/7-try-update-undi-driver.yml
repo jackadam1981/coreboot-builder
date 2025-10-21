@@ -114,36 +114,30 @@ jobs:
             "CONFIG_EDK2_LOAD_OPTION_ROMS=y"
           )
           
-          # 构建 EDK2 自定义构建参数（逐行添加，便于维护）
-          EDK2_BUILD_PARAMS="-D NETWORK_DRIVER_ENABLE=TRUE"
-          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_ENABLE=TRUE"
-          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_IP4_ENABLE=TRUE"
-          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_IP6_ENABLE=FALSE"
-          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_PXE_BOOT_ENABLE=TRUE"
-          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_HTTP_BOOT_ENABLE=FALSE"
-          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_SNP_ENABLE=TRUE"
-          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_RTEK_PCI=TRUE"
-          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_TLS_ENABLE=FALSE"
-          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_ISCSI_ENABLE=FALSE"
-          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_RTEK_USB=FALSE"
-          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_ASIX_USB3=FALSE"
-          EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_ASIX_USB2=FALSE"
+          # 定义 EDK2 构建参数数组
+          EDK2_BUILD_PARAMS=(
+            "-D NETWORK_DRIVER_ENABLE=TRUE"
+            "-D NETWORK_ENABLE=TRUE"
+            "-D NETWORK_IP4_ENABLE=TRUE"
+            "-D NETWORK_IP6_ENABLE=FALSE"
+            "-D NETWORK_PXE_BOOT_ENABLE=TRUE"
+            "-D NETWORK_HTTP_BOOT_ENABLE=FALSE"
+            "-D NETWORK_SNP_ENABLE=TRUE"
+            "-D NETWORK_RTEK_PCI=TRUE"
+            "-D NETWORK_TLS_ENABLE=FALSE"
+            "-D NETWORK_ISCSI_ENABLE=FALSE"
+            "-D NETWORK_RTEK_USB=FALSE"
+            "-D NETWORK_ASIX_USB3=FALSE"
+            "-D NETWORK_ASIX_USB2=FALSE"
+          )
           
-          # 将长参数分行写入配置文件，提高可读性
+          # 将 EDK2 构建参数分行写入配置文件
           echo "CONFIG_EDK2_CUSTOM_BUILD_PARAMS=\\" >> configs/cml/config.kaisa.uefi
-          echo "  -D NETWORK_DRIVER_ENABLE=TRUE \\" >> configs/cml/config.kaisa.uefi
-          echo "  -D NETWORK_ENABLE=TRUE \\" >> configs/cml/config.kaisa.uefi
-          echo "  -D NETWORK_IP4_ENABLE=TRUE \\" >> configs/cml/config.kaisa.uefi
-          echo "  -D NETWORK_IP6_ENABLE=FALSE \\" >> configs/cml/config.kaisa.uefi
-          echo "  -D NETWORK_PXE_BOOT_ENABLE=TRUE \\" >> configs/cml/config.kaisa.uefi
-          echo "  -D NETWORK_HTTP_BOOT_ENABLE=FALSE \\" >> configs/cml/config.kaisa.uefi
-          echo "  -D NETWORK_SNP_ENABLE=TRUE \\" >> configs/cml/config.kaisa.uefi
-          echo "  -D NETWORK_RTEK_PCI=TRUE \\" >> configs/cml/config.kaisa.uefi
-          echo "  -D NETWORK_TLS_ENABLE=FALSE \\" >> configs/cml/config.kaisa.uefi
-          echo "  -D NETWORK_ISCSI_ENABLE=FALSE \\" >> configs/cml/config.kaisa.uefi
-          echo "  -D NETWORK_RTEK_USB=FALSE \\" >> configs/cml/config.kaisa.uefi
-          echo "  -D NETWORK_ASIX_USB3=FALSE \\" >> configs/cml/config.kaisa.uefi
-          echo "  -D NETWORK_ASIX_USB2=FALSE\"" >> configs/cml/config.kaisa.uefi
+          for param in "${EDK2_BUILD_PARAMS[@]}"; do
+            echo "  $param \\" >> configs/cml/config.kaisa.uefi
+          done
+          # 移除最后一个反斜杠并添加引号
+          sed -i '$ s/ \\$/"/' configs/cml/config.kaisa.uefi
           
           INTEL_CONFIGS=(
 
