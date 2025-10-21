@@ -292,7 +292,14 @@ jobs:
             coreboot/coreboot-sdk:latest \
             bash -c "echo '🔧 重新构建 coreboot（使用新的 RTL 驱动）...' && \
                      make -j\$(nproc) && \
-                     chmod 644 /home/coreboot/roms/*.rom && \
+                     # 复制 ROM 文件到输出目录
+                     if [ -f 'build/coreboot.rom' ]; then \
+                       cp build/coreboot.rom /home/coreboot/roms/; \
+                       chmod 644 /home/coreboot/roms/coreboot.rom; \
+                       echo '✅ ROM 文件已复制到输出目录'; \
+                     else \
+                       echo '⚠️ 未找到生成的 ROM 文件'; \
+                     fi && \
                      echo '✅ MrChromebox 编译完成'"
 
       - name: 🔍 检查重新编译后的驱动 / Check Driver After Rebuild
