@@ -211,6 +211,35 @@ jobs:
                      make -j\$(nproc) || true && \
                      echo '✅ 首次构建完成（EDK2 已下载）'"
 
+      - name: 🔍 检查首次编译后的驱动 / Check Driver After First Build
+        run: |
+          echo "🔍 检查首次编译后的 RTL 驱动状态"
+          
+          # 检查首次编译后的驱动文件
+          docker run --rm --user root \
+            -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+            -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+            -w /home/coreboot/coreboot \
+            coreboot/coreboot-sdk:latest \
+            bash -c "echo '🔍 检查 EDK2 是否已下载...' && \
+                     if [ -d 'payloads/external/edk2/workspace' ]; then \
+                       echo '✅ EDK2 已下载'; \
+                       EDK2_DRIVER_PATH=\$(find payloads/external/edk2/workspace -name 'RtkUndiDxe.efi' 2>/dev/null | head -1); \
+                       if [ -n \"\$EDK2_DRIVER_PATH\" ]; then \
+                         echo \"📦 找到 EDK2 RTL 驱动: \$EDK2_DRIVER_PATH\"; \
+                         echo '📊 原始驱动文件信息:'; \
+                         file \"\$EDK2_DRIVER_PATH\"; \
+                         size=\$(stat -c%s \"\$EDK2_DRIVER_PATH\"); \
+                         echo \"📏 文件大小: \$size bytes\"; \
+                         echo '📋 原始驱动版本信息:'; \
+                         strings \"\$EDK2_DRIVER_PATH\" | grep -i 'version\|ver\|v[0-9]' | head -3; \
+                       else \
+                         echo '⚠️ 未找到 EDK2 RTL 驱动文件'; \
+                       fi; \
+                     else \
+                       echo '❌ EDK2 未下载'; \
+                     fi"
+
       - name: 🔄 替换 RTL 驱动 / Replace RTL Driver
         run: |
           echo "🔄 替换 RTL UNDI 驱动"
@@ -234,6 +263,13 @@ jobs:
                            # 清理 EDK2 构建缓存，强制重新构建
                            rm -rf payloads/external/edk2/workspace/Build; \
                            echo '🧹 EDK2 构建缓存已清理'; \
+                           # 验证替换结果
+                           echo '🔍 验证驱动替换结果:'; \
+                           file \"\$EDK2_DRIVER_PATH\"; \
+                           new_size=\$(stat -c%s \"\$EDK2_DRIVER_PATH\"); \
+                           echo \"📏 新文件大小: \$new_size bytes\"; \
+                           echo '📋 新驱动版本信息:'; \
+                           strings \"\$EDK2_DRIVER_PATH\" | grep -i 'version\|ver\|v[0-9]' | head -3; \
                          else \
                            echo '⚠️ 未找到新驱动文件，使用原有驱动'; \
                          fi; \
@@ -258,6 +294,38 @@ jobs:
                      make -j\$(nproc) && \
                      chmod 644 /home/coreboot/roms/*.rom && \
                      echo '✅ MrChromebox 编译完成'"
+
+      - name: 🔍 检查重新编译后的驱动 / Check Driver After Rebuild
+        run: |
+          echo "🔍 检查重新编译后的 RTL 驱动状态"
+          
+          # 检查重新编译后的驱动文件
+          docker run --rm --user root \
+            -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+            -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+            -w /home/coreboot/coreboot \
+            coreboot/coreboot-sdk:latest \
+            bash -c "echo '🔍 检查重新编译后的驱动状态...' && \
+                     if [ -d 'payloads/external/edk2/workspace' ]; then \
+                       echo '✅ EDK2 工作区存在'; \
+                       EDK2_DRIVER_PATH=\$(find payloads/external/edk2/workspace -name 'RtkUndiDxe.efi' 2>/dev/null | head -1); \
+                       if [ -n \"\$EDK2_DRIVER_PATH\" ]; then \
+                         echo \"📦 找到 EDK2 RTL 驱动: \$EDK2_DRIVER_PATH\"; \
+                         echo '📊 最终驱动文件信息:'; \
+                         file \"\$EDK2_DRIVER_PATH\"; \
+                         final_size=\$(stat -c%s \"\$EDK2_DRIVER_PATH\"); \
+                         echo \"📏 文件大小: \$final_size bytes\"; \
+                         echo '📋 最终驱动版本信息:'; \
+                         strings \"\$EDK2_DRIVER_PATH\" | grep -i 'version\|ver\|v[0-9]' | head -3; \
+                         echo '🌐 PXE/UNDI 功能检查:'; \
+                         strings \"\$EDK2_DRIVER_PATH\" | grep -i 'pxe\|undi' | head -3; \
+                         echo '✅ 驱动状态检查完成'; \
+                       else \
+                         echo '⚠️ 未找到 EDK2 RTL 驱动文件'; \
+                       fi; \
+                     else \
+                       echo '❌ EDK2 工作区不存在'; \
+                     fi"
 
       - name: 验证编译结果 / Verify Build Results
         run: |
