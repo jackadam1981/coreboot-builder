@@ -225,6 +225,11 @@ else
     # 从 VPD 中提取 MAC 地址
     MAC_FROM_VPD=$(strings vpd.bin | grep -E "^[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}$" | head -1)
     
+    # 如果上面的正则表达式没有匹配到，尝试更宽松的匹配
+    if [ -z "$MAC_FROM_VPD" ]; then
+        MAC_FROM_VPD=$(strings vpd.bin | grep -E "[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}" | head -1)
+    fi
+    
     if [ -n "$MAC_FROM_VPD" ]; then
         log_info "从 VPD 中提取到 MAC 地址: $MAC_FROM_VPD"
         
