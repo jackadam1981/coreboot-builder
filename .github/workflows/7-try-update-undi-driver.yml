@@ -348,11 +348,18 @@ jobs:
         run: |
           echo "📦 验证编译结果"
 
-          # 检查 ROM 文件
-          ROM_FILE=$(ls roms/coreboot_*.rom | head -1)
-          if [ -z "$ROM_FILE" ]; then
+          # 检查 ROM 文件（可能在 roms/ 或 build/ 目录）
+          ROM_FILE=""
+          if [ -f "roms/coreboot.rom" ]; then
+            ROM_FILE="roms/coreboot.rom"
+          elif [ -f "coreboot/build/coreboot.rom" ]; then
+            ROM_FILE="coreboot/build/coreboot.rom"
+          else
             echo "❌ 未找到 ROM 文件"
-            ls -la roms/
+            echo "检查 roms/ 目录:"
+            ls -la roms/ 2>/dev/null || echo "roms/ 目录不存在"
+            echo "检查 coreboot/build/ 目录:"
+            ls -la coreboot/build/ 2>/dev/null || echo "coreboot/build/ 目录不存在"
             exit 1
           fi
           
