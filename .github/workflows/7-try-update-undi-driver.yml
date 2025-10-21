@@ -249,27 +249,28 @@ jobs:
         run: |
           echo "🔧 修改 RTL8168 驱动支持 RTL8111H"
 
-          # 在构建环境中修改 RTL8168 驱动
-          docker run --rm --user root \
-            -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
-            -v ${{ github.workspace }}/roms:/home/coreboot/roms \
-            -w /home/coreboot/coreboot \
-            coreboot/coreboot-sdk:latest \
-            bash -c "echo '🔧 修改 RTL8168 驱动支持 RTL8111H...' && \
-                     RTL8168_DRIVER_PATH='src/drivers/net/r8168.c' && \
-                     if [ -f \"\$RTL8168_DRIVER_PATH\" ]; then \
-                       echo '📦 找到 RTL8168 驱动文件: \$RTL8168_DRIVER_PATH'; \
-                       # 复制并运行 Python 脚本
-                       cp /home/coreboot/coreboot/modify_rtl8168.py . && \
-                       chmod +x modify_rtl8168.py && \
-                       python3 modify_rtl8168.py && \
-                       rm modify_rtl8168.py && \
-                       # 验证修改结果
-                       echo '🔍 验证修改结果:'; \
-                       grep -A 5 -B 5 'RTL8111H support' \"\$RTL8168_DRIVER_PATH\"; \
-                     else \
-                       echo '⚠️ 未找到 RTL8168 驱动文件'; \
-                     fi"
+            # 在构建环境中修改 RTL8168 驱动
+            docker run --rm --user root \
+              -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+              -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+              -v ${{ github.workspace }}/modify_rtl8168.py:/home/coreboot/modify_rtl8168.py \
+              -w /home/coreboot/coreboot \
+              coreboot/coreboot-sdk:latest \
+              bash -c "echo '🔧 修改 RTL8168 驱动支持 RTL8111H...' && \
+                       RTL8168_DRIVER_PATH='src/drivers/net/r8168.c' && \
+                       if [ -f \"\$RTL8168_DRIVER_PATH\" ]; then \
+                         echo '📦 找到 RTL8168 驱动文件: \$RTL8168_DRIVER_PATH'; \
+                         # 复制并运行 Python 脚本
+                         cp /home/coreboot/modify_rtl8168.py . && \
+                         chmod +x modify_rtl8168.py && \
+                         python3 modify_rtl8168.py && \
+                         rm modify_rtl8168.py && \
+                         # 验证修改结果
+                         echo '🔍 验证修改结果:'; \
+                         grep -A 5 -B 5 'RTL8111H support' \"\$RTL8168_DRIVER_PATH\"; \
+                       else \
+                         echo '⚠️ 未找到 RTL8168 驱动文件'; \
+                       fi"
 
       - name: 🔄 替换 RTL 驱动 / Replace RTL Driver
         run: |
