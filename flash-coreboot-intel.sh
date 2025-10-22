@@ -222,52 +222,95 @@ else
     # 步骤 4.5: 写入 MAC 地址到 rt8168-macaddress CBFS 条目
     log_info "步骤 4.5/6: 写入 MAC 地址到 CBFS / Step 4.5/6: Writing MAC address to CBFS"
     
-    # 从 VPD 中提取 MAC 地址
-    MAC_FROM_VPD=$(strings vpd.bin | grep -E "^[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}$" | head -1)
-    
-    # 如果上面的正则表达式没有匹配到，尝试更宽松的匹配
+    # 注入 MAC 地址前：列出固件详细信息
+    log_info "注入 MAC 地址前的固件 CBFS 内容："
+    log_info "=========================================="
+    "$TOOLS_DIR/cbfstool" coreboot.rom print
+    log_info "=========================================="
+    echo ""
+
+    # 优先从 VPD 中提取 MAC 地址
+    MAC_FROM_VPD=$(strings vpd.bin | grep -E "^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$" | head -1)
     if [ -z "$MAC_FROM_VPD" ]; then
-        MAC_FROM_VPD=$(strings vpd.bin | grep -E "[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}" | head -1)
+        MAC_FROM_VPD=$(strings vpd.bin | grep -E "[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}" | head -1)
     fi
-    
+
+    TARGET_MAC=""
     if [ -n "$MAC_FROM_VPD" ]; then
-        log_info "从 VPD 中提取到 MAC 地址: $MAC_FROM_VPD"
-        
-        # 将 MAC 地址写入临时文件
-        echo -n "$MAC_FROM_VPD" > rt8168-macaddress.bin
-        
-        # 写入到 CBFS
-        if "$TOOLS_DIR/cbfstool" coreboot.rom add -f rt8168-macaddress.bin -n rt8168-macaddress -t raw 2>/dev/null; then
-            log_info "MAC 地址已写入 rt8168-macaddress CBFS 条目"
-        else
-            log_warn "写入 rt8168-macaddress CBFS 条目失败，尝试替换现有条目"
-            "$TOOLS_DIR/cbfstool" coreboot.rom remove -n rt8168-macaddress 2>/dev/null || true
-            "$TOOLS_DIR/cbfstool" coreboot.rom add -f rt8168-macaddress.bin -n rt8168-macaddress -t raw
-            log_info "MAC 地址已替换 rt8168-macaddress CBFS 条目"
+        TARGET_MAC="$MAC_FROM_VPD"
+        log_info "从 VPD 中提取到 MAC 地址: $TARGET_MAC"
+    else
+        # 回退：从系统网卡读取（排除无效地址）
+        SYS_MAC=$(ip link show | grep -A1 "state UP" | grep "link/ether" | head -1 | awk '{print $2}')
+        if echo "$SYS_MAC" | grep -qiE "^[0-9a-f]{2}(:[0-9a-f]{2}){5}$"; then
+            TARGET_MAC=$(echo "$SYS_MAC" | tr '[:lower:]' '[:upper:]')
+            log_info "从系统接口获取到 MAC 地址: $TARGET_MAC"
         fi
-        
-        # 验证写入结果
+    fi
+
+    # 可选：若存在外部覆盖文件，则优先生效（内容需为 AA:BB:CC:DD:EE:FF）
+    if [ -f "$SCRIPT_DIR/rt8168-macaddress.txt" ]; then
+        OVERRIDE_MAC=$(tr -d '\r\n' < "$SCRIPT_DIR/rt8168-macaddress.txt")
+        if echo "$OVERRIDE_MAC" | grep -qiE "^[0-9a-f]{2}(:[0-9a-f]{2}){5}$"; then
+            TARGET_MAC=$(echo "$OVERRIDE_MAC" | tr '[:lower:]' '[:upper:]')
+            log_info "使用外部覆盖 MAC 地址: $TARGET_MAC"
+        else
+            log_warn "覆盖文件格式不正确，忽略: $OVERRIDE_MAC"
+        fi
+    fi
+
+    if [ -n "$TARGET_MAC" ]; then
+        # 写入临时文件（驱动期望为文本形式）
+        echo -n "$TARGET_MAC" > rt8168-macaddress.bin
+
+        # 先移除旧条目（忽略失败），再添加新条目
+        "$TOOLS_DIR/cbfstool" coreboot.rom remove -n rt8168-macaddress 2>/dev/null || true
+        "$TOOLS_DIR/cbfstool" coreboot.rom add -f rt8168-macaddress.bin -n rt8168-macaddress -t raw
+
+        # 双重校验：提取对比 + 列表检查
         if "$TOOLS_DIR/cbfstool" coreboot.rom extract -n rt8168-macaddress -f rt8168-macaddress-verify.bin 2>/dev/null; then
             VERIFIED_MAC=$(cat rt8168-macaddress-verify.bin)
-            if [ "$VERIFIED_MAC" = "$MAC_FROM_VPD" ]; then
-                log_info "✅ MAC 地址验证成功: $VERIFIED_MAC"
-            else
-                log_warn "⚠️ MAC 地址验证失败: 期望 $MAC_FROM_VPD，实际 $VERIFIED_MAC"
-            fi
             rm -f rt8168-macaddress-verify.bin
+            if [ "$VERIFIED_MAC" != "$TARGET_MAC" ]; then
+                log_error "MAC 校验失败：期望 $TARGET_MAC，实际 $VERIFIED_MAC"
+                exit 1
+            fi
         else
-            log_warn "⚠️ 无法验证 MAC 地址写入结果"
+            log_error "无法提取 rt8168-macaddress 进行校验"
+            exit 1
         fi
+
+        # 确认 CBFS 列表中存在且大小>0
+        if ! "$TOOLS_DIR/cbfstool" coreboot.rom print | grep -E "rt8168-macaddress" >/dev/null; then
+            log_error "CBFS 中未找到 rt8168-macaddress 条目"
+            exit 1
+        fi
+
+        log_info "✅ MAC 地址已写入并通过校验: $TARGET_MAC"
+        
+        # 注入 MAC 地址后：再次列出固件详细信息进行对比
+        log_info "注入 MAC 地址后的固件 CBFS 内容："
+        log_info "=========================================="
+        "$TOOLS_DIR/cbfstool" coreboot.rom print
+        log_info "=========================================="
+        echo ""
         
         rm -f rt8168-macaddress.bin
     else
-        log_warn "⚠️ 无法从 VPD 中提取 MAC 地址，跳过 CBFS 写入"
+        log_warn "⚠️ 无法获取 MAC 地址（VPD/系统/覆盖文件均无），跳过 CBFS 写入"
     fi
     
     echo ""
     
     # 步骤 5: 提取并注入 HWID
     log_info "步骤 5/6: 提取并注入 HWID / Step 5/6: Extracting and injecting HWID"
+    
+    # 注入 HWID 前：列出固件详细信息
+    log_info "注入 HWID 前的固件 CBFS 内容："
+    log_info "=========================================="
+    "$TOOLS_DIR/cbfstool" coreboot.rom print
+    log_info "=========================================="
+    echo ""
     
     # 尝试从固件实用程序脚本的固件中提取
     if "$TOOLS_DIR/cbfstool" "$BACKUP_FILE" extract -n hwid -f hwid.txt 2>/dev/null; then
@@ -287,6 +330,13 @@ else
         # 添加新的HWID
         "$TOOLS_DIR/cbfstool" coreboot.rom add -n hwid -f hwid.txt -t raw
         log_info "✅ HWID 注入完成"
+        
+        # 注入 HWID 后：再次列出固件详细信息进行对比
+        log_info "注入 HWID 后的固件 CBFS 内容："
+        log_info "=========================================="
+        "$TOOLS_DIR/cbfstool" coreboot.rom print
+        log_info "=========================================="
+        echo ""
     else
         log_warn "⚠️  HWID 提取失败或为空，跳过注入"
         log_warn "   某些设备或固件可能不需要HWID"
