@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Kaisa 本地编译脚本
-# Local Build Script for Kaisa with EDK2 PXE Support
+# Kaisa 本地编译脚本（在开发机器上运行）
+# Local Build Script for Kaisa with EDK2 PXE Support (Run on development machine)
 
 set -e  # 遇到错误立即退出
 
@@ -36,6 +36,8 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 log_info "🚀 开始 Kaisa 本地编译（EDK2 PXE 支持）"
+log_info "📍 注意：此脚本在开发机器上运行，用于编译固件"
+log_info "📍 编译完成后，需要将 ROM 文件传输到目标 Kaisa 设备进行刷入"
 echo ""
 
 # 获取脚本所在目录

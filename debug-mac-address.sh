@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# MAC 地址调试脚本
-# Debug Script for MAC Address Issues
+# MAC 地址调试脚本（在开发机器上运行）
+# Debug Script for MAC Address Issues (Run on development machine)
 
 set -e
 

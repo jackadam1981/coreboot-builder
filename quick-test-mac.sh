@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# 快速测试 MAC 地址问题
-# Quick Test Script for MAC Address Issues
+# 快速测试 MAC 地址问题（在开发机器上运行）
+# Quick Test Script for MAC Address Issues (Run on development machine)
 
 set -e
 
