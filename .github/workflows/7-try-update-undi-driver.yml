@@ -324,37 +324,59 @@ jobs:
                      fi && \
                      echo '✅ MrChromebox 编译完成'"
 
-      - name: 🔍 检查重新编译后的驱动 / Check Driver After Rebuild
-        run: |
-          echo "🔍 检查重新编译后的 RTL 驱动状态"
+        - name: 🔍 检查重新编译后的驱动 / Check Driver After Rebuild
+          run: |
+            echo "🔍 检查重新编译后的 RTL 驱动状态"
 
-          # 检查重新编译后的驱动文件
-          docker run --rm --user root \
-            -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
-            -v ${{ github.workspace }}/roms:/home/coreboot/roms \
-            -w /home/coreboot/coreboot \
-            coreboot/coreboot-sdk:latest \
-            bash -c "echo '🔍 检查重新编译后的驱动状态...' && \
-                     if [ -d 'payloads/external/edk2/workspace' ]; then \
-                       echo '✅ EDK2 工作区存在'; \
-                       EDK2_DRIVER_PATH=\$(find payloads/external/edk2/workspace -name 'RtkUndiDxe.efi' 2>/dev/null | head -1); \
-                       if [ -n \"\$EDK2_DRIVER_PATH\" ]; then \
-                         echo \"📦 找到 EDK2 RTL 驱动: \$EDK2_DRIVER_PATH\"; \
-                         echo '📊 最终驱动文件信息:'; \
-                         file \"\$EDK2_DRIVER_PATH\"; \
-                         final_size=\$(stat -c%s \"\$EDK2_DRIVER_PATH\"); \
-                         echo \"📏 文件大小: \$final_size bytes\"; \
-                         echo '📋 最终驱动版本信息:'; \
-                         strings \"\$EDK2_DRIVER_PATH\" | grep -i 'version\|ver\|v[0-9]' | head -3; \
-                         echo '🌐 PXE/UNDI 功能检查:'; \
-                         strings \"\$EDK2_DRIVER_PATH\" | grep -i 'pxe\|undi' | head -3; \
-                         echo '✅ 驱动状态检查完成'; \
+            # 检查重新编译后的驱动文件
+            docker run --rm --user root \
+              -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+              -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+              -w /home/coreboot/coreboot \
+              coreboot/coreboot-sdk:latest \
+              bash -c "echo '🔍 检查重新编译后的驱动状态...' && \
+                       if [ -d 'payloads/external/edk2/workspace' ]; then \
+                         echo '✅ EDK2 工作区存在'; \
+                         EDK2_DRIVER_PATH=\$(find payloads/external/edk2/workspace -name 'RtkUndiDxe.efi' 2>/dev/null | head -1); \
+                         if [ -n \"\$EDK2_DRIVER_PATH\" ]; then \
+                           echo \"📦 找到 EDK2 RTL 驱动: \$EDK2_DRIVER_PATH\"; \
+                           echo '📊 最终驱动文件信息:'; \
+                           file \"\$EDK2_DRIVER_PATH\"; \
+                           final_size=\$(stat -c%s \"\$EDK2_DRIVER_PATH\"); \
+                           echo \"📏 文件大小: \$final_size bytes\"; \
+                           echo '📋 最终驱动版本信息:'; \
+                           strings \"\$EDK2_DRIVER_PATH\" | grep -i 'version\|ver\|v[0-9]' | head -3; \
+                           echo '🌐 PXE/UNDI 功能检查:'; \
+                           strings \"\$EDK2_DRIVER_PATH\" | grep -i 'pxe\|undi' | head -3; \
+                           echo '✅ 驱动状态检查完成'; \
+                         else \
+                           echo '⚠️ 未找到 EDK2 RTL 驱动文件'; \
+                         fi; \
                        else \
-                         echo '⚠️ 未找到 EDK2 RTL 驱动文件'; \
-                       fi; \
-                     else \
-                       echo '❌ EDK2 工作区不存在'; \
-                     fi"
+                         echo '❌ EDK2 工作区不存在'; \
+                       fi"
+
+        - name: 🔍 验证 MAC 地址处理 / Verify MAC Address Handling
+          run: |
+            echo "🔍 验证 MAC 地址处理配置"
+
+            # 检查 coreboot 配置中的 MAC 地址相关设置
+            docker run --rm --user root \
+              -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+              -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+              -w /home/coreboot/coreboot \
+              coreboot/coreboot-sdk:latest \
+              bash -c "echo '🔍 检查 MAC 地址相关配置...' && \
+                       echo '📋 检查 RTL8168 相关配置:'; \
+                       grep -i 'rt8168\|mac' .config | head -10; \
+                       echo ''; \
+                       echo '📋 检查 EDK2 网络配置:'; \
+                       grep -i 'network\|pxe' .config | head -10; \
+                       echo ''; \
+                       echo '📋 检查 VPD 相关配置:'; \
+                       grep -i 'vpd' .config | head -5; \
+                       echo ''; \
+                       echo '✅ MAC 地址配置检查完成'"
 
       - name: 验证编译结果 / Verify Build Results
         run: |
