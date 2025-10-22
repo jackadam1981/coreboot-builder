@@ -68,9 +68,6 @@ jobs:
             echo "📝 将使用 MrChromebox EDK2 中的原始驱动"
           fi
 
-      # 由于改用 EDK2 内置 PXE/HTTP 网络支持，不再准备或注入外部 iPXE 文件
-      # 这里保留构建前的源码拉取与配置步骤
-
       - name: 验证 UNDI 驱动准备 / Verify UNDI Driver Preparation
         run: |
           echo "🔍 验证 UNDI 驱动准备结果"
@@ -131,9 +128,6 @@ jobs:
           EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_ASIX_USB3=FALSE"
           EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_ASIX_USB2=FALSE"
 
-          # 添加到配置数组
-          PXE_CONFIGS+=("CONFIG_EDK2_CUSTOM_BUILD_PARAMS=\"$EDK2_BUILD_PARAMS\"")
-
           INTEL_CONFIGS=(
             "CONFIG_SOC_INTEL_COMMON_BLOCK_POWER_LIMIT=y"
             "CONFIG_SOC_INTEL_COMMON_BLOCK_THERMAL=y"
@@ -147,6 +141,10 @@ jobs:
           for config in "${PXE_CONFIGS[@]}"; do
             echo "$config" >> configs/cml/config.kaisa.uefi
           done
+          echo "" >> configs/cml/config.kaisa.uefi
+
+          # 写入 EDK2 自定义构建参数（单独处理，避免格式问题）
+          echo "CONFIG_EDK2_CUSTOM_BUILD_PARAMS=\"$EDK2_BUILD_PARAMS\"" >> configs/cml/config.kaisa.uefi
           echo "" >> configs/cml/config.kaisa.uefi
 
           # 写入 Intel 芯片组系统稳定配置
@@ -356,83 +354,83 @@ jobs:
                        echo '❌ EDK2 工作区不存在'; \
                      fi"
 
-        - name: 🔍 验证 MAC 地址处理 / Verify MAC Address Handling
-          run: |
-            echo "🔍 验证 MAC 地址处理配置"
+      - name: 🔍 验证 MAC 地址处理 / Verify MAC Address Handling
+        run: |
+          echo "🔍 验证 MAC 地址处理配置"
 
-            # 检查 coreboot 配置中的 MAC 地址相关设置
-            docker run --rm --user root \
-              -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
-              -v ${{ github.workspace }}/roms:/home/coreboot/roms \
-              -w /home/coreboot/coreboot \
-              coreboot/coreboot-sdk:latest \
-              bash -c "echo '🔍 检查 MAC 地址相关配置...' && \
-                       echo '📋 检查 RTL8168 相关配置:'; \
-                       grep -i 'rt8168\|mac' .config | head -10; \
-                       echo ''; \
-                       echo '📋 检查 EDK2 网络配置:'; \
-                       grep -i 'network\|pxe' .config | head -10; \
-                       echo ''; \
-                       echo '📋 检查 VPD 相关配置:'; \
-                       grep -i 'vpd' .config | head -5; \
-                       echo ''; \
-                       echo '✅ MAC 地址配置检查完成'"
+          # 检查 coreboot 配置中的 MAC 地址相关设置
+          docker run --rm --user root \
+            -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+            -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+            -w /home/coreboot/coreboot \
+            coreboot/coreboot-sdk:latest \
+            bash -c "echo '🔍 检查 MAC 地址相关配置...' && \
+                     echo '📋 检查 RTL8168 相关配置:'; \
+                     grep -i 'rt8168\|mac' .config | head -10; \
+                     echo ''; \
+                     echo '📋 检查 EDK2 网络配置:'; \
+                     grep -i 'network\|pxe' .config | head -10; \
+                     echo ''; \
+                     echo '📋 检查 VPD 相关配置:'; \
+                     grep -i 'vpd' .config | head -5; \
+                     echo ''; \
+                     echo '✅ MAC 地址配置检查完成'"
 
-        - name: 🔧 注入 MAC 地址到固件 / Inject MAC Address to Firmware
-          run: |
-            echo "🔧 注入 MAC 地址到固件"
+      - name: 🔧 注入 MAC 地址到固件 / Inject MAC Address to Firmware
+        run: |
+          echo "🔧 注入 MAC 地址到固件"
 
-            # 在构建环境中注入 MAC 地址
-            docker run --rm --user root \
-              -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
-              -v ${{ github.workspace }}/roms:/home/coreboot/roms \
-              -v ${{ github.workspace }}/flash-coreboot-intel.sh:/home/coreboot/flash-coreboot-intel.sh \
-              -w /home/coreboot/coreboot \
-              coreboot/coreboot-sdk:latest \
-              bash -c "echo '🔧 注入 MAC 地址到固件...' && \
-                       if [ -f 'build/coreboot.rom' ]; then \
-                         echo '📦 找到编译好的固件: build/coreboot.rom'; \
-                         # 复制固件到工作目录
-                         cp build/coreboot.rom coreboot.rom; \
-                         # 创建 VPD 文件（模拟从当前固件提取）
-                         echo 'ethernet_mac0' > vpd.bin; \
-                         echo 'c0:18:50:8c:be:6c' >> vpd.bin; \
-                         # 提取 MAC 地址
-                         MAC_FROM_VPD=\$(strings vpd.bin | grep -E '[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}' | head -1); \
-                         if [ -n \"\$MAC_FROM_VPD\" ]; then \
-                           echo \"📋 提取到 MAC 地址: \$MAC_FROM_VPD\"; \
-                           # 将 MAC 地址写入临时文件
-                           echo -n \"\$MAC_FROM_VPD\" > rt8168-macaddress.bin; \
-                           # 写入到 CBFS
-                           if cbfstool coreboot.rom add -f rt8168-macaddress.bin -n rt8168-macaddress -t raw 2>/dev/null; then \
-                             echo '✅ MAC 地址已写入 rt8168-macaddress CBFS 条目'; \
-                           else \
-                             echo '⚠️ 写入失败，尝试替换现有条目'; \
-                             cbfstool coreboot.rom remove -n rt8168-macaddress 2>/dev/null || true; \
-                             cbfstool coreboot.rom add -f rt8168-macaddress.bin -n rt8168-macaddress -t raw; \
-                             echo '✅ MAC 地址已替换 rt8168-macaddress CBFS 条目'; \
-                           fi; \
-                           # 验证写入结果
-                           if cbfstool coreboot.rom extract -n rt8168-macaddress -f rt8168-macaddress-verify.bin 2>/dev/null; then \
-                             VERIFIED_MAC=\$(cat rt8168-macaddress-verify.bin); \
-                             if [ \"\$VERIFIED_MAC\" = \"\$MAC_FROM_VPD\" ]; then \
-                               echo \"✅ MAC 地址验证成功: \$VERIFIED_MAC\"; \
-                             else \
-                               echo \"⚠️ MAC 地址验证失败: 期望 \$MAC_FROM_VPD，实际 \$VERIFIED_MAC\"; \
-                             fi; \
-                             rm -f rt8168-macaddress-verify.bin; \
-                           else \
-                             echo '⚠️ 无法验证 MAC 地址写入结果'; \
-                           fi; \
-                           # 复制处理后的固件到输出目录
-                           cp coreboot.rom /home/coreboot/roms/; \
-                           echo '✅ 处理后的固件已复制到输出目录'; \
+          # 在构建环境中注入 MAC 地址
+          docker run --rm --user root \
+            -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+            -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+            -v ${{ github.workspace }}/flash-coreboot-intel.sh:/home/coreboot/flash-coreboot-intel.sh \
+            -w /home/coreboot/coreboot \
+            coreboot/coreboot-sdk:latest \
+            bash -c "echo '🔧 注入 MAC 地址到固件...' && \
+                     if [ -f 'build/coreboot.rom' ]; then \
+                       echo '📦 找到编译好的固件: build/coreboot.rom'; \
+                       # 复制固件到工作目录
+                       cp build/coreboot.rom coreboot.rom; \
+                       # 创建 VPD 文件（模拟从当前固件提取）
+                       echo 'ethernet_mac0' > vpd.bin; \
+                       echo 'c0:18:50:8c:be:6c' >> vpd.bin; \
+                       # 提取 MAC 地址
+                       MAC_FROM_VPD=\$(strings vpd.bin | grep -E '[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}' | head -1); \
+                       if [ -n \"\$MAC_FROM_VPD\" ]; then \
+                         echo \"📋 提取到 MAC 地址: \$MAC_FROM_VPD\"; \
+                         # 将 MAC 地址写入临时文件
+                         echo -n \"\$MAC_FROM_VPD\" > rt8168-macaddress.bin; \
+                         # 写入到 CBFS
+                         if cbfstool coreboot.rom add -f rt8168-macaddress.bin -n rt8168-macaddress -t raw 2>/dev/null; then \
+                           echo '✅ MAC 地址已写入 rt8168-macaddress CBFS 条目'; \
                          else \
-                           echo '⚠️ 无法从 VPD 中提取 MAC 地址'; \
+                           echo '⚠️ 写入失败，尝试替换现有条目'; \
+                           cbfstool coreboot.rom remove -n rt8168-macaddress 2>/dev/null || true; \
+                           cbfstool coreboot.rom add -f rt8168-macaddress.bin -n rt8168-macaddress -t raw; \
+                           echo '✅ MAC 地址已替换 rt8168-macaddress CBFS 条目'; \
                          fi; \
+                         # 验证写入结果
+                         if cbfstool coreboot.rom extract -n rt8168-macaddress -f rt8168-macaddress-verify.bin 2>/dev/null; then \
+                           VERIFIED_MAC=\$(cat rt8168-macaddress-verify.bin); \
+                           if [ \"\$VERIFIED_MAC\" = \"\$MAC_FROM_VPD\" ]; then \
+                             echo \"✅ MAC 地址验证成功: \$VERIFIED_MAC\"; \
+                           else \
+                             echo \"⚠️ MAC 地址验证失败: 期望 \$MAC_FROM_VPD，实际 \$VERIFIED_MAC\"; \
+                           fi; \
+                           rm -f rt8168-macaddress-verify.bin; \
+                         else \
+                           echo '⚠️ 无法验证 MAC 地址写入结果'; \
+                         fi; \
+                         # 复制处理后的固件到输出目录
+                         cp coreboot.rom /home/coreboot/roms/; \
+                         echo '✅ 处理后的固件已复制到输出目录'; \
                        else \
-                         echo '⚠️ 未找到编译好的固件'; \
-                       fi"
+                         echo '⚠️ 无法从 VPD 中提取 MAC 地址'; \
+                       fi; \
+                     else \
+                       echo '⚠️ 未找到编译好的固件'; \
+                     fi"
 
       - name: 验证编译结果 / Verify Build Results
         run: |
@@ -517,8 +515,6 @@ jobs:
           else
             echo "❌ 无法获取 CBFS 信息"
           fi
-
-      # 删除外部 iPXE 注入步骤：改为完全依赖 EDK2 内置网络栈
 
       - name: 重新生成校验文件 / Regenerate Checksums
         run: |
