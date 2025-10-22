@@ -249,7 +249,7 @@ jobs:
         run: |
           echo "🔧 修改 RTL8168 驱动支持 RTL8111H"
           cd coreboot
-          
+
           RTL8168_DRIVER_PATH='src/drivers/net/r8168.c'
           if [ -f "$RTL8168_DRIVER_PATH" ]; then
             echo "📦 找到 RTL8168 驱动文件: $RTL8168_DRIVER_PATH"
@@ -324,37 +324,37 @@ jobs:
                      fi && \
                      echo '✅ MrChromebox 编译完成'"
 
-        - name: 🔍 检查重新编译后的驱动 / Check Driver After Rebuild
-          run: |
-            echo "🔍 检查重新编译后的 RTL 驱动状态"
+      - name: 🔍 检查重新编译后的驱动 / Check Driver After Rebuild
+        run: |
+          echo "🔍 检查重新编译后的 RTL 驱动状态"
 
-            # 检查重新编译后的驱动文件
-            docker run --rm --user root \
-              -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
-              -v ${{ github.workspace }}/roms:/home/coreboot/roms \
-              -w /home/coreboot/coreboot \
-              coreboot/coreboot-sdk:latest \
-              bash -c "echo '🔍 检查重新编译后的驱动状态...' && \
-                       if [ -d 'payloads/external/edk2/workspace' ]; then \
-                         echo '✅ EDK2 工作区存在'; \
-                         EDK2_DRIVER_PATH=\$(find payloads/external/edk2/workspace -name 'RtkUndiDxe.efi' 2>/dev/null | head -1); \
-                         if [ -n \"\$EDK2_DRIVER_PATH\" ]; then \
-                           echo \"📦 找到 EDK2 RTL 驱动: \$EDK2_DRIVER_PATH\"; \
-                           echo '📊 最终驱动文件信息:'; \
-                           file \"\$EDK2_DRIVER_PATH\"; \
-                           final_size=\$(stat -c%s \"\$EDK2_DRIVER_PATH\"); \
-                           echo \"📏 文件大小: \$final_size bytes\"; \
-                           echo '📋 最终驱动版本信息:'; \
-                           strings \"\$EDK2_DRIVER_PATH\" | grep -i 'version\|ver\|v[0-9]' | head -3; \
-                           echo '🌐 PXE/UNDI 功能检查:'; \
-                           strings \"\$EDK2_DRIVER_PATH\" | grep -i 'pxe\|undi' | head -3; \
-                           echo '✅ 驱动状态检查完成'; \
-                         else \
-                           echo '⚠️ 未找到 EDK2 RTL 驱动文件'; \
-                         fi; \
+          # 检查重新编译后的驱动文件
+          docker run --rm --user root \
+            -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+            -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+            -w /home/coreboot/coreboot \
+            coreboot/coreboot-sdk:latest \
+            bash -c "echo '🔍 检查重新编译后的驱动状态...' && \
+                     if [ -d 'payloads/external/edk2/workspace' ]; then \
+                       echo '✅ EDK2 工作区存在'; \
+                       EDK2_DRIVER_PATH=\$(find payloads/external/edk2/workspace -name 'RtkUndiDxe.efi' 2>/dev/null | head -1); \
+                       if [ -n \"\$EDK2_DRIVER_PATH\" ]; then \
+                         echo \"📦 找到 EDK2 RTL 驱动: \$EDK2_DRIVER_PATH\"; \
+                         echo '📊 最终驱动文件信息:'; \
+                         file \"\$EDK2_DRIVER_PATH\"; \
+                         final_size=\$(stat -c%s \"\$EDK2_DRIVER_PATH\"); \
+                         echo \"📏 文件大小: \$final_size bytes\"; \
+                         echo '📋 最终驱动版本信息:'; \
+                         strings \"\$EDK2_DRIVER_PATH\" | grep -i 'version\|ver\|v[0-9]' | head -3; \
+                         echo '🌐 PXE/UNDI 功能检查:'; \
+                         strings \"\$EDK2_DRIVER_PATH\" | grep -i 'pxe\|undi' | head -3; \
+                         echo '✅ 驱动状态检查完成'; \
                        else \
-                         echo '❌ EDK2 工作区不存在'; \
-                       fi"
+                         echo '⚠️ 未找到 EDK2 RTL 驱动文件'; \
+                       fi; \
+                     else \
+                       echo '❌ EDK2 工作区不存在'; \
+                     fi"
 
         - name: 🔍 验证 MAC 地址处理 / Verify MAC Address Handling
           run: |
@@ -377,6 +377,62 @@ jobs:
                        grep -i 'vpd' .config | head -5; \
                        echo ''; \
                        echo '✅ MAC 地址配置检查完成'"
+
+        - name: 🔧 注入 MAC 地址到固件 / Inject MAC Address to Firmware
+          run: |
+            echo "🔧 注入 MAC 地址到固件"
+
+            # 在构建环境中注入 MAC 地址
+            docker run --rm --user root \
+              -v ${{ github.workspace }}/coreboot:/home/coreboot/coreboot \
+              -v ${{ github.workspace }}/roms:/home/coreboot/roms \
+              -v ${{ github.workspace }}/flash-coreboot-intel.sh:/home/coreboot/flash-coreboot-intel.sh \
+              -w /home/coreboot/coreboot \
+              coreboot/coreboot-sdk:latest \
+              bash -c "echo '🔧 注入 MAC 地址到固件...' && \
+                       if [ -f 'build/coreboot.rom' ]; then \
+                         echo '📦 找到编译好的固件: build/coreboot.rom'; \
+                         # 复制固件到工作目录
+                         cp build/coreboot.rom coreboot.rom; \
+                         # 创建 VPD 文件（模拟从当前固件提取）
+                         echo 'ethernet_mac0' > vpd.bin; \
+                         echo 'c0:18:50:8c:be:6c' >> vpd.bin; \
+                         # 提取 MAC 地址
+                         MAC_FROM_VPD=\$(strings vpd.bin | grep -E '[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}:[0-9A-Fa-f]{2}' | head -1); \
+                         if [ -n \"\$MAC_FROM_VPD\" ]; then \
+                           echo \"📋 提取到 MAC 地址: \$MAC_FROM_VPD\"; \
+                           # 将 MAC 地址写入临时文件
+                           echo -n \"\$MAC_FROM_VPD\" > rt8168-macaddress.bin; \
+                           # 写入到 CBFS
+                           if cbfstool coreboot.rom add -f rt8168-macaddress.bin -n rt8168-macaddress -t raw 2>/dev/null; then \
+                             echo '✅ MAC 地址已写入 rt8168-macaddress CBFS 条目'; \
+                           else \
+                             echo '⚠️ 写入失败，尝试替换现有条目'; \
+                             cbfstool coreboot.rom remove -n rt8168-macaddress 2>/dev/null || true; \
+                             cbfstool coreboot.rom add -f rt8168-macaddress.bin -n rt8168-macaddress -t raw; \
+                             echo '✅ MAC 地址已替换 rt8168-macaddress CBFS 条目'; \
+                           fi; \
+                           # 验证写入结果
+                           if cbfstool coreboot.rom extract -n rt8168-macaddress -f rt8168-macaddress-verify.bin 2>/dev/null; then \
+                             VERIFIED_MAC=\$(cat rt8168-macaddress-verify.bin); \
+                             if [ \"\$VERIFIED_MAC\" = \"\$MAC_FROM_VPD\" ]; then \
+                               echo \"✅ MAC 地址验证成功: \$VERIFIED_MAC\"; \
+                             else \
+                               echo \"⚠️ MAC 地址验证失败: 期望 \$MAC_FROM_VPD，实际 \$VERIFIED_MAC\"; \
+                             fi; \
+                             rm -f rt8168-macaddress-verify.bin; \
+                           else \
+                             echo '⚠️ 无法验证 MAC 地址写入结果'; \
+                           fi; \
+                           # 复制处理后的固件到输出目录
+                           cp coreboot.rom /home/coreboot/roms/; \
+                           echo '✅ 处理后的固件已复制到输出目录'; \
+                         else \
+                           echo '⚠️ 无法从 VPD 中提取 MAC 地址'; \
+                         fi; \
+                       else \
+                         echo '⚠️ 未找到编译好的固件'; \
+                       fi"
 
       - name: 验证编译结果 / Verify Build Results
         run: |
