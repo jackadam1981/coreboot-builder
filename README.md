@@ -9,7 +9,7 @@
 - **解决 PXE 引导问题**：修复 RTL8111H 芯片在 PXE 网络引导时 MAC 地址显示为全0的问题
 - **支持 RTL8111H 芯片**：兼容 revision 12-15 及更新的变体
 - **实现 MAC 地址持久化**：确保 MAC 地址在网卡重置后能够正确保持
-- **提供技术方案**：VPD 方案（推荐）和 ERI 方案（备用）
+- **提供 ERI 方案**：ERI 寄存器编程（避免 VPD 解析 bug，确保 MAC 地址持久化）
 - **自动化构建**：一键构建和验证流程
 
 ## 🔧 技术方案
@@ -20,32 +20,27 @@ RTL8111H 芯片（revision 12-15）在 PXE 网络引导时会出现 MAC 地址�
 - 网络引导失败
 - 无法获取 IP 地址
 
-### 方案1：VPD 方案（推荐）
-- **配置**：`CONFIG_RT8168_GET_MAC_FROM_VPD=y`
-- **原理**：从 VPD（Vital Product Data）中读取 MAC 地址，并在网卡初始化时写入 ERI 寄存器
-- **适用**：现代主板（如 Google Kaisa）
-- **优势**：更可靠、支持动态配置、符合现代架构
-- **解决效果**：确保 PXE 引导时 MAC 地址正确显示
+### ERI 寄存器编程方案
+- **ERI 配置**：`CONFIG_RT8168_PUT_MAC_TO_ERI=y` - 将 MAC 地址写入 ERI 寄存器
+- **原理**：直接通过 ERI 寄存器编程实现 MAC 地址持久化，避免 VPD 解析 bug
+- **适用**：所有主板（包括 Google Kaisa）
+- **优势**：最可靠的解决方案，避免 VPD 解析问题，直接硬件控制
+- **解决效果**：彻底解决 PXE 引导时 MAC 地址全0问题
 
-### 方案2：ERI 方案（备用）
-- **配置**：`CONFIG_RT8168_PUT_MAC_TO_ERI=y`
-- **原理**：直接写入网卡的 ERI 寄存器实现 MAC 地址持久化
-- **适用**：传统主板或 VPD 不可用时
-- **优势**：兼容性好、直接硬件控制
-- **解决效果**：通过 ERI 寄存器确保 MAC 地址在网卡重置后保持
+### 技术细节
+- **ERI 编程**：将 MAC 地址写入网卡的 ERI 寄存器，确保持久化
+- **避免 VPD bug**：不依赖 VPD 解析，直接使用默认 MAC 地址或 CBFS 中的 MAC 地址
+- **硬件控制**：直接控制网卡硬件，确保 MAC 地址在重置后保持
 
-### ⚠️ 配置互斥性
+### ✅ 推荐配置
 
-**重要**：VPD 方案和 ERI 方案是互斥的，不能同时启用：
+**重要**：使用 ERI 寄存器编程，避免 VPD 解析 bug：
 
 ```kconfig
-# VPD 方案配置
-CONFIG_RT8168_GET_MAC_FROM_VPD=y
-# CONFIG_RT8168_PUT_MAC_TO_ERI 必须为 n 或未设置
-
-# ERI 方案配置  
+# ERI 寄存器编程方案（推荐）
 CONFIG_RT8168_PUT_MAC_TO_ERI=y
-# CONFIG_RT8168_GET_MAC_FROM_VPD 必须为 n 或未设置
+
+# 这种配置避免了 VPD 解析 bug，直接通过 ERI 寄存器确保持久化
 ```
 
 ## 📁 项目结构
@@ -56,7 +51,7 @@ coreboot-builder/
 │   ├── src/drivers/net/r8168.c # RTL8168 驱动源码
 │   └── configs/cml/            # 主板配置文件
 ├── roms/                       # 编译输出目录
-├── docker-build-kaisa-vpd.sh  # VPD 方案构建脚本（解决 PXE MAC 全0问题）
+├── docker-build-kaisa.sh      # 统一构建脚本（ERI 寄存器编程，解决 PXE MAC 全0问题）
 ├── flash-coreboot-intel.sh    # 固件刷写脚本
 ├── verify-rtl8168-modification.sh # 验证脚本
 └── README.md                   # 项目说明

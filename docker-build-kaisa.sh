@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Kaisa Docker 编译脚本 - ERI 寄存器方案
-# 为 Google Kaisa 主板提供 RTL8168 RTL8111H 支持（标准寄存器 + ERI 寄存器）
+# 为 Google Kaisa 主板提供 RTL8168 RTL8111H 支持（ERI 寄存器编程，避免 VPD 解析 bug）
 
 set -e
 
@@ -166,13 +166,53 @@ else
     # 放弃所有本地更改
     git reset --hard HEAD
     git clean -fd
-    # 更新到最新版本
-    git pull origin MrChromebox-2509
+    # 更新到最新版本（如果网络失败则继续使用本地代码）
+    git pull origin MrChromebox-2509 || log_warn "⚠️ 网络连接失败，使用本地代码继续编译"
     # 同步并更新子模块（确保依赖完整）
     log_info "📦 同步并更新子模块..."
     git submodule sync --recursive || true
     git submodule update --init --checkout --recursive
 fi
+
+# 应用 ERI 配置补丁（在 git reset 之后）
+log_info "🔧 应用 ERI 配置补丁..."
+
+# 修改 Kconfig：添加 depends on REALTEK_8168_RESET
+sed -i '/^config RT8168_PUT_MAC_TO_ERI$/,/^config / {
+    /^[[:space:]]*bool[[:space:]]*$/a\
+	depends on REALTEK_8168_RESET
+}' src/drivers/net/Kconfig
+
+# 修改主板 Kconfig：添加 select RT8168_PUT_MAC_TO_ERI
+if ! grep -q "select RT8168_PUT_MAC_TO_ERI" src/mainboard/google/puff/Kconfig; then
+    sed -i '/select RT8168_GET_MAC_FROM_VPD/a\	select RT8168_PUT_MAC_TO_ERI' src/mainboard/google/puff/Kconfig
+fi
+
+# 修改 Makefile：在 olddefconfig 之后添加 ERI 配置
+sed -i '/$(MAKE) olddefconfig/a\	@echo "CONFIG_RT8168_PUT_MAC_TO_ERI=y" >> .config' Makefile
+
+# 修改 build-uefi.sh：在 olddefconfig 之后添加 ERI 配置
+sed -i '/make olddefconfig/a\\n\t# 强制添加 ERI 配置（在 olddefconfig 之后）\n\techo "CONFIG_RT8168_PUT_MAC_TO_ERI=y" >> .config' build-uefi.sh
+
+# 修改 r8168.c：添加对 RTL8111H revision 12-15 的支持
+sed -i '/case 9:/,/break;/ {
+    /break;/a\
+		case 12:\
+		case 13:\
+		case 14:\
+		case 15:\
+			/* RTL8111H revision 12-15 ERI programming */\
+			outl(maclo, io_base + ERIDR);\
+			inl(io_base + ERIDR);\
+			outl(0x8000f0e0, io_base + ERIAR);\
+			inl(io_base + ERIAR);\
+			outl(machi, io_base + ERIDR);\
+			inl(io_base + ERIDR);\
+			outl(0x800030e4, io_base + ERIAR);\
+			break;
+}' src/drivers/net/r8168.c
+
+log_info "✅ ERI 配置补丁已应用"
 
 # 检查 Docker 镜像
 log_info "🐳 检查 Docker 环境..."
@@ -215,7 +255,7 @@ INTEL_CONFIGS=(
     "CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL=y"
 )
 
-# RTL8168 驱动配置 - ERI 寄存器编程
+# RTL8168 驱动配置 - ERI 寄存器编程（避免 VPD 解析 bug）
 RTL8168_CONFIGS=(
     "CONFIG_RT8168_PUT_MAC_TO_ERI=y"
 )
@@ -280,13 +320,6 @@ if [ -f "$RTL8168_DRIVER_PATH" ]; then
         log_warn "⚠️ RTL8168 驱动未找到 RTL8111H 支持"
     fi
     
-    # 检查 VPD 支持
-    if grep -q "RT8168_GET_MAC_FROM_VPD" "$RTL8168_DRIVER_PATH"; then
-        log_info "✅ RTL8168 驱动已支持 VPD MAC 地址获取"
-    else
-        log_warn "⚠️ RTL8168 驱动未找到 VPD 支持"
-    fi
-    
     # 检查 ERI 支持
     if grep -q "RT8168_PUT_MAC_TO_ERI" "$RTL8168_DRIVER_PATH"; then
         log_info "✅ RTL8168 驱动已支持 ERI 寄存器编程"
@@ -339,6 +372,10 @@ $DOCKER_CMD run --rm --user root \
     coreboot/coreboot-sdk:latest \
     bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
              echo '🔧 使用 MrChromebox build-uefi.sh 编译 kaisa...' && \
+             if [ -f 'patch-build-process.sh' ]; then \
+                 echo '应用 ERI 配置补丁...' && \
+                 ./patch-build-process.sh; \
+             fi && \
              ./build-uefi.sh kaisa && \
              chmod 644 /home/coreboot/roms/*.rom && \
              echo '✅ MrChromebox 编译完成'"

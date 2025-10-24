@@ -93,7 +93,8 @@ if [ "$USE_READY_ROM" = true ]; then
         log_error "请先使用原始ROM进行首次刷写"
         exit 1
     fi
-    CUSTOM_ROM="$LATEST_READY"
+    # 使用绝对路径，避免工作目录切换后路径失效
+    CUSTOM_ROM="$(realpath "$LATEST_READY")"
     log_info "使用已处理的ROM / Using ready ROM: $CUSTOM_ROM"
 fi
 
