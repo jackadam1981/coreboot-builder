@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Kaisa Docker 编译脚本 - VPD 方案
-# 为 Google Kaisa 主板提供 RTL8168 RTL8111H 支持
+# Kaisa Docker 编译脚本 - ERI 寄存器方案
+# 为 Google Kaisa 主板提供 RTL8168 RTL8111H 支持（标准寄存器 + ERI 寄存器）
 
 set -e
 
@@ -31,7 +31,7 @@ log_debug() {
 
 # 显示帮助信息
 show_help() {
-    echo "Kaisa Docker 编译脚本 - 标准寄存器版"
+    echo "Kaisa Docker 编译脚本 - ERI 寄存器版"
     echo ""
     echo "用法: $0 [选项]"
     echo ""
@@ -49,6 +49,7 @@ show_help() {
     echo "  $0 --jobs 8             # 使用8个并行编译"
     echo ""
     echo "注意: 使用 MrChromebox 的 build-uefi.sh kaisa 命令编译"
+    echo "      ERI 寄存器编程确保 MAC 地址持久化"
     echo ""
 }
 
@@ -89,8 +90,8 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-log_info "🐳 Kaisa Docker 编译脚本 - 标准寄存器方案"
-log_info "📍 为 Google Kaisa 主板提供 RTL8168 RTL8111H 支持（仅标准寄存器）"
+log_info "🐳 Kaisa Docker 编译脚本 - ERI 寄存器方案"
+log_info "📍 为 Google Kaisa 主板提供 RTL8168 RTL8111H 支持（标准寄存器 + ERI 寄存器）"
 echo ""
 
 # 获取脚本所在目录
@@ -157,6 +158,7 @@ if [ ! -d "$BUILD_DIR" ]; then
     git checkout MrChromebox-2509
     # 同步并更新子模块
     log_info "📦 同步并更新子模块..."
+    git submodule sync --recursive || true
     git submodule update --init --checkout --recursive
 else
     log_info "📦 目录已存在，放弃所有更改，使用原始 MrChromebox 代码..."
@@ -213,9 +215,9 @@ INTEL_CONFIGS=(
     "CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL=y"
 )
 
-# RTL8168 驱动配置 - 仅标准寄存器编程
+# RTL8168 驱动配置 - ERI 寄存器编程
 RTL8168_CONFIGS=(
-    # 仅使用标准寄存器编程，不启用 ERI 编程
+    "CONFIG_RT8168_PUT_MAC_TO_ERI=y"
 )
 
 # 使用 MrChromebox 的配置文件并添加自定义配置项
@@ -255,9 +257,9 @@ for config in "${INTEL_CONFIGS[@]}"; do
 done
 
 # 添加 RTL8168 驱动配置
-log_info "🔧 添加 RTL8168 驱动配置（仅标准寄存器编程）..."
+log_info "🔧 添加 RTL8168 驱动配置（标准寄存器 + ERI 寄存器编程）..."
 echo "" >> configs/cml/config.kaisa.uefi
-echo "# RTL8168 驱动配置（仅标准寄存器编程）" >> configs/cml/config.kaisa.uefi
+echo "# RTL8168 驱动配置（标准寄存器 + ERI 寄存器编程）" >> configs/cml/config.kaisa.uefi
 for config in "${RTL8168_CONFIGS[@]}"; do
     echo "$config" >> configs/cml/config.kaisa.uefi
 done
@@ -283,6 +285,13 @@ if [ -f "$RTL8168_DRIVER_PATH" ]; then
         log_info "✅ RTL8168 驱动已支持 VPD MAC 地址获取"
     else
         log_warn "⚠️ RTL8168 驱动未找到 VPD 支持"
+    fi
+    
+    # 检查 ERI 支持
+    if grep -q "RT8168_PUT_MAC_TO_ERI" "$RTL8168_DRIVER_PATH"; then
+        log_info "✅ RTL8168 驱动已支持 ERI 寄存器编程"
+    else
+        log_warn "⚠️ RTL8168 驱动未找到 ERI 支持"
     fi
 else
     log_warn "⚠️ 未找到 RTL8168 驱动文件"
@@ -350,6 +359,7 @@ if [ -n "$ROM_FILE" ]; then
     fi
     if [ -f "configs/cml/config.kaisa.uefi.backup" ]; then
         log_info "   - 配置文件已添加自定义配置项（基于 MrChromebox 配置）"
+        log_info "   - 已启用 ERI 寄存器编程（双重保险模式）"
     fi
     
     # 检查 CBFS 内容
