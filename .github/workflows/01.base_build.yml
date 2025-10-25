@@ -1,17 +1,12 @@
 name: Build Kaisa ROM
 
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - 'coreboot/**'
-      - '.github/workflows/build.yml'
   workflow_dispatch:
     inputs:
       release_name:
         description: 'Release name (e.g., kaisa-v1.0)'
         required: false
-        default: 'kaisa-v1.1,配置CONFIG_EDK2_NETWORK_PXE_SUPPORT=y，支持PXE启动'
+        default: 'kaisa-v1.0,最简单的mrchromebox默认编译kaisa'
         type: string
 
 jobs:
@@ -70,62 +65,15 @@ jobs:
     - name: Apply custom modifications
       run: |
         echo "🔧 Applying custom modifications to coreboot source..."
-        echo "📝 Applying RTL8168 driver fixes and EDK2 configurations"
-        
-        # 更新主板配置文件
-        echo "🔧 Updating Kaisa board configuration..."
-        CONFIG_FILE="coreboot/configs/cml/config.kaisa.uefi"
-        
-
-        echo "📝 Adding CONFIG_EDK2_NETWORK_PXE_SUPPORT=y to configuration..."
-        echo "" >> "$CONFIG_FILE"
-        echo "# EDK2 Network PXE Support" >> "$CONFIG_FILE"
-        echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> "$CONFIG_FILE"
-
-        
-        echo "✅ Kaisa board configuration updated"
+        echo "📝 This step will apply RTL8168 driver fixes and EDK2 configurations"
+        echo "🚧 TODO: Add specific modifications here"
         echo "✅ Custom modifications step completed"
     
     - name: Verify source modifications
       run: |
         echo "🔍 Verifying source modifications..."
-        echo "📝 Verifying that all custom modifications were applied correctly"
-        
-        # 验证主板配置文件 - 参考 build-uefi.sh 流程
-        echo "🔍 Verifying Kaisa board configuration..."
-        cd coreboot
-        
-        # 复制配置文件到根目录（参考 build-uefi.sh 第31行）
-        cfg_file="configs/cml/config.kaisa.uefi"
-        echo "📋 Copying $cfg_file to .config"
-        cp "$cfg_file" .config
-        
-        # 添加版本信息（参考 build-uefi.sh 第32行）
-        rev=$(git describe --tags --dirty)
-        echo "CONFIG_LOCALVERSION=\"${rev}\"" >> .config
-        
-        # 执行 make clean 和 make olddefconfig（参考 build-uefi.sh 第33-34行）
-        echo "🧹 Running make clean..."
-        make clean
-        
-        echo "⚙️ Running make olddefconfig..."
-        make olddefconfig
-        
-        # 验证 .config 文件中的配置
-        echo "🔍 Verifying CONFIG_EDK2_NETWORK_PXE_SUPPORT in .config..."
-        if grep -q "^CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" .config; then
-          echo "✅ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y is correctly configured in .config"
-        else
-          echo "❌ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y is not found or not enabled in .config"
-          echo "📋 Current .config EDK2 Network configuration:"
-          grep -n "CONFIG_EDK2.*NETWORK\|CONFIG_EDK2.*PXE" .config || echo "  No EDK2 network configs found"
-          exit 1
-        fi
-        
-        # 显示相关配置信息
-        echo "📋 EDK2 Network configuration in .config:"
-        grep -n "CONFIG_EDK2.*NETWORK\|CONFIG_EDK2.*PXE" .config || echo "  No additional network configs found"
-        
+        echo "📝 This step will verify that all custom modifications were applied correctly"
+        echo "🚧 TODO: Add verification checks here"
         echo "✅ Source modifications verification completed"
     
     - name: Build Kaisa ROM with Docker
