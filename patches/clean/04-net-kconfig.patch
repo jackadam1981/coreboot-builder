@@ -1,0 +1,10 @@
+--- a/src/drivers/net/Kconfig
++++ b/src/drivers/net/Kconfig
+@@ -19,6 +19,7 @@ config REALTEK_8168_MACADDRESS
+ 	  result in the default macaddress being used.
+ 
+ config RT8168_PUT_MAC_TO_ERI
++	depends on REALTEK_8168_RESET
+ 	bool
+ 	help
+ 	  After programming MAC address into the regular rt8168 ID registers,

@@ -1,22 +1,62 @@
 RTL8168 驱动修改验证报告
 ==========================
-生成时间: 2025年 10月 25日 星期六 07:07:54 CST
+生成时间: 2025年 10月 25日 星期六 15:44:11 CST
 
-1. 构建配置检查:
-   CONFIG_REALTEK_8168_RESET: #define CONFIG_REALTEK_8168_RESET 1
-   CONFIG_RT8168_PUT_MAC_TO_ERI: #define CONFIG_RT8168_PUT_MAC_TO_ERI 1
+📋 修改清单表格验证结果：
+==========================
 
-2. 源文件修改检查:
-   ✅ 源文件包含 RTL8111H 支持代码
-   ✅ 源文件包含 RTL8111H revision 12-15 支持
+1. Kconfig配置修改检查:
+----------------------
+   [1] ERI寄存器编程 (select RT8168_PUT_MAC_TO_ERI):
+      ✅ 已配置
+   [2] 从VPD读取MAC (select RT8168_GET_MAC_FROM_VPD):
+      ✅ 已配置
+   [3] 传统VPD格式支持 (select RT8168_SUPPORT_LEGACY_VPD_MAC):
+      ❌ 未配置
+   [4] 启用RTL8168驱动 (select REALTEK_8168_RESET):
+      ❌ 未配置
 
-3. 编译结果检查:
+2. 主板配置修改检查:
+------------------
+   [5] PXE支持 (CONFIG_EDK2_NETWORK_PXE_SUPPORT=y):
+      ✅ 已配置
+   [6] ROM加载支持 (CONFIG_EDK2_LOAD_OPTION_ROMS=y):
+      ✅ 已配置
+   [7] 启动超时设置 (CONFIG_EDK2_BOOT_TIMEOUT=10):
+      ✅ 已配置
+   [8] 启动管理器键 (CONFIG_EDK2_BOOT_MANAGER_ESCAPE=y):
+      ✅ 已配置
+   [9] EDK2网络驱动启用 (CONFIG_EDK2_CUSTOM_BUILD_PARAMS):
+      ✅ 已配置
+
+3. 源码修改检查:
+---------------
+   [10] VPD解析修复 (vpd_find):
+      ❌ 未修改
+   [11] RTL8111H ERI编程支持 (case 12-15):
+      ✅ 已修改
+   [12] MAC地址解析bug修复:
+      ✅ 已修改
+   [13] 依赖关系修复 (depends on REALTEK_8168_RESET):
+      ✅ 已修改
+
+4. 构建配置检查:
+---------------
+   CONFIG_REALTEK_8168_RESET: CONFIG_REALTEK_8168_RESET=y
+   CONFIG_RT8168_PUT_MAC_TO_ERI: CONFIG_RT8168_PUT_MAC_TO_ERI=y
+   CONFIG_RT8168_GET_MAC_FROM_VPD: CONFIG_RT8168_GET_MAC_FROM_VPD=y
+   CONFIG_EDK2_NETWORK_PXE_SUPPORT: CONFIG_EDK2_NETWORK_PXE_SUPPORT=y
+
+5. 编译结果检查:
+---------------
    对象文件大小: 41K
    ❌ 编译后的对象文件中未找到 RTL8111H 字符串
 
-4. VPD 处理检查:
+6. VPD 处理检查:
+---------------
    未找到设备刷机记录
 
-5. ROM 文件检查:
-   ROM 文件: roms/coreboot_edk2-kaisa-mrchromebox_20251024.rom
+7. ROM 文件检查:
+---------------
+   ROM 文件: roms/coreboot_edk2-kaisa-mrchromebox_20251025.rom
    文件大小: 16M

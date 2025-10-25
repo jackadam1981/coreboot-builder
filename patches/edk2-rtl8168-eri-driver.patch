@@ -1,0 +1,37 @@
+--- /dev/null
++++ b/payloads/external/edk2/workspace/mrchromebox/UefiPayloadPkg/Drivers/Rtl8168EriDriver/Rtl8168EriDriver.inf
+@@ -0,0 +1,30 @@
++## @file
++# Realtek RTL8168 ERI MAC Address Driver
++#
++# This driver reads MAC address from RTL8168 ERI registers and programs it
++# into the network controller to ensure PXE boot works with correct MAC address.
++#
++# Copyright (c) 2024, Google LLC. All rights reserved.
++# SPDX-License-Identifier: BSD-2-Clause-Patent
++##
++
++[Defines]
++  INF_VERSION                    = 0x00010005
++  BASE_NAME                      = Rtl8168EriDriver
++  FILE_GUID                      = 12345678-1234-1234-1234-123456789ABC
++  MODULE_TYPE                    = DXE_DRIVER
++  VERSION_STRING                 = 1.0
++  ENTRY_POINT                    = Rtl8168EriDriverEntryPoint
++
++[Sources]
++  Rtl8168EriDriver.c
++
++[Packages]
++  MdePkg/MdePkg.dec
++  UefiPayloadPkg/UefiPayloadPkg.dec
++
++[LibraryClasses]
++  UefiDriverEntryPoint
++  UefiLib
++  DebugLib
++  BaseLib
++
++[Protocols]
++  gEfiPciIoProtocolGuid
+

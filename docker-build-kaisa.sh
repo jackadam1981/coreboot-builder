@@ -41,18 +41,20 @@ show_help() {
     echo ""
     echo "选项:"
     echo "  -h, --help              显示此帮助信息"
-    echo "  -t, --test              测试模式：只验证补丁应用，不进行编译"
+    echo "  -t, --test              测试模式：只验证源码修改，不进行编译"
     echo "  -d, --dev               启动交互式开发环境"
     echo "  -c, --clean             清理编译文件"
     echo "  -f, --force             强制重新拉取镜像"
+    echo "  -l, --local             使用本地源码（不重置代码，保留手动修改）"
     echo "  -j, --jobs N            指定编译并行数 (默认: CPU核心数)"
     echo ""
     echo "示例:"
     echo "  $0                      # 完整编译模式"
-    echo "  $0 --test               # 测试模式：只验证补丁应用"
+    echo "  $0 --test               # 测试模式：只验证源码修改"
     echo "  $0 --dev                # 启动开发环境"
     echo "  $0 --clean              # 清理编译文件"
-    echo "  $0 --jobs 8             # 使用8个并行编译"
+    echo "  $0 --local              # 使用本地源码（保留手动修改）"
+    echo "  $0 --jobs 8              # 使用8个并行编译"
     echo ""
     echo "注意: 使用 MrChromebox 的 build-uefi.sh kaisa 命令编译"
     echo "      ERI 寄存器编程确保 MAC 地址持久化"
@@ -64,6 +66,7 @@ TEST_MODE=false
 DEV_MODE=false
 CLEAN_MODE=false
 FORCE_PULL=false
+LOCAL_SOURCE=false
 JOBS=$(nproc)
 
 # 解析命令行参数
@@ -87,6 +90,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -f|--force)
             FORCE_PULL=true
+            shift
+            ;;
+        -l|--local)
+            LOCAL_SOURCE=true
             shift
             ;;
         -j|--jobs)
@@ -200,17 +207,24 @@ if [ ! -d "$BUILD_DIR" ]; then
     git submodule sync --recursive || true
     git submodule update --init --checkout --recursive
 else
-    log_info "📦 目录已存在，恢复原始 MrChromebox 代码..."
-    cd "$BUILD_DIR"
-    # 始终重置代码到干净状态，确保补丁能正确应用
-    git reset --hard HEAD
-    git clean -fd
-    # 更新到最新版本（如果网络失败则继续使用本地代码）
-    git pull origin MrChromebox-2509 || log_warn "⚠️ 网络连接失败，使用本地代码继续编译"
-    # 同步并更新子模块（确保依赖完整）
-    log_info "📦 同步并更新子模块..."
-    git submodule sync --recursive || true
-    git submodule update --init --checkout --recursive
+    if [ "$LOCAL_SOURCE" = true ]; then
+        log_info "📦 使用本地源码（保留手动修改）..."
+        cd "$BUILD_DIR"
+        # 不重置代码，保留手动修改
+        log_info "📦 跳过代码重置，使用当前状态..."
+    else
+        log_info "📦 目录已存在，恢复原始 MrChromebox 代码..."
+        cd "$BUILD_DIR"
+        # 始终重置代码到干净状态，确保补丁能正确应用
+        git reset --hard HEAD
+        git clean -fd
+        # 更新到最新版本（如果网络失败则继续使用本地代码）
+        git pull origin MrChromebox-2509 || log_warn "⚠️ 网络连接失败，使用本地代码继续编译"
+        # 同步并更新子模块（确保依赖完整）
+        log_info "📦 同步并更新子模块..."
+        git submodule sync --recursive || true
+        git submodule update --init --checkout --recursive
+    fi
 fi
 
 # 检查 Docker 镜像
@@ -224,46 +238,27 @@ else
 fi
 
 
-# 应用补丁
-log_info "🔧 应用 RTL8111H 修复补丁..."
+# 验证源码修改
+log_info "🔧 验证源码修改状态..."
 
-# 检查补丁文件是否存在
-PATCH_DIR="$SCRIPT_DIR/patches"
-if [ -d "$PATCH_DIR" ]; then
-    log_info "📦 发现补丁目录，应用补丁..."
-    
-    # 进入 coreboot 目录
-    cd "$BUILD_DIR"
-    
-    # 应用所有补丁
-    for patch_file in "$PATCH_DIR"/*.patch; do
-        if [ -f "$patch_file" ]; then
-            patch_name=$(basename "$patch_file")
-            log_info "🔧 应用补丁: $patch_name"
-            
-            # 应用补丁
-            if patch -p1 < "$patch_file" >/dev/null 2>&1; then
-                log_success "✅ 补丁应用成功: $patch_name"
-            else
-                log_warn "⚠️ 补丁应用失败: $patch_name"
-                # 显示补丁文件内容用于调试
-                log_debug "补丁文件内容:"
-                head -10 "$patch_file" | sed 's/^/    /'
-            fi
-        fi
-    done
-    
-    log_info "🎉 所有补丁应用完成！"
+# 进入 coreboot 目录
+cd "$BUILD_DIR"
+
+# 检查源码修改状态
+log_info "📦 检查源码修改状态..."
+if git status --porcelain | grep -q .; then
+    log_info "📝 发现源码修改，使用修改后的代码进行编译..."
+    git status --short | sed 's/^/    /'
 else
-    log_warn "⚠️ 补丁目录不存在，跳过补丁应用"
+    log_info "📝 源码未修改，使用原始代码..."
 fi
 
-# 测试模式：只验证补丁应用，不进行编译
+# 测试模式：只验证源码修改，不进行编译
 if [ "$TEST_MODE" = true ]; then
-    log_info "🧪 测试模式：验证补丁应用结果..."
+    log_info "🧪 测试模式：验证源码修改结果..."
     
-    # 详细验证补丁应用结果
-    log_info "🔍 详细验证补丁应用结果..."
+    # 详细验证源码修改结果
+    log_info "🔍 详细验证源码修改结果..."
     
     # 检查 RTL8111H 支持
     if grep -q "case 12:" src/drivers/net/r8168.c; then
@@ -311,7 +306,7 @@ if [ "$TEST_MODE" = true ]; then
         log_warn "⚠️ VPD 解析修复未应用"
     fi
     
-    log_info "🎉 测试模式完成！补丁应用验证结束。"
+    log_info "🎉 测试模式完成！源码修改验证结束。"
     log_info "💡 如需进行完整编译，请运行: $0"
     exit 0
 fi
@@ -343,10 +338,6 @@ $DOCKER_CMD run --rm --user root \
     coreboot/coreboot-sdk:latest \
     bash -c "git config --global --add safe.directory /home/coreboot/coreboot && \
              echo '🔧 使用 MrChromebox build-uefi.sh 编译 kaisa...' && \
-             if [ -f 'patch-build-process.sh' ]; then \
-                 echo '应用 ERI 配置补丁...' && \
-                 ./patch-build-process.sh; \
-             fi && \
              ./build-uefi.sh kaisa && \
              chmod 644 /home/coreboot/roms/*.rom && \
              echo '✅ MrChromebox 编译完成'"
@@ -372,7 +363,9 @@ if [ -n "$ROM_FILE" ]; then
     
     # 检查 CBFS 内容
     log_info "🔍 检查 CBFS 内容："
-    if [ -f "coreboot/build/cbfstool" ]; then
+    if [ -f "tools/cbfstool" ]; then
+        tools/cbfstool "$ROM_FILE" print | grep -E "(rt8168|macaddress)" || echo "未找到 MAC 地址相关条目"
+    elif [ -f "coreboot/build/cbfstool" ]; then
         coreboot/build/cbfstool "$ROM_FILE" print | grep -E "(rt8168|macaddress)" || echo "未找到 MAC 地址相关条目"
     elif command -v cbfstool >/dev/null 2>&1; then
         cbfstool "$ROM_FILE" print | grep -E "(rt8168|macaddress)" || echo "未找到 MAC 地址相关条目"

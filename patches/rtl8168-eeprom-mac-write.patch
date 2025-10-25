@@ -1,0 +1,24 @@
+--- a/src/drivers/net/r8168.c
++++ b/src/drivers/net/r8168.c
+@@ -200,6 +200,7 @@ static void program_mac_address(struct device *dev, u16 io_base)
+ 	/* Some boards (e.g. asus/p8z77-v_le_plus) need the MAC address set here too */
+ 	if (CONFIG(RT8168_PUT_MAC_TO_ERI)) {
+ 		printk(BIOS_DEBUG, "r8168: Programming MAC to ERI registers...\n");
++		printk(BIOS_DEBUG, "r8168: MAC address: %02x:%02x:%02x:%02x:%02x:%02x\n",
++		       mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+ 		u8 revision = pci_read_config8(dev, PCI_REVISION_ID);
+ 		printk(BIOS_DEBUG, "r8168: Device revision ID: 0x%02x\n", revision);
+ 		switch (pci_read_config8(dev, PCI_REVISION_ID)) {
+@@ -220,6 +221,7 @@ static void program_mac_address(struct device *dev, u16 io_base)
+ 			printk(BIOS_DEBUG, "r8168: ERI programming completed for RTL8111H\n");
+ 			break;
+ 		}
++		printk(BIOS_DEBUG, "r8168: ERI programming completed\n");
+ 		udelay(1000);
+ 	}
+ 	/* Lock config regs */
+@@ -227,6 +229,7 @@ static void program_mac_address(struct device *dev, u16 io_base)
+ 
+ 	printk(BIOS_DEBUG, "done\n");
+ }
+

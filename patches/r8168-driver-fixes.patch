@@ -1,5 +1,5 @@
---- coreboot-official/src/drivers/net/r8168.c	2025-10-24 18:11:41.757742724 +0800
-+++ coreboot/src/drivers/net/r8168.c	2025-10-25 11:05:00.000000000 +0800
+--- a/src/drivers/net/r8168.c	2025-10-24 18:11:41.757742724 +0800
++++ b/src/drivers/net/r8168.c	2025-10-25 11:05:00.000000000 +0800
 @@ -245,8 +245,12 @@
  	inl(io_base);
  	/* Some boards (e.g. asus/p8z77-v_le_plus) need the MAC address set here too */
