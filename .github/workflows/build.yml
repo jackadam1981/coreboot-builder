@@ -164,10 +164,13 @@ jobs:
             echo "📝 Adding RTL8111H revision 12-15 ERI programming support..."
             
             # 查找现有的 case 语句位置
-            if grep -q "case 12:" "$R8168_DRIVER"; then
-              echo "📝 Found existing case 12, adding case 15 support..."
+            if grep -q "case 9:" "$R8168_DRIVER"; then
+              echo "📝 Found existing case 9, adding RTL8111H revision 12-15 support..."
               
-              # 在 case 12-14 之后添加 case 15
+              # 在 case 9 之后添加 RTL8111H revision 12-15 支持
+              sed -i '/case 9:/a\\tcase 12:' "$R8168_DRIVER"
+              sed -i '/case 12:/a\\tcase 13:' "$R8168_DRIVER"
+              sed -i '/case 13:/a\\tcase 14:' "$R8168_DRIVER"
               sed -i '/case 14:/a\\tcase 15:' "$R8168_DRIVER"
               sed -i '/case 15:/a\\t\t/* RTL8111H revision 12-15 ERI programming */' "$R8168_DRIVER"
               sed -i '/RTL8111H revision 12-15 ERI programming/a\\t\tprintk(BIOS_DEBUG, "r8168: Programming ERI for RTL8111H revision %d\\n", pci_read_config8(dev, PCI_REVISION_ID));' "$R8168_DRIVER"
@@ -181,9 +184,9 @@ jobs:
               sed -i '/outl(0x800030e4, io_base + ERIAR);/a\\t\tprintk(BIOS_DEBUG, "r8168: ERI programming completed for RTL8111H\\n");' "$R8168_DRIVER"
               sed -i '/ERI programming completed for RTL8111H/a\\t\tbreak;' "$R8168_DRIVER"
               
-              echo "✅ RTL8111H revision 15 support added"
+              echo "✅ RTL8111H revision 12-15 support added"
             else
-              echo "❌ Case 12 not found, cannot add case 15 support"
+              echo "❌ Case 9 not found, cannot add RTL8111H support"
               exit 1
             fi
           fi
@@ -362,11 +365,11 @@ jobs:
         if [ -f "$R8168_DRIVER" ]; then
           echo "✅ RTL8168 driver found: $R8168_DRIVER"
           
-          # 验证 case 15 支持
-          if grep -q "case 15:" "$R8168_DRIVER"; then
-            echo "✅ RTL8111H revision 15 case found in driver"
+          # 验证 RTL8111H revision 12-15 支持
+          if grep -q "case 12:" "$R8168_DRIVER" && grep -q "case 13:" "$R8168_DRIVER" && grep -q "case 14:" "$R8168_DRIVER" && grep -q "case 15:" "$R8168_DRIVER"; then
+            echo "✅ RTL8111H revision 12-15 cases found in driver"
           else
-            echo "❌ RTL8111H revision 15 case not found in driver"
+            echo "❌ RTL8111H revision 12-15 cases not found in driver"
             exit 1
           fi
           
