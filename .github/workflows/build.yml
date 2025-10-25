@@ -795,8 +795,10 @@ jobs:
           fi
           
           # 验证 RTL8111H ERI 支持
-          if grep -q "case 12: case 13: case 14: case 15:" "$R8168_DRIVER"; then
+          if grep -q "case 12:" "$R8168_DRIVER" && grep -q "case 13:" "$R8168_DRIVER" && grep -q "case 14:" "$R8168_DRIVER" && grep -q "case 15:" "$R8168_DRIVER"; then
             echo "✅ RTL8111H ERI support (revision 12-15) found"
+          elif grep -q "RTL8111H revision 12-15 ERI programming" "$R8168_DRIVER"; then
+            echo "✅ RTL8111H ERI support (revision 12-15) found (alternative pattern)"
           else
             echo "❌ RTL8111H ERI support not found"
           fi
