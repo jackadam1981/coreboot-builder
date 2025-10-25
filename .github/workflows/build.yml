@@ -91,6 +91,15 @@ jobs:
           echo "✅ RT8168_SUPPORT_LEGACY_VPD_MAC already present"
         fi
         
+        # 检查并添加 RT8168_PUT_MAC_TO_ERI 支持
+        if ! grep -q "select RT8168_PUT_MAC_TO_ERI" "$PUFF_KCONFIG"; then
+          echo "📝 Adding RT8168_PUT_MAC_TO_ERI support..."
+          sed -i '/select RT8168_SUPPORT_LEGACY_VPD_MAC/a\\tselect RT8168_PUT_MAC_TO_ERI' "$PUFF_KCONFIG"
+          echo "✅ RT8168_PUT_MAC_TO_ERI support added"
+        else
+          echo "✅ RT8168_PUT_MAC_TO_ERI already present"
+        fi
+        
         echo "✅ Step 1 completed: RTL8168 dependencies fixed"
     
     - name: "Step 2: Configure Kaisa UEFI settings"
@@ -238,6 +247,14 @@ jobs:
           echo "✅ RT8168_SUPPORT_LEGACY_VPD_MAC support found in puff/Kconfig"
         else
           echo "❌ RT8168_SUPPORT_LEGACY_VPD_MAC support not found in puff/Kconfig"
+          exit 1
+        fi
+        
+        # 验证 RT8168_PUT_MAC_TO_ERI 支持
+        if grep -q "select RT8168_PUT_MAC_TO_ERI" "$PUFF_KCONFIG"; then
+          echo "✅ RT8168_PUT_MAC_TO_ERI support found in puff/Kconfig"
+        else
+          echo "❌ RT8168_PUT_MAC_TO_ERI support not found in puff/Kconfig"
           exit 1
         fi
         
