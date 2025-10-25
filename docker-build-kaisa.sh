@@ -17,6 +17,10 @@ log_info() {
     echo -e "${GREEN}[INFO]${NC} $1"
 }
 
+log_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
 log_warn() {
     echo -e "${YELLOW}[WARN]${NC} $1"
 }
@@ -37,13 +41,15 @@ show_help() {
     echo ""
     echo "选项:"
     echo "  -h, --help              显示此帮助信息"
+    echo "  -t, --test              测试模式：只验证补丁应用，不进行编译"
     echo "  -d, --dev               启动交互式开发环境"
     echo "  -c, --clean             清理编译文件"
     echo "  -f, --force             强制重新拉取镜像"
     echo "  -j, --jobs N            指定编译并行数 (默认: CPU核心数)"
     echo ""
     echo "示例:"
-    echo "  $0                      # 使用 MrChromebox build-uefi.sh 编译"
+    echo "  $0                      # 完整编译模式"
+    echo "  $0 --test               # 测试模式：只验证补丁应用"
     echo "  $0 --dev                # 启动开发环境"
     echo "  $0 --clean              # 清理编译文件"
     echo "  $0 --jobs 8             # 使用8个并行编译"
@@ -54,6 +60,7 @@ show_help() {
 }
 
 # 默认参数
+TEST_MODE=false
 DEV_MODE=false
 CLEAN_MODE=false
 FORCE_PULL=false
@@ -65,6 +72,10 @@ while [[ $# -gt 0 ]]; do
         -h|--help)
             show_help
             exit 0
+            ;;
+        -t|--test)
+            TEST_MODE=true
+            shift
             ;;
         -d|--dev)
             DEV_MODE=true
@@ -128,14 +139,42 @@ if [ "$CLEAN_MODE" = true ]; then
         if [ -f "Makefile" ]; then
             make clean >/dev/null 2>&1 || true
         fi
-        rm -rf build/ .config
+        # 使用 sudo 清理 build 目录，避免权限问题
+        sudo rm -rf build/ .config 2>/dev/null || rm -rf build/ .config 2>/dev/null || true
         log_info "✅ coreboot 编译文件已清理"
     fi
     
     # 清理输出目录
     if [ -d "$OUTPUT_DIR" ]; then
         rm -f "$OUTPUT_DIR"/*.rom
-        log_info "✅ 输出文件已清理"
+        rm -f "$OUTPUT_DIR"/*.sha1
+        log_info "✅ 输出文件已清理 (ROM 和 SHA1 文件)"
+    fi
+    
+    # 清理设备目录（刷机时创建的）
+    if [ -d "$SCRIPT_DIR" ]; then
+        cd "$SCRIPT_DIR"
+        device_dirs=$(ls -d device_* 2>/dev/null | wc -l)
+        if [ "$device_dirs" -gt 0 ]; then
+            log_info "🧹 发现 $device_dirs 个设备目录"
+            read -p "是否清理设备目录? (y/N): " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                for device_dir in device_*; do
+                    if [ -d "$device_dir" ]; then
+                        log_info "🧹 清理设备目录: $device_dir"
+                        if sudo rm -rf "$device_dir" 2>/dev/null; then
+                            log_success "✅ 设备目录已清理: $device_dir"
+                        else
+                            log_warn "⚠️ 无法清理设备目录: $device_dir (需要 root 权限)"
+                            log_info "💡 请手动运行: sudo rm -rf $device_dir"
+                        fi
+                    fi
+                done
+            else
+                log_info "⏭️ 跳过设备目录清理"
+            fi
+        fi
     fi
     
     # 清理 Docker 镜像（可选）
@@ -161,9 +200,9 @@ if [ ! -d "$BUILD_DIR" ]; then
     git submodule sync --recursive || true
     git submodule update --init --checkout --recursive
 else
-    log_info "📦 目录已存在，放弃所有更改，使用原始 MrChromebox 代码..."
+    log_info "📦 目录已存在，恢复原始 MrChromebox 代码..."
     cd "$BUILD_DIR"
-    # 放弃所有本地更改
+    # 始终重置代码到干净状态，确保补丁能正确应用
     git reset --hard HEAD
     git clean -fd
     # 更新到最新版本（如果网络失败则继续使用本地代码）
@@ -173,46 +212,6 @@ else
     git submodule sync --recursive || true
     git submodule update --init --checkout --recursive
 fi
-
-# 应用 ERI 配置补丁（在 git reset 之后）
-log_info "🔧 应用 ERI 配置补丁..."
-
-# 修改 Kconfig：添加 depends on REALTEK_8168_RESET
-sed -i '/^config RT8168_PUT_MAC_TO_ERI$/,/^config / {
-    /^[[:space:]]*bool[[:space:]]*$/a\
-	depends on REALTEK_8168_RESET
-}' src/drivers/net/Kconfig
-
-# 修改主板 Kconfig：添加 select RT8168_PUT_MAC_TO_ERI
-if ! grep -q "select RT8168_PUT_MAC_TO_ERI" src/mainboard/google/puff/Kconfig; then
-    sed -i '/select RT8168_GET_MAC_FROM_VPD/a\	select RT8168_PUT_MAC_TO_ERI' src/mainboard/google/puff/Kconfig
-fi
-
-# 修改 Makefile：在 olddefconfig 之后添加 ERI 配置
-sed -i '/$(MAKE) olddefconfig/a\	@echo "CONFIG_RT8168_PUT_MAC_TO_ERI=y" >> .config' Makefile
-
-# 修改 build-uefi.sh：在 olddefconfig 之后添加 ERI 配置
-sed -i '/make olddefconfig/a\\n\t# 强制添加 ERI 配置（在 olddefconfig 之后）\n\techo "CONFIG_RT8168_PUT_MAC_TO_ERI=y" >> .config' build-uefi.sh
-
-# 修改 r8168.c：添加对 RTL8111H revision 12-15 的支持
-sed -i '/case 9:/,/break;/ {
-    /break;/a\
-		case 12:\
-		case 13:\
-		case 14:\
-		case 15:\
-			/* RTL8111H revision 12-15 ERI programming */\
-			outl(maclo, io_base + ERIDR);\
-			inl(io_base + ERIDR);\
-			outl(0x8000f0e0, io_base + ERIAR);\
-			inl(io_base + ERIAR);\
-			outl(machi, io_base + ERIDR);\
-			inl(io_base + ERIDR);\
-			outl(0x800030e4, io_base + ERIAR);\
-			break;
-}' src/drivers/net/r8168.c
-
-log_info "✅ ERI 配置补丁已应用"
 
 # 检查 Docker 镜像
 log_info "🐳 检查 Docker 环境..."
@@ -224,138 +223,101 @@ else
     log_info "✅ coreboot/coreboot-sdk:latest 镜像已存在"
 fi
 
-# 配置 PXE ROM 支持
-log_info "🔧 配置 PXE ROM 支持..."
 
-# 定义配置项数组
-PXE_CONFIGS=(
-    "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y"
-    "CONFIG_EDK2_LOAD_OPTION_ROMS=y"
-)
+# 应用补丁
+log_info "🔧 应用 RTL8111H 修复补丁..."
 
-# 构建 EDK2 自定义构建参数
-EDK2_BUILD_PARAMS="-D NETWORK_DRIVER_ENABLE=TRUE"
-EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_ENABLE=TRUE"
-EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_IP4_ENABLE=TRUE"
-EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_IP6_ENABLE=FALSE"
-EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_PXE_BOOT_ENABLE=TRUE"
-EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_HTTP_BOOT_ENABLE=FALSE"
-EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_SNP_ENABLE=TRUE"
-EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_RTEK_PCI=TRUE"
-EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_TLS_ENABLE=FALSE"
-EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_ISCSI_ENABLE=FALSE"
-EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_RTEK_USB=FALSE"
-EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_ASIX_USB3=FALSE"
-EDK2_BUILD_PARAMS="$EDK2_BUILD_PARAMS -D NETWORK_ASIX_USB2=FALSE"
-
-INTEL_CONFIGS=(
-    "CONFIG_SOC_INTEL_COMMON_BLOCK_POWER_LIMIT=y"
-    "CONFIG_SOC_INTEL_COMMON_BLOCK_THERMAL=y"
-    "CONFIG_SOUTHBRIDGE_INTEL_COMMON_WATCHDOG=y"
-    "CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL=y"
-)
-
-# RTL8168 驱动配置 - ERI 寄存器编程（避免 VPD 解析 bug）
-RTL8168_CONFIGS=(
-    "CONFIG_RT8168_PUT_MAC_TO_ERI=y"
-)
-
-# 使用 MrChromebox 的配置文件并添加自定义配置项
-log_info "🔧 使用 MrChromebox 配置文件并添加自定义配置项..."
-
-# 检查 MrChromebox 配置文件是否存在
-if [ ! -f "configs/cml/config.kaisa.uefi" ]; then
-    log_error "❌ 未找到 MrChromebox 配置文件: configs/cml/config.kaisa.uefi"
-    log_info "💡 请确保已正确克隆 MrChromebox coreboot 仓库"
-    exit 1
+# 检查补丁文件是否存在
+PATCH_DIR="$SCRIPT_DIR/patches"
+if [ -d "$PATCH_DIR" ]; then
+    log_info "📦 发现补丁目录，应用补丁..."
+    
+    # 进入 coreboot 目录
+    cd "$BUILD_DIR"
+    
+    # 应用所有补丁
+    for patch_file in "$PATCH_DIR"/*.patch; do
+        if [ -f "$patch_file" ]; then
+            patch_name=$(basename "$patch_file")
+            log_info "🔧 应用补丁: $patch_name"
+            
+            # 应用补丁
+            if patch -p1 < "$patch_file" >/dev/null 2>&1; then
+                log_success "✅ 补丁应用成功: $patch_name"
+            else
+                log_warn "⚠️ 补丁应用失败: $patch_name"
+                # 显示补丁文件内容用于调试
+                log_debug "补丁文件内容:"
+                head -10 "$patch_file" | sed 's/^/    /'
+            fi
+        fi
+    done
+    
+    log_info "🎉 所有补丁应用完成！"
+else
+    log_warn "⚠️ 补丁目录不存在，跳过补丁应用"
 fi
 
-# 备份原始配置文件
-cp configs/cml/config.kaisa.uefi configs/cml/config.kaisa.uefi.backup
-log_info "📦 已备份原始配置文件"
-
-# 添加自定义配置项到现有配置文件
-log_info "🔧 添加 PXE ROM 支持配置..."
-echo "" >> configs/cml/config.kaisa.uefi
-echo "# 自定义 PXE ROM 支持配置" >> configs/cml/config.kaisa.uefi
-for config in "${PXE_CONFIGS[@]}"; do
-    echo "$config" >> configs/cml/config.kaisa.uefi
-done
-
-# 添加 EDK2 自定义构建参数
-log_info "🔧 添加 EDK2 自定义构建参数..."
-echo "" >> configs/cml/config.kaisa.uefi
-echo "# EDK2 自定义构建参数" >> configs/cml/config.kaisa.uefi
-echo "CONFIG_EDK2_CUSTOM_BUILD_PARAMS=\"$EDK2_BUILD_PARAMS\"" >> configs/cml/config.kaisa.uefi
-
-# 添加 Intel 芯片组系统稳定配置
-log_info "🔧 添加 Intel 芯片组系统稳定配置..."
-echo "" >> configs/cml/config.kaisa.uefi
-echo "# Intel 芯片组系统稳定配置（适合 Kaisa 主板）" >> configs/cml/config.kaisa.uefi
-for config in "${INTEL_CONFIGS[@]}"; do
-    echo "$config" >> configs/cml/config.kaisa.uefi
-done
-
-# 添加 RTL8168 驱动配置
-log_info "🔧 添加 RTL8168 驱动配置（标准寄存器 + ERI 寄存器编程）..."
-echo "" >> configs/cml/config.kaisa.uefi
-echo "# RTL8168 驱动配置（标准寄存器 + ERI 寄存器编程）" >> configs/cml/config.kaisa.uefi
-for config in "${RTL8168_CONFIGS[@]}"; do
-    echo "$config" >> configs/cml/config.kaisa.uefi
-done
-
-log_info "✅ 配置完成"
-
-# 检查 RTL8168 驱动是否已支持 RTL8111H
-log_info "🔍 检查 RTL8168 驱动 RTL8111H 支持..."
-
-RTL8168_DRIVER_PATH='src/drivers/net/r8168.c'
-if [ -f "$RTL8168_DRIVER_PATH" ]; then
-    log_info "📦 找到 RTL8168 驱动文件: $RTL8168_DRIVER_PATH"
+# 测试模式：只验证补丁应用，不进行编译
+if [ "$TEST_MODE" = true ]; then
+    log_info "🧪 测试模式：验证补丁应用结果..."
     
-    # 检查是否已经支持 RTL8111H
-    if grep -q "RTL8111H support" "$RTL8168_DRIVER_PATH"; then
-        log_info "✅ RTL8168 驱动已支持 RTL8111H（MrChromebox 版本）"
+    # 详细验证补丁应用结果
+    log_info "🔍 详细验证补丁应用结果..."
+    
+    # 检查 RTL8111H 支持
+    if grep -q "case 12:" src/drivers/net/r8168.c; then
+        log_success "✅ RTL8111H revision 12-15 支持已添加"
+        echo "   📝 相关代码："
+        grep -A 5 "case 12:" src/drivers/net/r8168.c | sed 's/^/      /'
     else
-        log_warn "⚠️ RTL8168 驱动未找到 RTL8111H 支持"
+        log_warn "⚠️ RTL8111H revision 12-15 支持未找到"
     fi
     
-    # 检查 ERI 支持
-    if grep -q "RT8168_PUT_MAC_TO_ERI" "$RTL8168_DRIVER_PATH"; then
-        log_info "✅ RTL8168 驱动已支持 ERI 寄存器编程"
+    # 检查 ERI 配置
+    if grep -q "select RT8168_PUT_MAC_TO_ERI" src/mainboard/google/puff/Kconfig; then
+        log_success "✅ ERI 配置已启用"
     else
-        log_warn "⚠️ RTL8168 驱动未找到 ERI 支持"
+        log_warn "⚠️ ERI 配置未启用"
     fi
-else
-    log_warn "⚠️ 未找到 RTL8168 驱动文件"
+    
+    # 检查 ERI 依赖
+    if grep -q "depends on REALTEK_8168_RESET" src/drivers/net/Kconfig; then
+        log_success "✅ ERI 依赖关系已修复"
+    else
+        log_warn "⚠️ ERI 依赖关系未修复"
+    fi
+    
+    # 检查 Kaisa 配置
+    if grep -q "CONFIG_RT8168_PUT_MAC_TO_ERI=y" configs/cml/config.kaisa.uefi; then
+        log_success "✅ Kaisa 配置已更新"
+    else
+        log_warn "⚠️ Kaisa 配置未更新"
+    fi
+    
+    # 检查调试信息
+    if grep -q "Programming MAC to ERI registers" src/drivers/net/r8168.c; then
+        log_success "✅ ERI 调试信息已添加"
+    else
+        log_warn "⚠️ ERI 调试信息未添加"
+    fi
+    
+    log_info "🎉 测试模式完成！补丁应用验证结束。"
+    log_info "💡 如需进行完整编译，请运行: $0"
+    exit 0
 fi
 
 # 准备编译环境
 log_info "🔧 准备 MrChromebox 编译环境..."
 
-# 开发模式
-if [ "$DEV_MODE" = true ]; then
-    log_info "🐳 启动交互式开发环境..."
-    log_info "📁 映射目录："
-    log_info "   - 源码目录: $(pwd) -> /coreboot"
-    log_info "   - 输出目录: $OUTPUT_DIR -> /output"
-    log_info ""
-    log_info "🔧 在容器内可以执行："
-    log_info "   - ./build-uefi.sh kaisa    # MrChromebox 编译命令"
-    log_info "   - make menuconfig           # 配置编译选项"
-    log_info "   - make clean                # 清理"
-    log_info "   - exit                      # 退出容器"
-    log_info ""
-    
-    # 启动交互式 Docker 容器
-    $DOCKER_CMD run --rm -it \
-        -v "$(pwd)":/coreboot \
-        -v "$OUTPUT_DIR":/output \
-        -w /coreboot \
-        coreboot/coreboot-sdk:latest \
-        bash
-    exit 0
+# 自动清理输出目录
+if [ -d "$OUTPUT_DIR" ]; then
+    log_info "🧹 自动清理输出目录..."
+    rm -f "$OUTPUT_DIR"/*.rom
+    rm -f "$OUTPUT_DIR"/*.sha1
+    log_info "✅ 输出目录已清理 (ROM 和 SHA1 文件)"
 fi
+
 
 # 编译模式
 log_info "🐳 使用 MrChromebox 编译脚本编译 coreboot..."

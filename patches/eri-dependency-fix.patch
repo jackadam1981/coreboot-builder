@@ -1,0 +1,10 @@
+--- a/src/drivers/net/Kconfig
++++ b/src/drivers/net/Kconfig
+@@ -17,6 +17,7 @@ config RT8168_GET_MAC_FROM_VPD
+ config RT8168_PUT_MAC_TO_ERI
+ 	bool
++	depends on REALTEK_8168_RESET
+ 	help
+ 	  After programming MAC address into the regular rt8168 ID registers,
+ 	  also program it into ERI. On some mainboards our programmed
+
