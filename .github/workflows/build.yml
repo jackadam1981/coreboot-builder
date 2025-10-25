@@ -226,13 +226,58 @@ jobs:
             
             # 查找 get_mac_address 函数中的 for 循环
             if grep -q "for (i = 0; i < 6; i++)" "$R8168_DRIVER"; then
-              echo "📝 Found get_mac_address function, adding debug output..."
+              echo "📝 Found get_mac_address function, fixing MAC address bug..."
               
-              # 只在函数末尾添加调试输出，不修改 for 循环
-              # 因为 get_hex_digit 函数已经处理了无效字符
-              sed -i '/^}$/i\\tprintk(BIOS_DEBUG, "r8168: Parsed MAC address: %02x:%02x:%02x:%02x:%02x:%02x\\n",\n\t       macaddr[0], macaddr[1], macaddr[2], macaddr[3], macaddr[4], macaddr[5]);' "$R8168_DRIVER"
+              # 创建临时文件来安全地修改代码
+              TEMP_FILE=$(mktemp)
               
-              echo "✅ get_mac_address debug output added"
+              # 使用 awk 来修复 MAC 地址解析 bug
+              awk '
+              BEGIN { in_function = 0; in_for_loop = 0; skip_until_brace = 0 }
+              /^static void get_mac_address/ { 
+                in_function = 1
+                print
+                next
+              }
+              /^}$/ && in_function {
+                print "\tprintk(BIOS_DEBUG, \"r8168: Parsed MAC address: %02x:%02x:%02x:%02x:%02x:%02x\\n\","
+                print "\t       macaddr[0], macaddr[1], macaddr[2], macaddr[3], macaddr[4], macaddr[5]);"
+                print "}"
+                in_function = 0
+                next
+              }
+              /for \(i = 0; i < 6; i\+\+\) \{/ && in_function {
+                print "\tfor (i = 0; i < 6; i++) {"
+                print "\t\tu8 hex1, hex2;"
+                print "\t\thex1 = get_hex_digit(strbuf[offset]);"
+                print "\t\thex2 = get_hex_digit(strbuf[offset + 1]);"
+                print ""
+                print "\t\t/* Check if both hex digits are valid */"
+                print "\t\tif (hex1 > 0x0f || hex2 > 0x0f) {"
+                print "\t\t\tprintk(BIOS_ERR, \"r8168: Invalid hex digit in MAC address at position %d\\n\", i);"
+                print "\t\t\treturn;"
+                print "\t\t}"
+                print ""
+                print "\t\tmacaddr[i] = (hex1 << 4) | hex2;"
+                print "\t\toffset += 3;"
+                print "\t}"
+                skip_until_brace = 1
+                next
+              }
+              skip_until_brace && /^\t}/ {
+                skip_until_brace = 0
+                next
+              }
+              skip_until_brace {
+                next
+              }
+              { print }
+              ' "$R8168_DRIVER" > "$TEMP_FILE"
+              
+              # 替换原文件
+              mv "$TEMP_FILE" "$R8168_DRIVER"
+              
+              echo "✅ get_mac_address MAC address bug fixed"
               
               # 调试：显示修改后的 get_mac_address 函数
               echo "📋 Debug: Showing modified get_mac_address function:"
