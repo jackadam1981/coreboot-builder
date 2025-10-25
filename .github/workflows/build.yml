@@ -24,27 +24,46 @@ jobs:
       with:
         submodules: recursive
     
-    - name: Build Kaisa ROM
+    - name: Clone MrChromebox coreboot
       run: |
-        echo "🚀 Building Kaisa ROM: ${{ github.event.inputs.release_name || 'kaisa' }}"
-        echo "📦 Using MrChromebox build method with Docker"
-        
-        # Clone MrChromebox coreboot repository
+        echo "📥 Cloning MrChromebox coreboot repository..."
         if [ ! -d "coreboot" ]; then
-          echo "📥 Cloning MrChromebox coreboot repository..."
           git clone https://github.com/mrchromebox/coreboot.git
         fi
         
         cd coreboot
-        
-        # Update submodules
         echo "📦 Updating submodules..."
         git submodule update --init --checkout --recursive
+        echo "✅ Source code cloned and submodules updated"
+    
+    - name: Apply custom modifications
+      run: |
+        echo "🔧 Applying custom modifications to coreboot source..."
+        echo "📝 This step will apply RTL8168 driver fixes and EDK2 configurations"
+        echo "🚧 TODO: Add specific modifications here"
+        echo "✅ Custom modifications step completed"
+    
+    - name: Verify source modifications
+      run: |
+        echo "🔍 Verifying source modifications..."
+        echo "📝 This step will verify that all custom modifications were applied correctly"
+        echo "🚧 TODO: Add verification checks here"
+        echo "✅ Source modifications verification completed"
+    
+    - name: Build Kaisa ROM with Docker
+      run: |
+        echo "🚀 Building Kaisa ROM: ${{ github.event.inputs.release_name || 'kaisa' }}"
+        echo "🐳 Using coreboot/coreboot-sdk Docker image..."
+        
+        cd coreboot
+        
+        # Create output directory
+        mkdir -p ../roms
         
         # Build using Docker
-        echo "🐳 Building with coreboot/coreboot-sdk Docker image..."
         docker run --rm -v "$(pwd)":/home/coreboot/coreboot -v "$(pwd)/../roms":/home/coreboot/roms -w /home/coreboot/coreboot coreboot/coreboot-sdk:latest bash -c "
           echo '🔧 Building Kaisa ROM...'
+          git config --global --add safe.directory /home/coreboot/coreboot
           ./build-uefi.sh kaisa
           echo '✅ Build completed'
         "
