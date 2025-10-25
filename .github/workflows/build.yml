@@ -70,34 +70,53 @@ jobs:
     - name: Prepare RTL UNDI driver
       run: |
         echo "🔧 准备预下载的 RTL UNDI 驱动"
-        cd coreboot
         
-        # 检查预下载的 RTL 驱动
-        if [ -f "../RtkUndiDxe.efi" ]; then
-          echo "✅ 找到预下载的 RTL UNDI 驱动"
-          
+        # 显示当前目录结构
+        echo "📁 当前目录结构:"
+        pwd
+        ls -la
+        
+        # 检查多个可能的路径
+        DRIVER_FOUND=false
+        DRIVER_PATH=""
+        
+        # 检查项目根目录
+        if [ -f "RtkUndiDxe.efi" ]; then
+          echo "✅ 在项目根目录找到 RTL UNDI 驱动"
+          DRIVER_PATH="RtkUndiDxe.efi"
+          DRIVER_FOUND=true
+        # 检查 coreboot 目录外
+        elif [ -f "../RtkUndiDxe.efi" ]; then
+          echo "✅ 在上级目录找到 RTL UNDI 驱动"
+          DRIVER_PATH="../RtkUndiDxe.efi"
+          DRIVER_FOUND=true
+        fi
+        
+        if [ "$DRIVER_FOUND" = true ]; then
           # 验证驱动文件
           echo "📊 驱动文件信息:"
-          file "../RtkUndiDxe.efi"
-          size=$(stat -c%s "../RtkUndiDxe.efi")
+          file "$DRIVER_PATH"
+          size=$(stat -c%s "$DRIVER_PATH")
           echo "📏 文件大小: $size bytes"
           
           # 检查版本信息
           echo "📋 版本信息:"
-          strings "../RtkUndiDxe.efi" | grep -i "version\|ver\|v[0-9]" | head -5
+          strings "$DRIVER_PATH" | grep -i "version\|ver\|v[0-9]" | head -5
           
           # 检查 PXE/UNDI 功能
           echo "🌐 PXE/UNDI 功能:"
-          strings "../RtkUndiDxe.efi" | grep -i "pxe\|undi" | head -5
+          strings "$DRIVER_PATH" | grep -i "pxe\|undi" | head -5
           
-          # 复制到构建目录
+          # 进入 coreboot 目录并复制驱动
+          cd coreboot
           echo "💾 复制 RTL 驱动到构建目录..."
-          cp "../RtkUndiDxe.efi" "rtl_undi_driver_updated.efi"
+          cp "../$DRIVER_PATH" "rtl_undi_driver_updated.efi"
           echo "✅ RTL UNDI 驱动准备完成"
           echo "📝 此驱动将在 EDK2 构建过程中被集成到固件中"
         else
           echo "⚠️ 未找到预下载的 RTL 驱动文件"
           echo "📝 将使用 MrChromebox EDK2 中的原始驱动"
+          cd coreboot
         fi
 
     - name: Apply custom modifications
