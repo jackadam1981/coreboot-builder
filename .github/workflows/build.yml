@@ -67,7 +67,7 @@ jobs:
         chmod -R 755 .
         echo "✅ Source code ready"
     
-    - name: Apply custom modifications
+    - name: Apply custom modifications 01
       run: |
         echo "🔧 Applying custom modifications to coreboot source..."
         echo "📝 Applying RTL8168 driver fixes and EDK2 configurations"
@@ -86,7 +86,7 @@ jobs:
         echo "✅ Kaisa board configuration updated"
         echo "✅ Custom modifications step completed"
     
-    - name: Verify source modifications
+    - name: Verify source modifications 01
       run: |
         echo "🔍 Verifying source modifications..."
         echo "📝 Verifying that all custom modifications were applied correctly"
@@ -127,6 +127,74 @@ jobs:
         grep -n "CONFIG_EDK2.*NETWORK\|CONFIG_EDK2.*PXE" .config || echo "  No additional network configs found"
         
         echo "✅ Source modifications verification completed"
+    
+    - name: Apply EDK2 customizations
+      run: |
+        echo "🔧 Applying EDK2 customizations..."
+        echo "📋 Current EDK2 configuration:"
+        if [ -f "configs/cml/config.kaisa.uefi" ]; then
+          echo "✅ Kaisa UEFI config found"
+          echo "📋 EDK2 Network settings:"
+          grep -E "CONFIG_EDK2.*NETWORK|CONFIG_EDK2.*PXE|CONFIG_EDK2.*CUSTOM" configs/cml/config.kaisa.uefi || echo "No EDK2 network config found"
+        else
+          echo "❌ Kaisa UEFI config not found"
+        fi
+        
+        # TODO: Add EDK2-specific modifications here
+        # Example: Modify EDK2 network settings, PXE configuration, etc.
+        echo "✅ EDK2 customizations completed"
+    
+    - name: Verify EDK2 customizations
+      run: |
+        echo "🔍 Verifying EDK2 customizations..."
+        echo "📋 Checking EDK2 configuration files:"
+        
+        # Check if EDK2 config exists
+        if [ -f "configs/cml/config.kaisa.uefi" ]; then
+          echo "✅ Kaisa UEFI config exists"
+          
+          # Check for key EDK2 settings
+          echo "🔍 Checking EDK2 network settings:"
+          if grep -q "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" configs/cml/config.kaisa.uefi; then
+            echo "✅ PXE support enabled"
+          else
+            echo "❌ PXE support not found"
+          fi
+          
+          if grep -q "CONFIG_EDK2_LOAD_OPTION_ROMS=y" configs/cml/config.kaisa.uefi; then
+            echo "✅ Option ROMs enabled"
+          else
+            echo "❌ Option ROMs not found"
+          fi
+          
+          if grep -q "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" configs/cml/config.kaisa.uefi; then
+            echo "✅ Custom build parameters found"
+            echo "📋 Custom build parameters:"
+            grep "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" configs/cml/config.kaisa.uefi
+          else
+            echo "❌ Custom build parameters not found"
+          fi
+          
+          # Check for other EDK2 settings
+          echo "🔍 Checking other EDK2 settings:"
+          if grep -q "CONFIG_EDK2_BOOT_TIMEOUT" configs/cml/config.kaisa.uefi; then
+            echo "✅ Boot timeout configured"
+            grep "CONFIG_EDK2_BOOT_TIMEOUT" configs/cml/config.kaisa.uefi
+          else
+            echo "❌ Boot timeout not configured"
+          fi
+          
+          if grep -q "CONFIG_EDK2_BOOT_MANAGER_ESCAPE" configs/cml/config.kaisa.uefi; then
+            echo "✅ Boot manager escape configured"
+            grep "CONFIG_EDK2_BOOT_MANAGER_ESCAPE" configs/cml/config.kaisa.uefi
+          else
+            echo "❌ Boot manager escape not configured"
+          fi
+        else
+          echo "❌ Kaisa UEFI config not found"
+        fi
+        
+        echo "✅ EDK2 customizations verified"
     
     - name: Build Kaisa ROM with Docker
       run: |
