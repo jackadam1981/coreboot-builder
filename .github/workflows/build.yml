@@ -137,8 +137,6 @@ jobs:
         files: |
           roms/*.rom
           roms/*.sha1
-          coreboot/roms/*.rom
-          coreboot/roms/*.sha1
         draft: false
         prerelease: false
       env:
