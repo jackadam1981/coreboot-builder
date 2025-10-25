@@ -302,6 +302,15 @@ if [ "$TEST_MODE" = true ]; then
         log_warn "⚠️ ERI 调试信息未添加"
     fi
     
+    # 检查 VPD 解析修复
+    if grep -q "offset += vpd\[offset + 1\] + 2" src/drivers/net/r8168.c; then
+        log_success "✅ VPD 解析修复已应用"
+        echo "   📝 修复内容："
+        grep -A 1 -B 1 "offset += vpd\[offset + 1\] + 2" src/drivers/net/r8168.c | sed 's/^/      /'
+    else
+        log_warn "⚠️ VPD 解析修复未应用"
+    fi
+    
     log_info "🎉 测试模式完成！补丁应用验证结束。"
     log_info "💡 如需进行完整编译，请运行: $0"
     exit 0
