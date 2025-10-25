@@ -146,9 +146,27 @@ jobs:
           echo '✅ Build completed'
         "
         
+        # 检查生成的文件
+        echo "📋 Checking generated files in roms directory:"
+        ls -la roms/ || echo "roms directory not found"
+        echo "📋 Looking for .sha1 files:"
+        find roms/ -name "*.sha1" -type f || echo "No .sha1 files found"
+        
         echo "✅ ROM build completed"
     
     - name: Upload ROM
+      run: |
+        echo "📋 Files to upload:"
+        echo "ROM files:"
+        ls -la roms/*.rom || echo "No ROM files found"
+        echo "SHA1 files:"
+        ls -la roms/*.sha1 || echo "No SHA1 files found"
+        echo "All files in roms directory:"
+        ls -la roms/
+        
+        echo "📤 Uploading artifacts..."
+    
+    - name: Upload ROM Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: kaisa-rom
