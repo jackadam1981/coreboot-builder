@@ -228,11 +228,39 @@ jobs:
             if grep -q "for (i = 0; i < 6; i++)" "$R8168_DRIVER"; then
               echo "📝 Found get_mac_address function, adding validation..."
               
-              # 替换原有的简单赋值逻辑为带验证的逻辑
-              sed -i '/for (i = 0; i < 6; i++) {/,/}/c\\tfor (i = 0; i < 6; i++) {\n\t\tu8 hex1, hex2;\n\t\thex1 = get_hex_digit(strbuf[offset]);\n\t\thex2 = get_hex_digit(strbuf[offset + 1]);\n\n\t\t/* Check if both hex digits are valid */\n\t\tif (hex1 > 0x0f || hex2 > 0x0f) {\n\t\t\tprintk(BIOS_ERR, "r8168: Invalid hex digit in MAC address at position %d\\n", i);\n\t\t\treturn;\n\t\t}\n\n\t\tmacaddr[i] = (hex1 << 4) | hex2;\n\t\toffset += 3;\n\t}' "$R8168_DRIVER"
+              # 创建临时文件来安全地修改代码
+              TEMP_FILE=$(mktemp)
               
-              # 在函数末尾添加调试输出
-              sed -i '/^}/i\\tprintk(BIOS_DEBUG, "r8168: Parsed MAC address: %02x:%02x:%02x:%02x:%02x:%02x\\n",\n\t       macaddr[0], macaddr[1], macaddr[2], macaddr[3], macaddr[4], macaddr[5]);' "$R8168_DRIVER"
+              # 使用 awk 来安全地替换 for 循环
+              awk '
+              /for \(i = 0; i < 6; i\+\+\) \{/ {
+                print "\tfor (i = 0; i < 6; i++) {"
+                print "\t\tu8 hex1, hex2;"
+                print "\t\thex1 = get_hex_digit(strbuf[offset]);"
+                print "\t\thex2 = get_hex_digit(strbuf[offset + 1]);"
+                print ""
+                print "\t\t/* Check if both hex digits are valid */"
+                print "\t\tif (hex1 > 0x0f || hex2 > 0x0f) {"
+                print "\t\t\tprintk(BIOS_ERR, \"r8168: Invalid hex digit in MAC address at position %d\\n\", i);"
+                print "\t\t\treturn;"
+                print "\t\t}"
+                print ""
+                print "\t\tmacaddr[i] = (hex1 << 4) | hex2;"
+                print "\t\toffset += 3;"
+                print "\t}"
+                next
+              }
+              /^}$/ && in_function {
+                print "\tprintk(BIOS_DEBUG, \"r8168: Parsed MAC address: %02x:%02x:%02x:%02x:%02x:%02x\\n\","
+                print "\t       macaddr[0], macaddr[1], macaddr[2], macaddr[3], macaddr[4], macaddr[5]);"
+                in_function = 0
+              }
+              /^static void get_mac_address/ { in_function = 1 }
+              { print }
+              ' "$R8168_DRIVER" > "$TEMP_FILE"
+              
+              # 替换原文件
+              mv "$TEMP_FILE" "$R8168_DRIVER"
               
               echo "✅ get_mac_address validation added"
             else
