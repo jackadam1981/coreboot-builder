@@ -302,6 +302,129 @@ jobs:
         
         echo "✅ Step 3 verification completed: EDK2 custom build parameters verified"
     
+    - name: Verify final build results
+      run: |
+        echo "🔍 Verifying final build results..."
+        echo "📝 Checking that all configurations are properly applied in generated .config"
+        
+        cd coreboot
+        
+        # 验证生成的 .config 文件
+        echo "🔍 Verifying generated .config file..."
+        if [ -f ".config" ]; then
+          echo "✅ .config file found"
+          
+          # 验证关键配置项
+          echo "🔍 Checking key configurations in .config:"
+          
+          # 检查 PXE 支持
+          if grep -q "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" .config; then
+            echo "✅ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y found in .config"
+          else
+            echo "❌ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y not found in .config"
+          fi
+          
+          # 检查 ROM 加载支持
+          if grep -q "CONFIG_EDK2_LOAD_OPTION_ROMS=y" .config; then
+            echo "✅ CONFIG_EDK2_LOAD_OPTION_ROMS=y found in .config"
+          else
+            echo "❌ CONFIG_EDK2_LOAD_OPTION_ROMS=y not found in .config"
+          fi
+          
+          # 检查 RTL8168 ERI 编程
+          if grep -q "CONFIG_RT8168_PUT_MAC_TO_ERI=y" .config; then
+            echo "✅ CONFIG_RT8168_PUT_MAC_TO_ERI=y found in .config"
+          else
+            echo "❌ CONFIG_RT8168_PUT_MAC_TO_ERI=y not found in .config"
+          fi
+          
+          # 检查 RTL8168 基础重置配置
+          if grep -q "CONFIG_REALTEK_8168_RESET=y" .config; then
+            echo "✅ CONFIG_REALTEK_8168_RESET=y found in .config"
+          else
+            echo "❌ CONFIG_REALTEK_8168_RESET=y not found in .config"
+          fi
+          
+          # 检查传统 VPD MAC 支持
+          if grep -q "CONFIG_RT8168_SUPPORT_LEGACY_VPD_MAC=y" .config; then
+            echo "✅ CONFIG_RT8168_SUPPORT_LEGACY_VPD_MAC=y found in .config"
+          else
+            echo "❌ CONFIG_RT8168_SUPPORT_LEGACY_VPD_MAC=y not found in .config"
+          fi
+          
+          # 检查 EDK2 自定义构建参数
+          if grep -q "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" .config; then
+            echo "✅ CONFIG_EDK2_CUSTOM_BUILD_PARAMS found in .config"
+            echo "📋 EDK2 custom build parameters:"
+            grep "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" .config
+            
+            # 验证关键 EDK2 参数
+            echo "🔍 Verifying key EDK2 parameters in .config:"
+            
+            # 检查网络驱动启用
+            if grep -q "NETWORK_DRIVER_ENABLE=TRUE" .config; then
+              echo "✅ NETWORK_DRIVER_ENABLE=TRUE found"
+            else
+              echo "❌ NETWORK_DRIVER_ENABLE=TRUE not found"
+            fi
+            
+            # 检查 PXE 启动启用
+            if grep -q "NETWORK_PXE_BOOT_ENABLE=TRUE" .config; then
+              echo "✅ NETWORK_PXE_BOOT_ENABLE=TRUE found"
+            else
+              echo "❌ NETWORK_PXE_BOOT_ENABLE=TRUE not found"
+            fi
+            
+            # 检查 SNP 协议启用
+            if grep -q "NETWORK_SNP_ENABLE=TRUE" .config; then
+              echo "✅ NETWORK_SNP_ENABLE=TRUE found"
+            else
+              echo "❌ NETWORK_SNP_ENABLE=TRUE not found"
+            fi
+            
+            # 检查 RTL8168 支持
+            if grep -q "NETWORK_RTEK_PCI=TRUE" .config; then
+              echo "✅ NETWORK_RTEK_PCI=TRUE found (RTL8168 support)"
+            else
+              echo "❌ NETWORK_RTEK_PCI=TRUE not found"
+            fi
+            
+            # 检查 TLS 禁用
+            if grep -q "NETWORK_TLS_ENABLE=FALSE" .config; then
+              echo "✅ NETWORK_TLS_ENABLE=FALSE found (TLS disabled to avoid build issues)"
+            else
+              echo "❌ NETWORK_TLS_ENABLE=FALSE not found"
+            fi
+            
+            # 检查 VLAN 禁用
+            if grep -q "NETWORK_VLAN_ENABLE=FALSE" .config; then
+              echo "✅ NETWORK_VLAN_ENABLE=FALSE found (VLAN disabled for terminal devices)"
+            else
+              echo "❌ NETWORK_VLAN_ENABLE=FALSE not found"
+            fi
+            
+            # 检查 HTTP 功能禁用
+            if grep -q "NETWORK_HTTP_BOOT_ENABLE=FALSE" .config; then
+              echo "✅ NETWORK_HTTP_BOOT_ENABLE=FALSE found (HTTP boot disabled)"
+            else
+              echo "❌ NETWORK_HTTP_BOOT_ENABLE=FALSE not found"
+            fi
+            
+            # 检查 IPv6 禁用
+            if grep -q "NETWORK_IP6_ENABLE=FALSE" .config; then
+              echo "✅ NETWORK_IP6_ENABLE=FALSE found (IPv6 disabled)"
+            else
+              echo "❌ NETWORK_IP6_ENABLE=FALSE not found"
+            fi
+          else
+            echo "❌ CONFIG_EDK2_CUSTOM_BUILD_PARAMS not found in .config"
+          fi
+        else
+          echo "❌ .config file not found"
+        fi
+        
+        echo "✅ Final build results verification completed"
+      
     - name: Build Kaisa ROM with Docker
       run: |
           echo "🚀 Building Kaisa ROM: ${{ github.event.inputs.release_name || 'kaisa' }}"
@@ -358,98 +481,6 @@ jobs:
           
           echo "✅ ROM build completed"
     
-    - name: Verify final build results
-      run: |
-        echo "🔍 Verifying final build results..."
-        echo "📝 Checking that all configurations are properly applied in generated .config"
-        
-        cd coreboot
-        
-        # 验证生成的 .config 文件
-        echo "🔍 Verifying generated .config file..."
-        if [ -f ".config" ]; then
-          echo "✅ .config file found"
-          
-          # 验证关键配置项
-          echo "🔍 Checking key configurations in .config:"
-          
-          # 检查 PXE 支持
-          if grep -q "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" .config; then
-            echo "✅ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y found in .config"
-          else
-            echo "❌ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y not found in .config"
-          fi
-          
-          # 检查 ROM 加载支持
-          if grep -q "CONFIG_EDK2_LOAD_OPTION_ROMS=y" .config; then
-            echo "✅ CONFIG_EDK2_LOAD_OPTION_ROMS=y found in .config"
-          else
-            echo "❌ CONFIG_EDK2_LOAD_OPTION_ROMS=y not found in .config"
-          fi
-          
-          # 检查 RTL8168 ERI 编程
-          if grep -q "CONFIG_RT8168_PUT_MAC_TO_ERI=y" .config; then
-            echo "✅ CONFIG_RT8168_PUT_MAC_TO_ERI=y found in .config"
-          else
-            echo "❌ CONFIG_RT8168_PUT_MAC_TO_ERI=y not found in .config"
-          fi
-          
-          # 检查 RTL8168 基础重置配置
-          if grep -q "CONFIG_REALTEK_8168_RESET=y" .config; then
-            echo "✅ CONFIG_REALTEK_8168_RESET=y found in .config"
-          else
-            echo "❌ CONFIG_REALTEK_8168_RESET=y not found in .config"
-          fi
-          
-          # 检查传统 VPD MAC 支持
-          if grep -q "CONFIG_RT8168_SUPPORT_LEGACY_VPD_MAC=y" .config; then
-            echo "✅ CONFIG_RT8168_SUPPORT_LEGACY_VPD_MAC=y found in .config"
-          else
-            echo "❌ CONFIG_RT8168_SUPPORT_LEGACY_VPD_MAC=y not found in .config"
-          fi
-          
-          # 检查 EDK2 自定义构建参数
-          if grep -q "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" .config; then
-            echo "✅ CONFIG_EDK2_CUSTOM_BUILD_PARAMS found in .config"
-            echo "📋 EDK2 custom build parameters:"
-            grep "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" .config
-          else
-            echo "❌ CONFIG_EDK2_CUSTOM_BUILD_PARAMS not found in .config"
-          fi
-        else
-          echo "❌ .config file not found"
-        fi
-        
-        # 验证 ROM 文件生成
-        echo "🔍 Verifying ROM file generation..."
-        if [ -f "../roms" ] && [ -d "../roms" ]; then
-          echo "✅ roms directory found"
-          echo "📋 ROM files:"
-          ls -la ../roms/
-          
-          # 检查 ROM 文件
-          if ls ../roms/*.rom 1> /dev/null 2>&1; then
-            echo "✅ ROM file(s) generated successfully"
-            for rom_file in ../roms/*.rom; do
-              size=$(stat -c%s "$rom_file")
-              echo "📏 ROM file size: $size bytes"
-            done
-          else
-            echo "❌ No ROM files found"
-          fi
-          
-          # 检查 SHA1 文件
-          if ls ../roms/*.sha1 1> /dev/null 2>&1; then
-            echo "✅ SHA1 file(s) generated successfully"
-          else
-            echo "⚠️ No SHA1 files found"
-          fi
-        else
-          echo "❌ roms directory not found"
-        fi
-        
-        echo "✅ Final build results verification completed"
-      
     - name: Upload ROM
       run: |
         echo "📋 Files to upload:"
