@@ -233,7 +233,20 @@ jobs:
               
               # 使用 awk 来安全地替换 for 循环
               awk '
-              /for \(i = 0; i < 6; i\+\+\) \{/ {
+              BEGIN { in_function = 0; in_for_loop = 0; skip_until_brace = 0 }
+              /^static void get_mac_address/ { 
+                in_function = 1
+                print
+                next
+              }
+              /^}$/ && in_function {
+                print "\tprintk(BIOS_DEBUG, \"r8168: Parsed MAC address: %02x:%02x:%02x:%02x:%02x:%02x\\n\","
+                print "\t       macaddr[0], macaddr[1], macaddr[2], macaddr[3], macaddr[4], macaddr[5]);"
+                print "}"
+                in_function = 0
+                next
+              }
+              /for \(i = 0; i < 6; i\+\+\) \{/ && in_function {
                 print "\tfor (i = 0; i < 6; i++) {"
                 print "\t\tu8 hex1, hex2;"
                 print "\t\thex1 = get_hex_digit(strbuf[offset]);"
@@ -248,14 +261,18 @@ jobs:
                 print "\t\tmacaddr[i] = (hex1 << 4) | hex2;"
                 print "\t\toffset += 3;"
                 print "\t}"
+                in_for_loop = 1
+                skip_until_brace = 1
                 next
               }
-              /^}$/ && in_function {
-                print "\tprintk(BIOS_DEBUG, \"r8168: Parsed MAC address: %02x:%02x:%02x:%02x:%02x:%02x\\n\","
-                print "\t       macaddr[0], macaddr[1], macaddr[2], macaddr[3], macaddr[4], macaddr[5]);"
-                in_function = 0
+              skip_until_brace && /^\t}/ {
+                skip_until_brace = 0
+                in_for_loop = 0
+                next
               }
-              /^static void get_mac_address/ { in_function = 1 }
+              skip_until_brace {
+                next
+              }
               { print }
               ' "$R8168_DRIVER" > "$TEMP_FILE"
 
