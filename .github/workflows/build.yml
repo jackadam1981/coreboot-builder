@@ -258,11 +258,23 @@ jobs:
               /^static void get_mac_address/ { in_function = 1 }
               { print }
               ' "$R8168_DRIVER" > "$TEMP_FILE"
+
+              # 调试：显示修改前的 get_mac_address 函数
+              echo "📋 Debug: Showing original get_mac_address function:"
+              echo "=========================================="
+              awk '/^static void get_mac_address/,/^}/' "$R8168_DRIVER"
+              echo "=========================================="
               
               # 替换原文件
               mv "$TEMP_FILE" "$R8168_DRIVER"
               
               echo "✅ get_mac_address validation added"
+              
+              # 调试：显示修改后的 get_mac_address 函数
+              echo "📋 Debug: Showing modified get_mac_address function:"
+              echo "=========================================="
+              awk '/^static void get_mac_address/,/^}/' "$R8168_DRIVER"
+              echo "=========================================="
             else
               echo "❌ get_mac_address function not found"
               exit 1
@@ -532,6 +544,12 @@ jobs:
             exit 1
           fi
           
+          # 调试：显示完整的 get_mac_address 函数
+          echo "📋 Debug: Complete get_mac_address function:"
+          echo "=========================================="
+          awk '/^static void get_mac_address/,/^}/' "$R8168_DRIVER"
+          echo "=========================================="
+          
           echo "✅ Step 5 verification completed: get_mac_address validation verified"
         else
           echo "❌ RTL8168 driver not found: $R8168_DRIVER"
@@ -701,11 +719,29 @@ jobs:
               exit 1
             fi
             
-            # 检查 EDK2 子模块状态
-            echo '📋 Checking EDK2 submodule status:'
-            git submodule status payloads/external/edk2 || echo 'EDK2 submodule not found'
-            
-            # 运行构建脚本
+          # 检查 EDK2 子模块状态
+          echo '📋 Checking EDK2 submodule status:'
+          git submodule status payloads/external/edk2 || echo 'EDK2 submodule not found'
+          
+          # 检查 r8168.c 语法
+          echo '📋 Checking r8168.c syntax:'
+          if [ -f 'src/drivers/net/r8168.c' ]; then
+            echo '✅ r8168.c found, checking syntax...'
+            # 使用 gcc 进行语法检查
+            if gcc -fsyntax-only -I src/include -I src/commonlib/include -I src/soc/intel/common/include src/drivers/net/r8168.c 2>&1; then
+              echo '✅ r8168.c syntax is valid'
+            else
+              echo '❌ r8168.c syntax error detected'
+              echo '📋 Showing get_mac_address function for debugging:'
+              awk '/^static void get_mac_address/,/^}/' src/drivers/net/r8168.c
+              exit 1
+            fi
+          else
+            echo '❌ r8168.c not found'
+            exit 1
+          fi
+          
+          # 运行构建脚本
             echo '🚀 Starting build process...'
             if ./build-uefi.sh kaisa; then
               echo '✅ Build script completed successfully'
