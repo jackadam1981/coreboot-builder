@@ -206,6 +206,47 @@ jobs:
         
         echo "✅ Step 4 completed: RTL8111H revision 12-15 ERI support added"
     
+    - name: "Step 5: Fix get_mac_address function validation"
+      run: |
+        echo "🔧 Step 5: Fixing get_mac_address function validation..."
+        echo "📝 Adding hex digit validation and error handling to get_mac_address function"
+        
+        cd coreboot
+        R8168_DRIVER="src/drivers/net/r8168.c"
+        
+        # 检查驱动文件是否存在
+        if [ -f "$R8168_DRIVER" ]; then
+          echo "✅ RTL8168 driver found: $R8168_DRIVER"
+          
+          # 检查是否已经有十六进制验证
+          if grep -q "Check if both hex digits are valid" "$R8168_DRIVER"; then
+            echo "✅ get_mac_address hex validation already present"
+          else
+            echo "📝 Adding hex digit validation to get_mac_address function..."
+            
+            # 查找 get_mac_address 函数中的 for 循环
+            if grep -q "for (i = 0; i < 6; i++)" "$R8168_DRIVER"; then
+              echo "📝 Found get_mac_address function, adding validation..."
+              
+              # 替换原有的简单赋值逻辑为带验证的逻辑
+              sed -i '/for (i = 0; i < 6; i++) {/,/}/c\\tfor (i = 0; i < 6; i++) {\n\t\tu8 hex1, hex2;\n\t\thex1 = get_hex_digit(strbuf[offset]);\n\t\thex2 = get_hex_digit(strbuf[offset + 1]);\n\n\t\t/* Check if both hex digits are valid */\n\t\tif (hex1 > 0x0f || hex2 > 0x0f) {\n\t\t\tprintk(BIOS_ERR, "r8168: Invalid hex digit in MAC address at position %d\\n", i);\n\t\t\treturn;\n\t\t}\n\n\t\tmacaddr[i] = (hex1 << 4) | hex2;\n\t\toffset += 3;\n\t}' "$R8168_DRIVER"
+              
+              # 在函数末尾添加调试输出
+              sed -i '/^}/i\\tprintk(BIOS_DEBUG, "r8168: Parsed MAC address: %02x:%02x:%02x:%02x:%02x:%02x\\n",\n\t       macaddr[0], macaddr[1], macaddr[2], macaddr[3], macaddr[4], macaddr[5]);' "$R8168_DRIVER"
+              
+              echo "✅ get_mac_address validation added"
+            else
+              echo "❌ get_mac_address function not found"
+              exit 1
+            fi
+          fi
+        else
+          echo "❌ RTL8168 driver not found: $R8168_DRIVER"
+          exit 1
+        fi
+        
+        echo "✅ Step 5 completed: get_mac_address validation fixed"
+    
     - name: Simulate build configuration
       run: |
         echo "🔧 Simulating build configuration process..."
@@ -415,6 +456,55 @@ jobs:
           fi
           
           echo "✅ Step 4 verification completed: RTL8111H revision 12-15 ERI support verified"
+        else
+          echo "❌ RTL8168 driver not found: $R8168_DRIVER"
+          exit 1
+        fi
+    
+    - name: "Verify Step 5: get_mac_address function validation"
+      run: |
+        echo "🔍 Verifying Step 5: get_mac_address function validation..."
+        cd coreboot
+        
+        R8168_DRIVER="src/drivers/net/r8168.c"
+        
+        # 验证 RTL8168 驱动文件存在
+        if [ -f "$R8168_DRIVER" ]; then
+          echo "✅ RTL8168 driver found: $R8168_DRIVER"
+          
+          # 验证十六进制数字验证代码
+          if grep -q "Check if both hex digits are valid" "$R8168_DRIVER"; then
+            echo "✅ Hex digit validation code found in get_mac_address function"
+          else
+            echo "❌ Hex digit validation code not found in get_mac_address function"
+            exit 1
+          fi
+          
+          # 验证错误处理代码
+          if grep -q "Invalid hex digit in MAC address at position" "$R8168_DRIVER"; then
+            echo "✅ Error handling for invalid hex digits found"
+          else
+            echo "❌ Error handling for invalid hex digits not found"
+            exit 1
+          fi
+          
+          # 验证调试输出
+          if grep -q "Parsed MAC address:" "$R8168_DRIVER"; then
+            echo "✅ MAC address parsing debug output found"
+          else
+            echo "❌ MAC address parsing debug output not found"
+            exit 1
+          fi
+          
+          # 验证变量声明
+          if grep -q "u8 hex1, hex2;" "$R8168_DRIVER"; then
+            echo "✅ Hex digit variables declaration found"
+          else
+            echo "❌ Hex digit variables declaration not found"
+            exit 1
+          fi
+          
+          echo "✅ Step 5 verification completed: get_mac_address validation verified"
         else
           echo "❌ RTL8168 driver not found: $R8168_DRIVER"
           exit 1
