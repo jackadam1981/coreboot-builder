@@ -145,6 +145,55 @@ jobs:
         
         echo "✅ EDK2 custom build parameters configuration completed"
     
+    - name: "Step 4: Add RTL8111H revision 12-15 ERI support"
+      run: |
+        echo "🔧 Step 4: Adding RTL8111H revision 12-15 ERI programming support..."
+        echo "📝 Ensuring RTL8111H revision 12-15 case is properly supported in r8168.c"
+        
+        cd coreboot
+        R8168_DRIVER="src/drivers/net/r8168.c"
+        
+        # 检查驱动文件是否存在
+        if [ -f "$R8168_DRIVER" ]; then
+          echo "✅ RTL8168 driver found: $R8168_DRIVER"
+          
+          # 检查是否已经有 case 15 支持
+          if grep -q "case 15:" "$R8168_DRIVER"; then
+            echo "✅ RTL8111H revision 15 support already present"
+          else
+            echo "📝 Adding RTL8111H revision 12-15 ERI programming support..."
+            
+            # 查找现有的 case 语句位置
+            if grep -q "case 12:" "$R8168_DRIVER"; then
+              echo "📝 Found existing case 12, adding case 15 support..."
+              
+              # 在 case 12-14 之后添加 case 15
+              sed -i '/case 14:/a\\tcase 15:' "$R8168_DRIVER"
+              sed -i '/case 15:/a\\t\t/* RTL8111H revision 12-15 ERI programming */' "$R8168_DRIVER"
+              sed -i '/RTL8111H revision 12-15 ERI programming/a\\t\tprintk(BIOS_DEBUG, "r8168: Programming ERI for RTL8111H revision %d\\n", pci_read_config8(dev, PCI_REVISION_ID));' "$R8168_DRIVER"
+              sed -i '/Programming ERI for RTL8111H revision/a\\t\toutl(maclo, io_base + ERIDR);' "$R8168_DRIVER"
+              sed -i '/outl(maclo, io_base + ERIDR);/a\\t\tinl(io_base + ERIDR);' "$R8168_DRIVER"
+              sed -i '/inl(io_base + ERIDR);/a\\t\toutl(0x8000f0e0, io_base + ERIAR);' "$R8168_DRIVER"
+              sed -i '/outl(0x8000f0e0, io_base + ERIAR);/a\\t\tinl(io_base + ERIAR);' "$R8168_DRIVER"
+              sed -i '/inl(io_base + ERIAR);/a\\t\toutl(machi, io_base + ERIDR);' "$R8168_DRIVER"
+              sed -i '/outl(machi, io_base + ERIDR);/a\\t\tinl(io_base + ERIDR);' "$R8168_DRIVER"
+              sed -i '/inl(io_base + ERIDR);/a\\t\toutl(0x800030e4, io_base + ERIAR);' "$R8168_DRIVER"
+              sed -i '/outl(0x800030e4, io_base + ERIAR);/a\\t\tprintk(BIOS_DEBUG, "r8168: ERI programming completed for RTL8111H\\n");' "$R8168_DRIVER"
+              sed -i '/ERI programming completed for RTL8111H/a\\t\tbreak;' "$R8168_DRIVER"
+              
+              echo "✅ RTL8111H revision 15 support added"
+            else
+              echo "❌ Case 12 not found, cannot add case 15 support"
+              exit 1
+            fi
+          fi
+        else
+          echo "❌ RTL8168 driver not found: $R8168_DRIVER"
+          exit 1
+        fi
+        
+        echo "✅ Step 4 completed: RTL8111H revision 12-15 ERI support added"
+    
     - name: Simulate build configuration
       run: |
         echo "🔧 Simulating build configuration process..."
@@ -301,6 +350,55 @@ jobs:
         fi
         
         echo "✅ Step 3 verification completed: EDK2 custom build parameters verified"
+    
+    - name: "Verify Step 4: RTL8111H revision 12-15 ERI support"
+      run: |
+        echo "🔍 Verifying Step 4: RTL8111H revision 12-15 ERI support..."
+        cd coreboot
+        
+        R8168_DRIVER="src/drivers/net/r8168.c"
+        
+        # 验证 RTL8168 驱动文件存在
+        if [ -f "$R8168_DRIVER" ]; then
+          echo "✅ RTL8168 driver found: $R8168_DRIVER"
+          
+          # 验证 case 15 支持
+          if grep -q "case 15:" "$R8168_DRIVER"; then
+            echo "✅ RTL8111H revision 15 case found in driver"
+          else
+            echo "❌ RTL8111H revision 15 case not found in driver"
+            exit 1
+          fi
+          
+          # 验证 ERI 编程代码
+          if grep -q "RTL8111H revision 12-15 ERI programming" "$R8168_DRIVER"; then
+            echo "✅ RTL8111H revision 12-15 ERI programming code found"
+          else
+            echo "❌ RTL8111H revision 12-15 ERI programming code not found"
+            exit 1
+          fi
+          
+          # 验证调试输出
+          if grep -q "Programming ERI for RTL8111H revision" "$R8168_DRIVER"; then
+            echo "✅ RTL8111H ERI programming debug output found"
+          else
+            echo "❌ RTL8111H ERI programming debug output not found"
+            exit 1
+          fi
+          
+          # 验证完成调试输出
+          if grep -q "ERI programming completed for RTL8111H" "$R8168_DRIVER"; then
+            echo "✅ RTL8111H ERI programming completion debug output found"
+          else
+            echo "❌ RTL8111H ERI programming completion debug output not found"
+            exit 1
+          fi
+          
+          echo "✅ Step 4 verification completed: RTL8111H revision 12-15 ERI support verified"
+        else
+          echo "❌ RTL8168 driver not found: $R8168_DRIVER"
+          exit 1
+        fi
     
     - name: Verify final build results
       run: |
