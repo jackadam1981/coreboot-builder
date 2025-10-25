@@ -24,17 +24,42 @@ jobs:
       with:
         submodules: recursive
     
+    - name: Cache Docker image
+      uses: actions/cache@v3
+      with:
+        path: ~/.docker
+        key: docker-coreboot-sdk-${{ hashFiles('**/lockfiles') }}
+        restore-keys: |
+          docker-coreboot-sdk-
+    
+    - name: Pull Docker image
+      run: |
+        echo "🐳 Pulling coreboot/coreboot-sdk Docker image..."
+        docker pull coreboot/coreboot-sdk:latest
+        echo "✅ Docker image ready"
+    
+    - name: Cache coreboot source
+      uses: actions/cache@v3
+      with:
+        path: coreboot
+        key: coreboot-${{ hashFiles('**/lockfiles') }}
+        restore-keys: |
+          coreboot-
+    
     - name: Clone MrChromebox coreboot
       run: |
         echo "📥 Cloning MrChromebox coreboot repository..."
         if [ ! -d "coreboot" ]; then
+          echo "📥 Cache miss, cloning repository..."
           git clone https://github.com/mrchromebox/coreboot.git
+        else
+          echo "✅ Cache hit, using cached repository"
         fi
         
         cd coreboot
         echo "📦 Updating submodules..."
         git submodule update --init --checkout --recursive
-        echo "✅ Source code cloned and submodules updated"
+        echo "✅ Source code ready"
     
     - name: Apply custom modifications
       run: |
@@ -64,6 +89,7 @@ jobs:
         docker run --rm -v "$(pwd)":/home/coreboot/coreboot -v "$(pwd)/../roms":/home/coreboot/roms -w /home/coreboot/coreboot coreboot/coreboot-sdk:latest bash -c "
           echo '🔧 Building Kaisa ROM...'
           git config --global --add safe.directory /home/coreboot/coreboot
+          chmod -R 755 /home/coreboot/coreboot
           ./build-uefi.sh kaisa
           echo '✅ Build completed'
         "
@@ -77,3 +103,5 @@ jobs:
         path: |
           roms/*.rom
           roms/*.sha1
+          coreboot/roms/*.rom
+          coreboot/roms/*.sha1
