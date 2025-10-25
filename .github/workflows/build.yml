@@ -77,10 +77,14 @@ jobs:
         CONFIG_FILE="coreboot/configs/cml/config.kaisa.uefi"
         
 
-        echo "📝 Adding CONFIG_EDK2_NETWORK_PXE_SUPPORT=y to configuration..."
+        echo "📝 Adding EDK2 network and RTL8168 configurations..."
         echo "" >> "$CONFIG_FILE"
         echo "# EDK2 Network PXE Support" >> "$CONFIG_FILE"
         echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> "$CONFIG_FILE"
+        echo "CONFIG_EDK2_LOAD_OPTION_ROMS=y" >> "$CONFIG_FILE"
+        echo "" >> "$CONFIG_FILE"
+        echo "# RTL8168 MAC Address ERI Programming" >> "$CONFIG_FILE"
+        echo "CONFIG_RT8168_PUT_MAC_TO_ERI=y" >> "$CONFIG_FILE"
 
         
         echo "✅ Kaisa board configuration updated"
@@ -149,10 +153,28 @@ jobs:
         CONFIG_FILE="coreboot/configs/cml/config.kaisa.uefi"
         if [ -f "$CONFIG_FILE" ]; then
           echo "✅ Kaisa UEFI config found"
+          
+          # 验证 PXE 支持
           if grep -q "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" "$CONFIG_FILE"; then
-            echo "✅ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y found in config file"
+            echo "✅ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y found"
           else
-            echo "❌ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y not found in config file"
+            echo "❌ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y not found"
+            exit 1
+          fi
+          
+          # 验证 ROM 加载支持
+          if grep -q "CONFIG_EDK2_LOAD_OPTION_ROMS=y" "$CONFIG_FILE"; then
+            echo "✅ CONFIG_EDK2_LOAD_OPTION_ROMS=y found"
+          else
+            echo "❌ CONFIG_EDK2_LOAD_OPTION_ROMS=y not found"
+            exit 1
+          fi
+          
+          # 验证 RTL8168 ERI 编程
+          if grep -q "CONFIG_RT8168_PUT_MAC_TO_ERI=y" "$CONFIG_FILE"; then
+            echo "✅ CONFIG_RT8168_PUT_MAC_TO_ERI=y found"
+          else
+            echo "❌ CONFIG_RT8168_PUT_MAC_TO_ERI=y not found"
             exit 1
           fi
         else
