@@ -43,8 +43,9 @@ jobs:
         
         # Build using Docker
         echo "🐳 Building with coreboot/coreboot-sdk Docker image..."
-        docker run --rm -v "$(pwd)":/home/coreboot/coreboot -v "$(pwd)/../roms":/home/coreboot/roms -w /home/coreboot/coreboot coreboot/coreboot-sdk:latest bash -c "
+        docker run --rm --user root -v "$(pwd)":/home/coreboot/coreboot -v "$(pwd)/../roms":/home/coreboot/roms -w /home/coreboot/coreboot coreboot/coreboot-sdk:latest bash -c "
           echo '🔧 Building Kaisa ROM...'
+          git config --global --add safe.directory /home/coreboot/coreboot
           ./build-uefi.sh kaisa
           echo '✅ Build completed'
         "
