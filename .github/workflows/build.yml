@@ -662,11 +662,32 @@ jobs:
             echo '📋 Checking output directory setup:'
             ls -la /home/coreboot/roms/ || echo 'Output directory not found'
             
+            # 检查配置文件
+            echo '📋 Checking Kaisa configuration:'
+            if [ -f 'configs/cml/config.kaisa.uefi' ]; then
+              echo '✅ Kaisa config found'
+              echo '📋 Config file contents:'
+              cat configs/cml/config.kaisa.uefi
+            else
+              echo '❌ Kaisa config not found'
+              exit 1
+            fi
+            
+            # 检查 EDK2 子模块状态
+            echo '📋 Checking EDK2 submodule status:'
+            git submodule status payloads/external/edk2 || echo 'EDK2 submodule not found'
+            
             # 运行构建脚本
+            echo '🚀 Starting build process...'
             if ./build-uefi.sh kaisa; then
               echo '✅ Build script completed successfully'
             else
               echo '❌ Build script failed'
+              echo '📋 Checking build logs...'
+              if [ -f 'build.log' ]; then
+                echo '📋 Build log contents:'
+                tail -50 build.log
+              fi
               exit 1
             fi
             
