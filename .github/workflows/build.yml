@@ -67,67 +67,36 @@ jobs:
         chmod -R 755 .
         echo "✅ Source code ready"
     
-    - name: Download and prepare RTL UNDI driver
+    - name: Prepare RTL UNDI driver
       run: |
-        echo "🔧 下载并准备 RTL UNDI 驱动"
+        echo "🔧 准备预下载的 RTL UNDI 驱动"
         cd coreboot
         
-        # 检查是否有预下载的 RTL 驱动
+        # 检查预下载的 RTL 驱动
         if [ -f "../RtkUndiDxe.efi" ]; then
           echo "✅ 找到预下载的 RTL UNDI 驱动"
-          DRIVER_SOURCE="../RtkUndiDxe.efi"
-        else
-          echo "📥 下载最新的 RTL UNDI 驱动..."
-          
-          # 创建临时目录
-          mkdir -p /tmp/rtl_driver
-          cd /tmp/rtl_driver
-          
-          # 尝试从多个源下载 RTL UNDI 驱动
-          echo "🔍 尝试从 Realtek 官方源下载..."
-          
-          # 方法1: 从 Realtek 官方下载（需要具体的下载链接）
-          # wget -O RtkUndiDxe.efi "https://www.realtek.com/downloads/..."
-          
-          # 方法2: 从 GitHub 或其他可信源下载
-          # 这里需要实际的下载链接
-          echo "⚠️ 需要配置实际的 RTL UNDI 驱动下载链接"
-          echo "📝 当前使用 MrChromebox EDK2 中的原始驱动"
-          
-          # 回到 coreboot 目录
-          cd /home/runner/work/coreboot-builder/coreboot-builder/coreboot
-        fi
-        
-        # 如果找到了驱动文件，进行验证和复制
-        if [ -f "$DRIVER_SOURCE" ] 2>/dev/null || [ -f "/tmp/rtl_driver/RtkUndiDxe.efi" ]; then
-          if [ -f "$DRIVER_SOURCE" ]; then
-            echo "✅ 使用预下载的 RTL UNDI 驱动"
-          else
-            echo "✅ 使用下载的 RTL UNDI 驱动"
-            DRIVER_SOURCE="/tmp/rtl_driver/RtkUndiDxe.efi"
-          fi
           
           # 验证驱动文件
           echo "📊 驱动文件信息:"
-          file "$DRIVER_SOURCE"
-          size=$(stat -c%s "$DRIVER_SOURCE")
+          file "../RtkUndiDxe.efi"
+          size=$(stat -c%s "../RtkUndiDxe.efi")
           echo "📏 文件大小: $size bytes"
           
           # 检查版本信息
           echo "📋 版本信息:"
-          strings "$DRIVER_SOURCE" | grep -i "version\|ver\|v[0-9]" | head -5
+          strings "../RtkUndiDxe.efi" | grep -i "version\|ver\|v[0-9]" | head -5
           
           # 检查 PXE/UNDI 功能
           echo "🌐 PXE/UNDI 功能:"
-          strings "$DRIVER_SOURCE" | grep -i "pxe\|undi" | head -5
+          strings "../RtkUndiDxe.efi" | grep -i "pxe\|undi" | head -5
           
           # 复制到构建目录
           echo "💾 复制 RTL 驱动到构建目录..."
-          cp "$DRIVER_SOURCE" "rtl_undi_driver_updated.efi"
+          cp "../RtkUndiDxe.efi" "rtl_undi_driver_updated.efi"
           echo "✅ RTL UNDI 驱动准备完成"
           echo "📝 此驱动将在 EDK2 构建过程中被集成到固件中"
         else
-          echo "⚠️ 未找到 RTL 驱动文件"
+          echo "⚠️ 未找到预下载的 RTL 驱动文件"
           echo "📝 将使用 MrChromebox EDK2 中的原始驱动"
         fi
 
