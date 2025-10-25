@@ -59,6 +59,8 @@ jobs:
         cd coreboot
         echo "📦 Updating submodules..."
         git submodule update --init --checkout --recursive
+        echo "🔧 Setting proper permissions..."
+        chmod -R 755 .
         echo "✅ Source code ready"
     
     - name: Apply custom modifications
@@ -89,7 +91,6 @@ jobs:
         docker run --rm -v "$(pwd)":/home/coreboot/coreboot -v "$(pwd)/../roms":/home/coreboot/roms -w /home/coreboot/coreboot coreboot/coreboot-sdk:latest bash -c "
           echo '🔧 Building Kaisa ROM...'
           git config --global --add safe.directory /home/coreboot/coreboot
-          chmod -R 755 /home/coreboot/coreboot
           ./build-uefi.sh kaisa
           echo '✅ Build completed'
         "
