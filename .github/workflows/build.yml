@@ -11,7 +11,7 @@ on:
       release_name:
         description: 'Release name (e.g., kaisa-v1.0)'
         required: false
-        default: 'kaisa-v1.1,配置CONFIG_EDK2_NETWORK_PXE_SUPPORT=y，支持PXE启动'
+        default: 'kaisa-v1.1,配置EDK2_custom_build_params,定制编译EDK2'
         type: string
 
 jobs:
@@ -109,7 +109,7 @@ jobs:
           # 添加优化的 EDK2 自定义构建参数
           echo "" >> "$CONFIG_FILE"
           echo "# EDK2 custom build parameters for PXE network boot" >> "$CONFIG_FILE"
-          echo 'CONFIG_EDK2_CUSTOM_BUILD_PARAMS="-D NETWORK_DRIVER_ENABLE=TRUE -D NETWORK_ENABLE=TRUE -D NETWORK_IP4_ENABLE=TRUE -D NETWORK_IP6_ENABLE=FALSE -D NETWORK_PXE_BOOT_ENABLE=TRUE -D NETWORK_HTTP_BOOT_ENABLE=FALSE -D NETWORK_HTTP_ENABLE=FALSE -D NETWORK_ALLOW_HTTP_CONNECTIONS=FALSE -D NETWORK_SNP_ENABLE=TRUE -D NETWORK_VLAN_ENABLE=FALSE -D NETWORK_RTEK_PCI=TRUE -D NETWORK_TLS_ENABLE=TRUE -D NETWORK_ISCSI_ENABLE=FALSE -D NETWORK_RTEK_USB=FALSE -D NETWORK_ASIX_USB3=FALSE -D NETWORK_ASIX_USB2=FALSE"' >> "$CONFIG_FILE"
+          echo 'CONFIG_EDK2_CUSTOM_BUILD_PARAMS="-D NETWORK_DRIVER_ENABLE=TRUE -D NETWORK_ENABLE=TRUE -D NETWORK_IP4_ENABLE=TRUE -D NETWORK_IP6_ENABLE=FALSE -D NETWORK_PXE_BOOT_ENABLE=TRUE -D NETWORK_HTTP_BOOT_ENABLE=FALSE -D NETWORK_HTTP_ENABLE=FALSE -D NETWORK_ALLOW_HTTP_CONNECTIONS=FALSE -D NETWORK_SNP_ENABLE=TRUE -D NETWORK_VLAN_ENABLE=FALSE -D NETWORK_RTEK_PCI=TRUE -D NETWORK_TLS_ENABLE=FALSE -D NETWORK_ISCSI_ENABLE=FALSE -D NETWORK_RTEK_USB=FALSE -D NETWORK_ASIX_USB3=FALSE -D NETWORK_ASIX_USB2=FALSE"' >> "$CONFIG_FILE"
           
           echo "✅ EDK2 custom build parameters configured"
         else
@@ -211,11 +211,11 @@ jobs:
               echo "❌ NETWORK_RTEK_PCI=TRUE not found"
             fi
             
-            # 检查 TLS 支持
-            if grep -q "NETWORK_TLS_ENABLE=TRUE" "$CONFIG_FILE"; then
-              echo "✅ NETWORK_TLS_ENABLE=TRUE found (encryption support)"
+            # 检查 TLS 禁用
+            if grep -q "NETWORK_TLS_ENABLE=FALSE" "$CONFIG_FILE"; then
+              echo "✅ NETWORK_TLS_ENABLE=FALSE found (TLS disabled to avoid build issues)"
             else
-              echo "❌ NETWORK_TLS_ENABLE=TRUE not found"
+              echo "❌ NETWORK_TLS_ENABLE=FALSE not found"
             fi
             
             # 检查 VLAN 禁用
@@ -285,10 +285,40 @@ jobs:
         mkdir -p ../roms
         
         # Build using Docker
+        echo "🔧 Starting Docker build..."
         docker run --rm --user root -v "$(pwd)":/home/coreboot/coreboot -v "$(pwd)/../roms":/home/coreboot/roms -w /home/coreboot/coreboot coreboot/coreboot-sdk:latest bash -c "
           echo '🔧 Building Kaisa ROM...'
           git config --global --add safe.directory /home/coreboot/coreboot
-          ./build-uefi.sh kaisa
+          
+          # 检查 build-uefi.sh 是否存在
+          if [ ! -f './build-uefi.sh' ]; then
+            echo '❌ build-uefi.sh not found'
+            exit 1
+          fi
+          
+          # 检查权限
+          ls -la ./build-uefi.sh
+          
+          # 检查输出目录
+          echo '📋 Checking output directory setup:'
+          ls -la /home/coreboot/roms/ || echo 'Output directory not found'
+          
+          # 运行构建脚本
+          if ./build-uefi.sh kaisa; then
+            echo '✅ Build script completed successfully'
+          else
+            echo '❌ Build script failed'
+            exit 1
+          fi
+          
+          # 检查构建输出
+          echo '📋 Checking build output in /home/coreboot/roms:'
+          ls -la /home/coreboot/roms/ || echo 'No files in /home/coreboot/roms'
+          
+          # 检查 coreboot 目录中的 roms
+          echo '📋 Checking build output in coreboot directory:'
+          ls -la roms/ || echo 'No files in coreboot/roms'
+          
           echo '✅ Build completed'
         "
         
