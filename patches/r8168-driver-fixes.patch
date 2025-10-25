@@ -1,17 +1,6 @@
-diff --git a/src/drivers/net/r8168.c b/src/drivers/net/r8168.c
-index 8ef2ee8148..a9a1da13d1 100644
---- a/src/drivers/net/r8168.c
-+++ b/src/drivers/net/r8168.c
-@@ -117,7 +117,7 @@ static enum cb_err fetch_mac_vpd_key(u8 *macstrbuf, const char *vpd_key)
- 	}
- 	printk(BIOS_DEBUG, "Located '%s' in VPD\n", vpd_key);
- 
--	offset += strlen(vpd_key) + 1;	/* move to next character */
-+	offset += vpd[offset + 1] + 2;	/* move to next character */
- 
- 	if (offset + MACLEN > search_length) {
- 		rdev_munmap(&rdev, search_address);
-@@ -245,8 +245,12 @@ static void program_mac_address(struct device *dev, u16 io_base)
+--- coreboot-official/src/drivers/net/r8168.c	2025-10-24 18:11:41.757742724 +0800
++++ coreboot/src/drivers/net/r8168.c	2025-10-25 11:05:00.000000000 +0800
+@@ -245,8 +245,12 @@
  	inl(io_base);
  	/* Some boards (e.g. asus/p8z77-v_le_plus) need the MAC address set here too */
  	if (CONFIG(RT8168_PUT_MAC_TO_ERI)) {
@@ -24,7 +13,7 @@ index 8ef2ee8148..a9a1da13d1 100644
  			outl((maclo & 0xffff) << 16, io_base + ERIDR);
  			inl(io_base + ERIDR);
  			outl(0x8000f0f0, io_base + ERIAR);
-@@ -256,6 +260,7 @@ static void program_mac_address(struct device *dev, u16 io_base)
+@@ -256,6 +260,7 @@
  			outl(0x8000f0f4, io_base + ERIAR);
  			break;
  		case 9:
@@ -32,7 +21,7 @@ index 8ef2ee8148..a9a1da13d1 100644
  			outl(maclo, io_base + ERIDR);
  			inl(io_base + ERIDR);
  			outl(0x8000f0e0, io_base + ERIAR);
-@@ -264,6 +269,21 @@ static void program_mac_address(struct device *dev, u16 io_base)
+@@ -264,6 +269,21 @@
  			inl(io_base + ERIDR);
  			outl(0x800030e4, io_base + ERIAR);
  			break;
