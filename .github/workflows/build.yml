@@ -67,7 +67,7 @@ jobs:
         chmod -R 755 .
         echo "✅ Source code ready"
     
-    - name: Apply custom modifications 01
+    - name: Apply custom modifications
       run: |
         echo "🔧 Applying custom modifications to coreboot source..."
         echo "📝 Applying RTL8168 driver fixes and EDK2 configurations"
@@ -86,13 +86,44 @@ jobs:
         echo "✅ Kaisa board configuration updated"
         echo "✅ Custom modifications step completed"
     
-    - name: Verify source modifications 01
+    - name: Configure EDK2 custom build parameters
       run: |
-        echo "🔍 Verifying source modifications..."
-        echo "📝 Verifying that all custom modifications were applied correctly"
+        echo "🔧 Configuring EDK2 custom build parameters..."
+        echo "📝 Adding optimized EDK2 network configuration for PXE boot"
         
-        # 验证主板配置文件 - 参考 build-uefi.sh 流程
-        echo "🔍 Verifying Kaisa board configuration..."
+        CONFIG_FILE="coreboot/configs/cml/config.kaisa.uefi"
+        
+        # 检查配置文件是否存在
+        if [ -f "$CONFIG_FILE" ]; then
+          echo "✅ Kaisa UEFI config found"
+          
+          # 检查是否已经存在 EDK2 自定义构建参数
+          if grep -q "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" "$CONFIG_FILE"; then
+            echo "📝 Updating existing CONFIG_EDK2_CUSTOM_BUILD_PARAMS..."
+            # 删除旧的配置行
+            sed -i '/CONFIG_EDK2_CUSTOM_BUILD_PARAMS/d' "$CONFIG_FILE"
+          else
+            echo "📝 Adding new CONFIG_EDK2_CUSTOM_BUILD_PARAMS..."
+          fi
+          
+          # 添加优化的 EDK2 自定义构建参数
+          echo "" >> "$CONFIG_FILE"
+          echo "# EDK2 custom build parameters for PXE network boot" >> "$CONFIG_FILE"
+          echo 'CONFIG_EDK2_CUSTOM_BUILD_PARAMS="-D NETWORK_DRIVER_ENABLE=TRUE -D NETWORK_ENABLE=TRUE -D NETWORK_IP4_ENABLE=TRUE -D NETWORK_IP6_ENABLE=FALSE -D NETWORK_PXE_BOOT_ENABLE=TRUE -D NETWORK_HTTP_BOOT_ENABLE=FALSE -D NETWORK_HTTP_ENABLE=FALSE -D NETWORK_ALLOW_HTTP_CONNECTIONS=FALSE -D NETWORK_SNP_ENABLE=TRUE -D NETWORK_VLAN_ENABLE=FALSE -D NETWORK_RTEK_PCI=TRUE -D NETWORK_TLS_ENABLE=TRUE -D NETWORK_ISCSI_ENABLE=FALSE -D NETWORK_RTEK_USB=FALSE -D NETWORK_ASIX_USB3=FALSE -D NETWORK_ASIX_USB2=FALSE"' >> "$CONFIG_FILE"
+          
+          echo "✅ EDK2 custom build parameters configured"
+        else
+          echo "❌ Kaisa UEFI config not found"
+          exit 1
+        fi
+        
+        echo "✅ EDK2 custom build parameters configuration completed"
+    
+    - name: Simulate build configuration
+      run: |
+        echo "🔧 Simulating build configuration process..."
+        echo "📝 This step simulates the build-uefi.sh configuration process"
+        
         cd coreboot
         
         # 复制配置文件到根目录（参考 build-uefi.sh 第31行）
@@ -100,16 +131,131 @@ jobs:
         echo "📋 Copying $cfg_file to .config"
         cp "$cfg_file" .config
         
-        # 添加版本信息（参考 build-uefi.sh 第32行）
-        rev=$(git describe --tags --dirty)
-        echo "CONFIG_LOCALVERSION=\"${rev}\"" >> .config
-        
         # 执行 make clean 和 make olddefconfig（参考 build-uefi.sh 第33-34行）
         echo "🧹 Running make clean..."
         make clean
         
         echo "⚙️ Running make olddefconfig..."
         make olddefconfig
+        
+        echo "✅ Build configuration simulation completed"
+    
+    - name: Verify custom modifications
+      run: |
+        echo "🔍 Verifying custom modifications..."
+        echo "📝 Checking that CONFIG_EDK2_NETWORK_PXE_SUPPORT=y was added"
+        
+        # 验证配置文件修改
+        CONFIG_FILE="coreboot/configs/cml/config.kaisa.uefi"
+        if [ -f "$CONFIG_FILE" ]; then
+          echo "✅ Kaisa UEFI config found"
+          if grep -q "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" "$CONFIG_FILE"; then
+            echo "✅ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y found in config file"
+          else
+            echo "❌ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y not found in config file"
+            exit 1
+          fi
+        else
+          echo "❌ Kaisa UEFI config not found"
+          exit 1
+        fi
+        
+        echo "✅ Custom modifications verification completed"
+    
+    - name: Verify EDK2 custom build parameters
+      run: |
+        echo "🔍 Verifying EDK2 custom build parameters..."
+        echo "📝 Checking that all required EDK2 parameters are configured"
+        
+        CONFIG_FILE="coreboot/configs/cml/config.kaisa.uefi"
+        
+        # 检查配置文件是否存在
+        if [ -f "$CONFIG_FILE" ]; then
+          echo "✅ Kaisa UEFI config found"
+          
+          # 验证 EDK2 自定义构建参数
+          echo "🔍 Verifying CONFIG_EDK2_CUSTOM_BUILD_PARAMS..."
+          if grep -q "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" "$CONFIG_FILE"; then
+            echo "✅ CONFIG_EDK2_CUSTOM_BUILD_PARAMS found"
+            echo "📋 Current EDK2 custom build parameters:"
+            grep "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" "$CONFIG_FILE"
+            
+            # 验证关键参数
+            echo "🔍 Verifying key EDK2 parameters:"
+            
+            # 检查网络驱动启用
+            if grep -q "NETWORK_DRIVER_ENABLE=TRUE" "$CONFIG_FILE"; then
+              echo "✅ NETWORK_DRIVER_ENABLE=TRUE found"
+            else
+              echo "❌ NETWORK_DRIVER_ENABLE=TRUE not found"
+            fi
+            
+            # 检查 PXE 启动启用
+            if grep -q "NETWORK_PXE_BOOT_ENABLE=TRUE" "$CONFIG_FILE"; then
+              echo "✅ NETWORK_PXE_BOOT_ENABLE=TRUE found"
+            else
+              echo "❌ NETWORK_PXE_BOOT_ENABLE=TRUE not found"
+            fi
+            
+            # 检查 SNP 协议启用
+            if grep -q "NETWORK_SNP_ENABLE=TRUE" "$CONFIG_FILE"; then
+              echo "✅ NETWORK_SNP_ENABLE=TRUE found"
+            else
+              echo "❌ NETWORK_SNP_ENABLE=TRUE not found"
+            fi
+            
+            # 检查 RTL8168 支持
+            if grep -q "NETWORK_RTEK_PCI=TRUE" "$CONFIG_FILE"; then
+              echo "✅ NETWORK_RTEK_PCI=TRUE found (RTL8168 support)"
+            else
+              echo "❌ NETWORK_RTEK_PCI=TRUE not found"
+            fi
+            
+            # 检查 TLS 支持
+            if grep -q "NETWORK_TLS_ENABLE=TRUE" "$CONFIG_FILE"; then
+              echo "✅ NETWORK_TLS_ENABLE=TRUE found (encryption support)"
+            else
+              echo "❌ NETWORK_TLS_ENABLE=TRUE not found"
+            fi
+            
+            # 检查 VLAN 禁用
+            if grep -q "NETWORK_VLAN_ENABLE=FALSE" "$CONFIG_FILE"; then
+              echo "✅ NETWORK_VLAN_ENABLE=FALSE found (VLAN disabled for terminal devices)"
+            else
+              echo "❌ NETWORK_VLAN_ENABLE=FALSE not found"
+            fi
+            
+            # 检查 HTTP 功能禁用
+            if grep -q "NETWORK_HTTP_BOOT_ENABLE=FALSE" "$CONFIG_FILE"; then
+              echo "✅ NETWORK_HTTP_BOOT_ENABLE=FALSE found (HTTP boot disabled)"
+            else
+              echo "❌ NETWORK_HTTP_BOOT_ENABLE=FALSE not found"
+            fi
+            
+            # 检查 IPv6 禁用
+            if grep -q "NETWORK_IP6_ENABLE=FALSE" "$CONFIG_FILE"; then
+              echo "✅ NETWORK_IP6_ENABLE=FALSE found (IPv6 disabled)"
+            else
+              echo "❌ NETWORK_IP6_ENABLE=FALSE not found"
+            fi
+            
+          else
+            echo "❌ CONFIG_EDK2_CUSTOM_BUILD_PARAMS not found"
+            exit 1
+          fi
+        else
+          echo "❌ Kaisa UEFI config not found"
+          exit 1
+        fi
+        
+        echo "✅ EDK2 custom build parameters verification completed"
+    
+    - name: Verify build configuration
+      run: |
+        echo "🔍 Verifying build configuration..."
+        echo "📝 Checking that CONFIG_EDK2_NETWORK_PXE_SUPPORT=y is properly configured for build"
+        
+        cd coreboot
         
         # 验证 .config 文件中的配置
         echo "🔍 Verifying CONFIG_EDK2_NETWORK_PXE_SUPPORT in .config..."
@@ -126,75 +272,7 @@ jobs:
         echo "📋 EDK2 Network configuration in .config:"
         grep -n "CONFIG_EDK2.*NETWORK\|CONFIG_EDK2.*PXE" .config || echo "  No additional network configs found"
         
-        echo "✅ Source modifications verification completed"
-    
-    - name: Apply EDK2 customizations
-      run: |
-        echo "🔧 Applying EDK2 customizations..."
-        echo "📋 Current EDK2 configuration:"
-        if [ -f "configs/cml/config.kaisa.uefi" ]; then
-          echo "✅ Kaisa UEFI config found"
-          echo "📋 EDK2 Network settings:"
-          grep -E "CONFIG_EDK2.*NETWORK|CONFIG_EDK2.*PXE|CONFIG_EDK2.*CUSTOM" configs/cml/config.kaisa.uefi || echo "No EDK2 network config found"
-        else
-          echo "❌ Kaisa UEFI config not found"
-        fi
-        
-        # TODO: Add EDK2-specific modifications here
-        # Example: Modify EDK2 network settings, PXE configuration, etc.
-        echo "✅ EDK2 customizations completed"
-    
-    - name: Verify EDK2 customizations
-      run: |
-        echo "🔍 Verifying EDK2 customizations..."
-        echo "📋 Checking EDK2 configuration files:"
-        
-        # Check if EDK2 config exists
-        if [ -f "configs/cml/config.kaisa.uefi" ]; then
-          echo "✅ Kaisa UEFI config exists"
-          
-          # Check for key EDK2 settings
-          echo "🔍 Checking EDK2 network settings:"
-          if grep -q "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" configs/cml/config.kaisa.uefi; then
-            echo "✅ PXE support enabled"
-          else
-            echo "❌ PXE support not found"
-          fi
-          
-          if grep -q "CONFIG_EDK2_LOAD_OPTION_ROMS=y" configs/cml/config.kaisa.uefi; then
-            echo "✅ Option ROMs enabled"
-          else
-            echo "❌ Option ROMs not found"
-          fi
-          
-          if grep -q "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" configs/cml/config.kaisa.uefi; then
-            echo "✅ Custom build parameters found"
-            echo "📋 Custom build parameters:"
-            grep "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" configs/cml/config.kaisa.uefi
-          else
-            echo "❌ Custom build parameters not found"
-          fi
-          
-          # Check for other EDK2 settings
-          echo "🔍 Checking other EDK2 settings:"
-          if grep -q "CONFIG_EDK2_BOOT_TIMEOUT" configs/cml/config.kaisa.uefi; then
-            echo "✅ Boot timeout configured"
-            grep "CONFIG_EDK2_BOOT_TIMEOUT" configs/cml/config.kaisa.uefi
-          else
-            echo "❌ Boot timeout not configured"
-          fi
-          
-          if grep -q "CONFIG_EDK2_BOOT_MANAGER_ESCAPE" configs/cml/config.kaisa.uefi; then
-            echo "✅ Boot manager escape configured"
-            grep "CONFIG_EDK2_BOOT_MANAGER_ESCAPE" configs/cml/config.kaisa.uefi
-          else
-            echo "❌ Boot manager escape not configured"
-          fi
-        else
-          echo "❌ Kaisa UEFI config not found"
-        fi
-        
-        echo "✅ EDK2 customizations verified"
+        echo "✅ Build configuration verification completed"
     
     - name: Build Kaisa ROM with Docker
       run: |
