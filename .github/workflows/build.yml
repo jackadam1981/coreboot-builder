@@ -104,8 +104,6 @@ jobs:
         path: |
           roms/*.rom
           roms/*.sha1
-          coreboot/roms/*.rom
-          coreboot/roms/*.sha1
     
     - name: Create Release
       if: ${{ (github.event_name == 'workflow_dispatch' && inputs.release) || (github.event_name != 'workflow_dispatch') }}
