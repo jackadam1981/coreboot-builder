@@ -206,10 +206,10 @@ jobs:
         
         echo "✅ Step 4 completed: RTL8111H revision 12-15 ERI support added"
     
-    - name: "Step 5: Fix get_mac_address function validation"
+    - name: "Step 5: Fix RTL8168 driver and VPD parsing"
       run: |
-        echo "🔧 Step 5: Fixing get_mac_address function validation..."
-        echo "📝 Adding hex digit validation and error handling to get_mac_address function"
+        echo "🔧 Step 5: Fixing RTL8168 driver and VPD parsing..."
+        echo "📝 Fixing get_mac_address function and adding VPD parsing fix"
         
         cd coreboot
         R8168_DRIVER="src/drivers/net/r8168.c"
@@ -217,6 +217,25 @@ jobs:
         # 检查驱动文件是否存在
         if [ -f "$R8168_DRIVER" ]; then
           echo "✅ RTL8168 driver found: $R8168_DRIVER"
+          
+          # 5.1: 添加 VPD 解析修复
+          echo "📝 5.1: Adding VPD parsing fix using vpd_find()..."
+          
+          # 添加 VPD 头文件
+          if ! grep -q "#include <drivers/vpd/vpd.h>" "$R8168_DRIVER"; then
+            sed -i '/#include "chip.h"/a\\#include <drivers/vpd/vpd.h>' "$R8168_DRIVER"
+            echo "✅ Added VPD header include"
+          fi
+          
+          # 修复 fetch_mac_vpd_key 函数使用 vpd_find
+          if ! grep -q "vpd_find" "$R8168_DRIVER"; then
+            # 在 fetch_mac_vpd_key 函数开头添加 vpd_find 尝试
+            sed -i '/struct region_device rdev;/i\\\t/* Try using the proper VPD parsing function first */\n\tconst char *vpd_value;\n\tsize_t vpd_size;\n\tvpd_value = vpd_find(vpd_key, &vpd_size, VPD_RO);\n\tif (vpd_value && vpd_size > 0) {\n\t\t/* Copy the value to macstrbuf, ensuring null termination */\n\t\tint copy_size = MIN(vpd_size, MACLEN - 1);\n\t\tmemcpy(macstrbuf, vpd_value, copy_size);\n\t\tmacstrbuf[copy_size] = '\''\\0'\'';\n\t\tprintk(BIOS_DEBUG, "r8168: Found MAC in VPD using vpd_find: %s\\n", macstrbuf);\n\t\treturn CB_SUCCESS;\n\t}\n\tprintk(BIOS_DEBUG, "r8168: vpd_find failed, trying legacy method\\n");' "$R8168_DRIVER"
+            echo "✅ Added vpd_find() VPD parsing fix"
+          fi
+          
+          # 5.2: 修复 get_mac_address 函数
+          echo "📝 5.2: Fixing get_mac_address function validation..."
           
           # 检查是否已经有十六进制验证
           if grep -q "Check if both hex digits are valid" "$R8168_DRIVER"; then
@@ -289,12 +308,22 @@ jobs:
               exit 1
             fi
           fi
+          
+          # 5.3: 添加调试输出
+          echo "📝 5.3: Adding debug output to program_mac_address function..."
+          
+          # 在 get_mac_address 调用前添加调试输出
+          sed -i '/get_mac_address(mac, macstrbuf);/i\\tprintk(BIOS_DEBUG, "r8168: macstrbuf content: %s\\n", macstrbuf);' "$R8168_DRIVER"
+          # 在 get_mac_address 调用后添加调试输出
+          sed -i '/get_mac_address(mac, macstrbuf);/a\\tprintk(BIOS_DEBUG, "r8168: mac array after get_mac_address: %02x:%02x:%02x:%02x:%02x:%02x\\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);' "$R8168_DRIVER"
+          echo "✅ Debug output added to program_mac_address function"
+          
         else
           echo "❌ RTL8168 driver not found: $R8168_DRIVER"
           exit 1
         fi
         
-        echo "✅ Step 5 completed: get_mac_address validation fixed"
+        echo "✅ Step 5 completed: RTL8168 driver and VPD parsing fixed"
     
     - name: Simulate build configuration
       run: |
@@ -510,9 +539,9 @@ jobs:
           exit 1
         fi
     
-    - name: "Verify Step 5: get_mac_address function validation"
+    - name: "Verify Step 5: RTL8168 driver and VPD parsing"
       run: |
-        echo "🔍 Verifying Step 5: get_mac_address function validation..."
+        echo "🔍 Verifying Step 5: RTL8168 driver and VPD parsing..."
         cd coreboot
         
         R8168_DRIVER="src/drivers/net/r8168.c"
@@ -520,6 +549,36 @@ jobs:
         # 验证 RTL8168 驱动文件存在
         if [ -f "$R8168_DRIVER" ]; then
           echo "✅ RTL8168 driver found: $R8168_DRIVER"
+          
+          # 5.1: 验证 VPD 解析修复
+          echo "🔍 5.1: Verifying VPD parsing fix..."
+          
+          # 验证 VPD 头文件包含
+          if grep -q "#include <drivers/vpd/vpd.h>" "$R8168_DRIVER"; then
+            echo "✅ VPD header include found"
+          else
+            echo "❌ VPD header include not found"
+            exit 1
+          fi
+          
+          # 验证 vpd_find 函数调用
+          if grep -q "vpd_find" "$R8168_DRIVER"; then
+            echo "✅ vpd_find() function call found"
+          else
+            echo "❌ vpd_find() function call not found"
+            exit 1
+          fi
+          
+          # 验证 VPD 解析调试输出
+          if grep -q "Found MAC in VPD using vpd_find" "$R8168_DRIVER"; then
+            echo "✅ VPD parsing debug output found"
+          else
+            echo "❌ VPD parsing debug output not found"
+            exit 1
+          fi
+          
+          # 5.2: 验证 get_mac_address 函数修复
+          echo "🔍 5.2: Verifying get_mac_address function fix..."
           
           # 验证十六进制数字验证代码
           if grep -q "Check if both hex digits are valid" "$R8168_DRIVER"; then
@@ -553,13 +612,32 @@ jobs:
             exit 1
           fi
           
+          # 5.3: 验证 program_mac_address 调试输出
+          echo "🔍 5.3: Verifying program_mac_address debug output..."
+          
+          # 验证 macstrbuf 内容调试输出
+          if grep -q "macstrbuf content:" "$R8168_DRIVER"; then
+            echo "✅ macstrbuf content debug output found"
+          else
+            echo "❌ macstrbuf content debug output not found"
+            exit 1
+          fi
+          
+          # 验证 mac 数组调试输出
+          if grep -q "mac array after get_mac_address:" "$R8168_DRIVER"; then
+            echo "✅ mac array debug output found"
+          else
+            echo "❌ mac array debug output not found"
+            exit 1
+          fi
+          
           # 调试：显示完整的 get_mac_address 函数
           echo "📋 Debug: Complete get_mac_address function:"
           echo "=========================================="
           awk '/^static void get_mac_address/,/^}/' "$R8168_DRIVER"
           echo "=========================================="
           
-          echo "✅ Step 5 verification completed: get_mac_address validation verified"
+          echo "✅ Step 5 verification completed: RTL8168 driver and VPD parsing verified"
         else
           echo "❌ RTL8168 driver not found: $R8168_DRIVER"
           exit 1
@@ -686,6 +764,61 @@ jobs:
           echo "❌ .config file not found"
         fi
         
+        # 验证 RTL8168 驱动源码修改
+        echo "🔍 Verifying RTL8168 driver source code modifications..."
+        R8168_DRIVER="src/drivers/net/r8168.c"
+        
+        if [ -f "$R8168_DRIVER" ]; then
+          echo "✅ RTL8168 driver found: $R8168_DRIVER"
+          
+          # 显示完整的 r8168.c 文件内容用于验证
+          echo "📋 Complete RTL8168 driver source code:"
+          echo "=========================================="
+          cat "$R8168_DRIVER"
+          echo "=========================================="
+          
+          # 验证关键修改点
+          echo "🔍 Verifying key modifications in RTL8168 driver:"
+          
+          # 验证 VPD 头文件包含
+          if grep -q "#include <drivers/vpd/vpd.h>" "$R8168_DRIVER"; then
+            echo "✅ VPD header include found"
+          else
+            echo "❌ VPD header include not found"
+          fi
+          
+          # 验证 vpd_find 函数调用
+          if grep -q "vpd_find" "$R8168_DRIVER"; then
+            echo "✅ vpd_find() function call found"
+          else
+            echo "❌ vpd_find() function call not found"
+          fi
+          
+          # 验证 RTL8111H ERI 支持
+          if grep -q "case 12: case 13: case 14: case 15:" "$R8168_DRIVER"; then
+            echo "✅ RTL8111H ERI support (revision 12-15) found"
+          else
+            echo "❌ RTL8111H ERI support not found"
+          fi
+          
+          # 验证 get_mac_address 函数修复
+          if grep -q "Check if both hex digits are valid" "$R8168_DRIVER"; then
+            echo "✅ get_mac_address function validation fix found"
+          else
+            echo "❌ get_mac_address function validation fix not found"
+          fi
+          
+          # 验证调试输出
+          if grep -q "Parsed MAC address:" "$R8168_DRIVER"; then
+            echo "✅ MAC address parsing debug output found"
+          else
+            echo "❌ MAC address parsing debug output not found"
+          fi
+          
+        else
+          echo "❌ RTL8168 driver not found: $R8168_DRIVER"
+        fi
+        
         echo "✅ Final build results verification completed"
       
     - name: Build Kaisa ROM with Docker
@@ -736,17 +869,86 @@ jobs:
           echo '📋 Skipping r8168.c syntax check (requires full build environment)'
           echo '✅ Proceeding with build process...'
           
+          
+          # 清理 build 目录权限问题
+            echo '🧹 Cleaning build directory permissions...'
+            sudo rm -rf ./build || true
+            mkdir -p ./build
+            
           # 运行构建脚本
             echo '🚀 Starting build process...'
-            if ./build-uefi.sh kaisa; then
+            echo '📋 Running: ./build-uefi.sh kaisa'
+            
+            # 捕获构建输出到日志文件
+            if ./build-uefi.sh kaisa 2>&1 | tee build_output.log; then
               echo '✅ Build script completed successfully'
             else
-              echo '❌ Build script failed'
+              BUILD_EXIT_CODE=$?
+              echo "❌ Build script failed with exit code: $BUILD_EXIT_CODE"
               echo '📋 Checking build logs...'
-              if [ -f 'build.log' ]; then
-                echo '📋 Build log contents:'
-                tail -50 build.log
+              
+              # 显示构建输出日志
+              if [ -f 'build_output.log' ]; then
+                echo '📋 Build output log contents:'
+                echo '=========================================='
+                cat build_output.log
+                echo '=========================================='
               fi
+              
+              # 检查其他可能的日志文件
+              echo '📋 Checking for other log files...'
+              find . -name "*.log" -type f -exec echo "Found log file: {}" \; -exec tail -20 {} \;
+              
+              # 检查构建目录中的错误
+              echo '📋 Checking build directory for errors...'
+              if [ -d 'build' ]; then
+                echo 'Build directory contents:'
+                ls -la build/
+                
+                # 查找错误日志
+                find build/ -name "*.log" -type f -exec echo "Build log: {}" \; -exec tail -20 {} \;
+                find build/ -name "error*" -type f -exec echo "Error file: {}" \; -exec cat {} \;
+              fi
+              
+              # 检查 EDK2 构建日志
+              if [ -f 'payloads/external/edk2/workspace/Build/UefiPayloadPkgX64/UEFIPAYLOAD.txt' ]; then
+                echo '📋 EDK2 build log:'
+                echo '=========================================='
+                tail -50 payloads/external/edk2/workspace/Build/UefiPayloadPkgX64/UEFIPAYLOAD.txt
+                echo '=========================================='
+              fi
+              
+              # 检查 coreboot 构建状态
+              echo '📋 Checking coreboot build status...'
+              if [ -d 'build' ]; then
+                echo 'Build directory exists'
+                ls -la build/
+                
+                # 检查是否有 coreboot.rom 文件
+                if [ -f 'build/coreboot.rom' ]; then
+                  echo '✅ coreboot.rom found in build directory'
+                  ls -la build/coreboot.rom
+                else
+                  echo '❌ coreboot.rom not found in build directory'
+                fi
+                
+                # 检查是否有其他 ROM 文件
+                find build/ -name "*.rom" -type f -exec echo "ROM file: {}" \; -exec ls -la {} \;
+              else
+                echo '❌ Build directory not found'
+              fi
+              
+              # 检查是否有任何 ROM 文件生成
+              echo '📋 Checking for any ROM files...'
+              find . -name "*.rom" -type f -exec echo "ROM file: {}" \; -exec ls -la {} \;
+              
+              # 检查 build-uefi.sh 脚本的退出状态
+              echo '📋 Checking build-uefi.sh script status...'
+              if [ -f 'build_output.log' ]; then
+                echo 'Last 20 lines of build output:'
+                tail -20 build_output.log
+              fi
+              
               exit 1
             fi
             
@@ -757,6 +959,21 @@ jobs:
             # 检查 coreboot 目录中的 roms
             echo '📋 Checking build output in coreboot directory:'
             ls -la roms/ || echo 'No files in coreboot/roms'
+            
+            # 检查是否生成了 ROM 文件
+            echo '📋 Checking for generated ROM files...'
+            ROM_COUNT=$(find . -name "*.rom" -type f | wc -l)
+            echo "Found $ROM_COUNT ROM files"
+            
+            if [ $ROM_COUNT -eq 0 ]; then
+              echo '❌ No ROM files generated - build may have failed'
+              echo '📋 Checking for any generated files...'
+              find . -name "*.bin" -o -name "*.elf" -o -name "*.efi" | head -10
+              exit 1
+            else
+              echo '✅ ROM files generated successfully'
+              find . -name "*.rom" -type f -exec echo "ROM file: {}" \; -exec ls -la {} \;
+            fi
             
             echo '✅ Build completed'
           "
