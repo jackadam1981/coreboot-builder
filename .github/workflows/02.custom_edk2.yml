@@ -388,7 +388,7 @@ jobs:
         compression-level: 0
     
     - name: Create Release
-      if: ${{ (github.event_name == 'workflow_dispatch' && inputs.release) || (github.event_name != 'workflow_dispatch') }}
+      if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.release_name }}
       uses: softprops/action-gh-release@v1
       with:
         tag_name: kaisa-${{ github.run_number }}

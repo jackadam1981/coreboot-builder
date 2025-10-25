@@ -65,49 +65,42 @@ jobs:
         chmod -R 755 .
         echo "✅ Source code ready"
     
-    - name: Prepare RTL UNDI driver
+    - name: "Step 1: Fix RTL8168 dependencies in puff/Kconfig"
       run: |
-        echo "🔧 准备预下载的 RTL UNDI 驱动"
+        echo "🔧 Step 1: Fixing RTL8168 dependencies in puff/Kconfig..."
+        echo "📝 Adding missing dependencies for RTL8168 ERI programming"
+        
         cd coreboot
+        PUFF_KCONFIG="src/mainboard/google/puff/Kconfig"
         
-        # 检查预下载的 RTL 驱动
-        if [ -f "../RtkUndiDxe.efi" ]; then
-          echo "✅ 找到预下载的 RTL UNDI 驱动"
-          
-          # 验证驱动文件
-          echo "📊 驱动文件信息:"
-          file "../RtkUndiDxe.efi"
-          size=$(stat -c%s "../RtkUndiDxe.efi")
-          echo "📏 文件大小: $size bytes"
-          
-          # 检查版本信息
-          echo "📋 版本信息:"
-          strings "../RtkUndiDxe.efi" | grep -i "version\|ver\|v[0-9]" | head -5
-          
-          # 检查 PXE/UNDI 功能
-          echo "🌐 PXE/UNDI 功能:"
-          strings "../RtkUndiDxe.efi" | grep -i "pxe\|undi" | head -5
-          
-          # 复制到构建目录
-          echo "💾 复制 RTL 驱动到构建目录..."
-          cp "../RtkUndiDxe.efi" "rtl_undi_driver_updated.efi"
-          echo "✅ RTL UNDI 驱动准备完成"
-          echo "📝 此驱动将在 EDK2 构建过程中被集成到固件中"
+        # 检查并添加 REALTEK_8168_RESET 依赖
+        if ! grep -q "select REALTEK_8168_RESET" "$PUFF_KCONFIG"; then
+          echo "📝 Adding REALTEK_8168_RESET dependency..."
+          sed -i '/select RT8168_GEN_ACPI_POWER_RESOURCE/a\\tselect REALTEK_8168_RESET' "$PUFF_KCONFIG"
+          echo "✅ REALTEK_8168_RESET dependency added"
         else
-          echo "⚠️ 未找到预下载的 RTL 驱动文件"
-          echo "📝 将使用 MrChromebox EDK2 中的原始驱动"
+          echo "✅ REALTEK_8168_RESET already present"
         fi
-
-    - name: Apply custom modifications
+        
+        # 检查并添加 RT8168_SUPPORT_LEGACY_VPD_MAC 支持
+        if ! grep -q "select RT8168_SUPPORT_LEGACY_VPD_MAC" "$PUFF_KCONFIG"; then
+          echo "📝 Adding RT8168_SUPPORT_LEGACY_VPD_MAC support..."
+          sed -i '/select RT8168_SET_LED_MODE/a\\tselect RT8168_SUPPORT_LEGACY_VPD_MAC' "$PUFF_KCONFIG"
+          echo "✅ RT8168_SUPPORT_LEGACY_VPD_MAC support added"
+        else
+          echo "✅ RT8168_SUPPORT_LEGACY_VPD_MAC already present"
+        fi
+        
+        echo "✅ Step 1 completed: RTL8168 dependencies fixed"
+    
+    - name: "Step 2: Configure Kaisa UEFI settings"
       run: |
-        echo "🔧 Applying custom modifications to coreboot source..."
-        echo "📝 Applying RTL8168 driver fixes and EDK2 configurations"
+        echo "🔧 Step 2: Configuring Kaisa UEFI settings..."
+        echo "📝 Adding EDK2 network and RTL8168 configurations to config.kaisa.uefi"
         
-        # 更新主板配置文件
-        echo "🔧 Updating Kaisa board configuration..."
-        CONFIG_FILE="coreboot/configs/cml/config.kaisa.uefi"
+        cd coreboot
+        CONFIG_FILE="configs/cml/config.kaisa.uefi"
         
-
         echo "📝 Adding EDK2 network and RTL8168 configurations..."
         echo "" >> "$CONFIG_FILE"
         echo "# EDK2 Network PXE Support" >> "$CONFIG_FILE"
@@ -116,14 +109,12 @@ jobs:
         echo "" >> "$CONFIG_FILE"
         echo "# RTL8168 MAC Address ERI Programming" >> "$CONFIG_FILE"
         echo "CONFIG_RT8168_PUT_MAC_TO_ERI=y" >> "$CONFIG_FILE"
-
         
-        echo "✅ Kaisa board configuration updated"
-        echo "✅ Custom modifications step completed"
+        echo "✅ Step 2 completed: Kaisa UEFI settings configured"
     
-    - name: Configure EDK2 custom build parameters
+    - name: "Step 3: Configure EDK2 custom build parameters"
       run: |
-        echo "🔧 Configuring EDK2 custom build parameters..."
+        echo "🔧 Step 3: Configuring EDK2 custom build parameters..."
         echo "📝 Adding optimized EDK2 network configuration for PXE boot"
         
         CONFIG_FILE="coreboot/configs/cml/config.kaisa.uefi"
@@ -175,67 +166,202 @@ jobs:
         
         echo "✅ Build configuration simulation completed"
     
+    - name: "Verify Step 1: RTL8168 dependencies"
+      run: |
+        echo "🔍 Verifying Step 1: RTL8168 dependencies in puff/Kconfig..."
+        cd coreboot
+        
+        PUFF_KCONFIG="src/mainboard/google/puff/Kconfig"
+        
+        # 验证 REALTEK_8168_RESET 依赖
+        if grep -q "select REALTEK_8168_RESET" "$PUFF_KCONFIG"; then
+          echo "✅ REALTEK_8168_RESET dependency found in puff/Kconfig"
+        else
+          echo "❌ REALTEK_8168_RESET dependency not found in puff/Kconfig"
+          exit 1
+        fi
+        
+        # 验证 RT8168_SUPPORT_LEGACY_VPD_MAC 支持
+        if grep -q "select RT8168_SUPPORT_LEGACY_VPD_MAC" "$PUFF_KCONFIG"; then
+          echo "✅ RT8168_SUPPORT_LEGACY_VPD_MAC support found in puff/Kconfig"
+        else
+          echo "❌ RT8168_SUPPORT_LEGACY_VPD_MAC support not found in puff/Kconfig"
+          exit 1
+        fi
+        
+        echo "✅ Step 1 verification completed: RTL8168 dependencies verified"
+    
+    - name: "Verify Step 2: Kaisa UEFI settings"
+      run: |
+        echo "🔍 Verifying Step 2: Kaisa UEFI settings in config.kaisa.uefi..."
+        cd coreboot
+        
+        CONFIG_FILE="configs/cml/config.kaisa.uefi"
+        
+        # 验证 PXE 支持配置
+        if grep -q "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" "$CONFIG_FILE"; then
+          echo "✅ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y found in config.kaisa.uefi"
+        else
+          echo "❌ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y not found in config.kaisa.uefi"
+          exit 1
+        fi
+        
+        # 验证 ROM 加载支持配置
+        if grep -q "CONFIG_EDK2_LOAD_OPTION_ROMS=y" "$CONFIG_FILE"; then
+          echo "✅ CONFIG_EDK2_LOAD_OPTION_ROMS=y found in config.kaisa.uefi"
+        else
+          echo "❌ CONFIG_EDK2_LOAD_OPTION_ROMS=y not found in config.kaisa.uefi"
+          exit 1
+        fi
+        
+        # 验证 RTL8168 ERI 编程配置
+        if grep -q "CONFIG_RT8168_PUT_MAC_TO_ERI=y" "$CONFIG_FILE"; then
+          echo "✅ CONFIG_RT8168_PUT_MAC_TO_ERI=y found in config.kaisa.uefi"
+        else
+          echo "❌ CONFIG_RT8168_PUT_MAC_TO_ERI=y not found in config.kaisa.uefi"
+          exit 1
+        fi
+        
+        echo "✅ Step 2 verification completed: Kaisa UEFI settings verified"
+    
+    - name: "Verify Step 3: EDK2 custom build parameters"
+      run: |
+        echo "🔍 Verifying Step 3: EDK2 custom build parameters..."
+        cd coreboot
+        
+        CONFIG_FILE="configs/cml/config.kaisa.uefi"
+        
+        # 验证 EDK2 自定义构建参数
+        if grep -q "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" "$CONFIG_FILE"; then
+          echo "✅ CONFIG_EDK2_CUSTOM_BUILD_PARAMS found in config.kaisa.uefi"
+          echo "📋 EDK2 custom build parameters:"
+          grep "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" "$CONFIG_FILE"
+          
+          # 验证关键 EDK2 参数
+          echo "🔍 Verifying key EDK2 parameters:"
+          
+          # 检查网络驱动启用
+          if grep -q "NETWORK_DRIVER_ENABLE=TRUE" "$CONFIG_FILE"; then
+            echo "✅ NETWORK_DRIVER_ENABLE=TRUE found"
+          else
+            echo "❌ NETWORK_DRIVER_ENABLE=TRUE not found"
+          fi
+          
+          # 检查 PXE 启动启用
+          if grep -q "NETWORK_PXE_BOOT_ENABLE=TRUE" "$CONFIG_FILE"; then
+            echo "✅ NETWORK_PXE_BOOT_ENABLE=TRUE found"
+          else
+            echo "❌ NETWORK_PXE_BOOT_ENABLE=TRUE not found"
+          fi
+          
+          # 检查 SNP 协议启用
+          if grep -q "NETWORK_SNP_ENABLE=TRUE" "$CONFIG_FILE"; then
+            echo "✅ NETWORK_SNP_ENABLE=TRUE found"
+          else
+            echo "❌ NETWORK_SNP_ENABLE=TRUE not found"
+          fi
+          
+          # 检查 RTL8168 支持
+          if grep -q "NETWORK_RTEK_PCI=TRUE" "$CONFIG_FILE"; then
+            echo "✅ NETWORK_RTEK_PCI=TRUE found (RTL8168 support)"
+          else
+            echo "❌ NETWORK_RTEK_PCI=TRUE not found"
+          fi
+          
+          # 检查 TLS 禁用
+          if grep -q "NETWORK_TLS_ENABLE=FALSE" "$CONFIG_FILE"; then
+            echo "✅ NETWORK_TLS_ENABLE=FALSE found (TLS disabled to avoid build issues)"
+          else
+            echo "❌ NETWORK_TLS_ENABLE=FALSE not found"
+          fi
+          
+          # 检查 VLAN 禁用
+          if grep -q "NETWORK_VLAN_ENABLE=FALSE" "$CONFIG_FILE"; then
+            echo "✅ NETWORK_VLAN_ENABLE=FALSE found (VLAN disabled for terminal devices)"
+          else
+            echo "❌ NETWORK_VLAN_ENABLE=FALSE not found"
+          fi
+          
+          # 检查 HTTP 功能禁用
+          if grep -q "NETWORK_HTTP_BOOT_ENABLE=FALSE" "$CONFIG_FILE"; then
+            echo "✅ NETWORK_HTTP_BOOT_ENABLE=FALSE found (HTTP boot disabled)"
+          else
+            echo "❌ NETWORK_HTTP_BOOT_ENABLE=FALSE not found"
+          fi
+          
+          # 检查 IPv6 禁用
+          if grep -q "NETWORK_IP6_ENABLE=FALSE" "$CONFIG_FILE"; then
+            echo "✅ NETWORK_IP6_ENABLE=FALSE found (IPv6 disabled)"
+          else
+            echo "❌ NETWORK_IP6_ENABLE=FALSE not found"
+          fi
+        else
+          echo "❌ CONFIG_EDK2_CUSTOM_BUILD_PARAMS not found in config.kaisa.uefi"
+          exit 1
+        fi
+        
+        echo "✅ Step 3 verification completed: EDK2 custom build parameters verified"
     
     - name: Build Kaisa ROM with Docker
       run: |
-        echo "🚀 Building Kaisa ROM: ${{ github.event.inputs.release_name || 'kaisa' }}"
-        echo "🐳 Using coreboot/coreboot-sdk Docker image..."
-        
-        cd coreboot
-        
-        # Create output directory
-        mkdir -p ../roms
-        
-        # Build using Docker
-        echo "🔧 Starting Docker build..."
-        docker run --rm --user root -v "$(pwd)":/home/coreboot/coreboot -v "$(pwd)/../roms":/home/coreboot/roms -w /home/coreboot/coreboot coreboot/coreboot-sdk:latest bash -c "
-          echo '🔧 Building Kaisa ROM...'
-          git config --global --add safe.directory /home/coreboot/coreboot
+          echo "🚀 Building Kaisa ROM: ${{ github.event.inputs.release_name || 'kaisa' }}"
+          echo "🐳 Using coreboot/coreboot-sdk Docker image..."
           
-          # 检查 build-uefi.sh 是否存在
-          if [ ! -f './build-uefi.sh' ]; then
-            echo '❌ build-uefi.sh not found'
-            exit 1
-          fi
+          cd coreboot
           
-          # 检查权限
-          ls -la ./build-uefi.sh
+          # Create output directory
+          mkdir -p ../roms
           
-          # 检查输出目录
-          echo '📋 Checking output directory setup:'
-          ls -la /home/coreboot/roms/ || echo 'Output directory not found'
+          # Build using Docker
+          echo "🔧 Starting Docker build..."
+          docker run --rm --user root -v "$(pwd)":/home/coreboot/coreboot -v "$(pwd)/../roms":/home/coreboot/roms -w /home/coreboot/coreboot coreboot/coreboot-sdk:latest bash -c "
+            echo '🔧 Building Kaisa ROM...'
+            git config --global --add safe.directory /home/coreboot/coreboot
+            
+            # 检查 build-uefi.sh 是否存在
+            if [ ! -f './build-uefi.sh' ]; then
+              echo '❌ build-uefi.sh not found'
+              exit 1
+            fi
+            
+            # 检查权限
+            ls -la ./build-uefi.sh
+            
+            # 检查输出目录
+            echo '📋 Checking output directory setup:'
+            ls -la /home/coreboot/roms/ || echo 'Output directory not found'
+            
+            # 运行构建脚本
+            if ./build-uefi.sh kaisa; then
+              echo '✅ Build script completed successfully'
+            else
+              echo '❌ Build script failed'
+              exit 1
+            fi
+            
+            # 检查构建输出
+            echo '📋 Checking build output in /home/coreboot/roms:'
+            ls -la /home/coreboot/roms/ || echo 'No files in /home/coreboot/roms'
+            
+            # 检查 coreboot 目录中的 roms
+            echo '📋 Checking build output in coreboot directory:'
+            ls -la roms/ || echo 'No files in coreboot/roms'
+            
+            echo '✅ Build completed'
+          "
           
-          # 运行构建脚本
-          if ./build-uefi.sh kaisa; then
-            echo '✅ Build script completed successfully'
-          else
-            echo '❌ Build script failed'
-            exit 1
-          fi
+          # 检查生成的文件
+          echo "📋 Checking generated files in roms directory:"
+          ls -la roms/ || echo "roms directory not found"
+          echo "📋 Looking for .sha1 files:"
+          find roms/ -name "*.sha1" -type f || echo "No .sha1 files found"
           
-          # 检查构建输出
-          echo '📋 Checking build output in /home/coreboot/roms:'
-          ls -la /home/coreboot/roms/ || echo 'No files in /home/coreboot/roms'
-          
-          # 检查 coreboot 目录中的 roms
-          echo '📋 Checking build output in coreboot directory:'
-          ls -la roms/ || echo 'No files in coreboot/roms'
-          
-          echo '✅ Build completed'
-        "
-        
-        # 检查生成的文件
-        echo "📋 Checking generated files in roms directory:"
-        ls -la roms/ || echo "roms directory not found"
-        echo "📋 Looking for .sha1 files:"
-        find roms/ -name "*.sha1" -type f || echo "No .sha1 files found"
-        
-        echo "✅ ROM build completed"
+          echo "✅ ROM build completed"
     
-    - name: Verify build results
+    - name: Verify final build results
       run: |
-        echo "🔍 Verifying build results and configurations..."
-        echo "📝 Checking that all required configurations are properly applied"
+        echo "🔍 Verifying final build results..."
+        echo "📝 Checking that all configurations are properly applied in generated .config"
         
         cd coreboot
         
@@ -245,7 +371,7 @@ jobs:
           echo "✅ .config file found"
           
           # 验证关键配置项
-          echo "🔍 Checking key configurations:"
+          echo "🔍 Checking key configurations in .config:"
           
           # 检查 PXE 支持
           if grep -q "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" .config; then
@@ -268,70 +394,25 @@ jobs:
             echo "❌ CONFIG_RT8168_PUT_MAC_TO_ERI=y not found in .config"
           fi
           
+          # 检查 RTL8168 基础重置配置
+          if grep -q "CONFIG_REALTEK_8168_RESET=y" .config; then
+            echo "✅ CONFIG_REALTEK_8168_RESET=y found in .config"
+          else
+            echo "❌ CONFIG_REALTEK_8168_RESET=y not found in .config"
+          fi
+          
+          # 检查传统 VPD MAC 支持
+          if grep -q "CONFIG_RT8168_SUPPORT_LEGACY_VPD_MAC=y" .config; then
+            echo "✅ CONFIG_RT8168_SUPPORT_LEGACY_VPD_MAC=y found in .config"
+          else
+            echo "❌ CONFIG_RT8168_SUPPORT_LEGACY_VPD_MAC=y not found in .config"
+          fi
+          
           # 检查 EDK2 自定义构建参数
           if grep -q "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" .config; then
             echo "✅ CONFIG_EDK2_CUSTOM_BUILD_PARAMS found in .config"
             echo "📋 EDK2 custom build parameters:"
             grep "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" .config
-            
-            # 验证关键 EDK2 参数
-            echo "🔍 Verifying key EDK2 parameters in .config:"
-            
-            # 检查网络驱动启用
-            if grep -q "NETWORK_DRIVER_ENABLE=TRUE" .config; then
-              echo "✅ NETWORK_DRIVER_ENABLE=TRUE found"
-            else
-              echo "❌ NETWORK_DRIVER_ENABLE=TRUE not found"
-            fi
-            
-            # 检查 PXE 启动启用
-            if grep -q "NETWORK_PXE_BOOT_ENABLE=TRUE" .config; then
-              echo "✅ NETWORK_PXE_BOOT_ENABLE=TRUE found"
-            else
-              echo "❌ NETWORK_PXE_BOOT_ENABLE=TRUE not found"
-            fi
-            
-            # 检查 SNP 协议启用
-            if grep -q "NETWORK_SNP_ENABLE=TRUE" .config; then
-              echo "✅ NETWORK_SNP_ENABLE=TRUE found"
-            else
-              echo "❌ NETWORK_SNP_ENABLE=TRUE not found"
-            fi
-            
-            # 检查 RTL8168 支持
-            if grep -q "NETWORK_RTEK_PCI=TRUE" .config; then
-              echo "✅ NETWORK_RTEK_PCI=TRUE found (RTL8168 support)"
-            else
-              echo "❌ NETWORK_RTEK_PCI=TRUE not found"
-            fi
-            
-            # 检查 TLS 禁用
-            if grep -q "NETWORK_TLS_ENABLE=FALSE" .config; then
-              echo "✅ NETWORK_TLS_ENABLE=FALSE found (TLS disabled to avoid build issues)"
-            else
-              echo "❌ NETWORK_TLS_ENABLE=FALSE not found"
-            fi
-            
-            # 检查 VLAN 禁用
-            if grep -q "NETWORK_VLAN_ENABLE=FALSE" .config; then
-              echo "✅ NETWORK_VLAN_ENABLE=FALSE found (VLAN disabled for terminal devices)"
-            else
-              echo "❌ NETWORK_VLAN_ENABLE=FALSE not found"
-            fi
-            
-            # 检查 HTTP 功能禁用
-            if grep -q "NETWORK_HTTP_BOOT_ENABLE=FALSE" .config; then
-              echo "✅ NETWORK_HTTP_BOOT_ENABLE=FALSE found (HTTP boot disabled)"
-            else
-              echo "❌ NETWORK_HTTP_BOOT_ENABLE=FALSE not found"
-            fi
-            
-            # 检查 IPv6 禁用
-            if grep -q "NETWORK_IP6_ENABLE=FALSE" .config; then
-              echo "✅ NETWORK_IP6_ENABLE=FALSE found (IPv6 disabled)"
-            else
-              echo "❌ NETWORK_IP6_ENABLE=FALSE not found"
-            fi
           else
             echo "❌ CONFIG_EDK2_CUSTOM_BUILD_PARAMS not found in .config"
           fi
@@ -367,8 +448,8 @@ jobs:
           echo "❌ roms directory not found"
         fi
         
-        echo "✅ Build results verification completed"
-    
+        echo "✅ Final build results verification completed"
+      
     - name: Upload ROM
       run: |
         echo "📋 Files to upload:"
@@ -391,7 +472,7 @@ jobs:
         compression-level: 0
     
     - name: Create Release
-      if: ${{ (github.event_name == 'workflow_dispatch' && inputs.release) || (github.event_name != 'workflow_dispatch') }}
+      if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.release_name }}
       uses: softprops/action-gh-release@v1
       with:
         tag_name: kaisa-${{ github.run_number }}
