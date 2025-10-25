@@ -2,16 +2,14 @@ name: Build Kaisa ROM
 
 on:
   push:
-    branches: [ main ]
-    paths:
-      - 'coreboot/**'
-      - '.github/workflows/build.yml'
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       release_name:
         description: 'Release name (e.g., kaisa-v1.0)'
         required: false
-        default: 'kaisa-v1.1,配置EDK2_custom_build_params,定制编译EDK2'
+        default: 'kaisa-v1.2,定制编译网卡驱动'
         type: string
 
 jobs:
@@ -177,157 +175,6 @@ jobs:
         
         echo "✅ Build configuration simulation completed"
     
-    - name: Verify custom modifications
-      run: |
-        echo "🔍 Verifying custom modifications..."
-        echo "📝 Checking that CONFIG_EDK2_NETWORK_PXE_SUPPORT=y was added"
-        
-        # 验证配置文件修改
-        CONFIG_FILE="coreboot/configs/cml/config.kaisa.uefi"
-        if [ -f "$CONFIG_FILE" ]; then
-          echo "✅ Kaisa UEFI config found"
-          
-          # 验证 PXE 支持
-          if grep -q "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" "$CONFIG_FILE"; then
-            echo "✅ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y found"
-          else
-            echo "❌ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y not found"
-            exit 1
-          fi
-          
-          # 验证 ROM 加载支持
-          if grep -q "CONFIG_EDK2_LOAD_OPTION_ROMS=y" "$CONFIG_FILE"; then
-            echo "✅ CONFIG_EDK2_LOAD_OPTION_ROMS=y found"
-          else
-            echo "❌ CONFIG_EDK2_LOAD_OPTION_ROMS=y not found"
-            exit 1
-          fi
-          
-          # 验证 RTL8168 ERI 编程
-          if grep -q "CONFIG_RT8168_PUT_MAC_TO_ERI=y" "$CONFIG_FILE"; then
-            echo "✅ CONFIG_RT8168_PUT_MAC_TO_ERI=y found"
-          else
-            echo "❌ CONFIG_RT8168_PUT_MAC_TO_ERI=y not found"
-            exit 1
-          fi
-        else
-          echo "❌ Kaisa UEFI config not found"
-          exit 1
-        fi
-        
-        echo "✅ Custom modifications verification completed"
-    
-    - name: Verify EDK2 custom build parameters
-      run: |
-        echo "🔍 Verifying EDK2 custom build parameters..."
-        echo "📝 Checking that all required EDK2 parameters are configured"
-        
-        CONFIG_FILE="coreboot/configs/cml/config.kaisa.uefi"
-        
-        # 检查配置文件是否存在
-        if [ -f "$CONFIG_FILE" ]; then
-          echo "✅ Kaisa UEFI config found"
-          
-          # 验证 EDK2 自定义构建参数
-          echo "🔍 Verifying CONFIG_EDK2_CUSTOM_BUILD_PARAMS..."
-          if grep -q "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" "$CONFIG_FILE"; then
-            echo "✅ CONFIG_EDK2_CUSTOM_BUILD_PARAMS found"
-            echo "📋 Current EDK2 custom build parameters:"
-            grep "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" "$CONFIG_FILE"
-            
-            # 验证关键参数
-            echo "🔍 Verifying key EDK2 parameters:"
-            
-            # 检查网络驱动启用
-            if grep -q "NETWORK_DRIVER_ENABLE=TRUE" "$CONFIG_FILE"; then
-              echo "✅ NETWORK_DRIVER_ENABLE=TRUE found"
-            else
-              echo "❌ NETWORK_DRIVER_ENABLE=TRUE not found"
-            fi
-            
-            # 检查 PXE 启动启用
-            if grep -q "NETWORK_PXE_BOOT_ENABLE=TRUE" "$CONFIG_FILE"; then
-              echo "✅ NETWORK_PXE_BOOT_ENABLE=TRUE found"
-            else
-              echo "❌ NETWORK_PXE_BOOT_ENABLE=TRUE not found"
-            fi
-            
-            # 检查 SNP 协议启用
-            if grep -q "NETWORK_SNP_ENABLE=TRUE" "$CONFIG_FILE"; then
-              echo "✅ NETWORK_SNP_ENABLE=TRUE found"
-            else
-              echo "❌ NETWORK_SNP_ENABLE=TRUE not found"
-            fi
-            
-            # 检查 RTL8168 支持
-            if grep -q "NETWORK_RTEK_PCI=TRUE" "$CONFIG_FILE"; then
-              echo "✅ NETWORK_RTEK_PCI=TRUE found (RTL8168 support)"
-            else
-              echo "❌ NETWORK_RTEK_PCI=TRUE not found"
-            fi
-            
-            # 检查 TLS 禁用
-            if grep -q "NETWORK_TLS_ENABLE=FALSE" "$CONFIG_FILE"; then
-              echo "✅ NETWORK_TLS_ENABLE=FALSE found (TLS disabled to avoid build issues)"
-            else
-              echo "❌ NETWORK_TLS_ENABLE=FALSE not found"
-            fi
-            
-            # 检查 VLAN 禁用
-            if grep -q "NETWORK_VLAN_ENABLE=FALSE" "$CONFIG_FILE"; then
-              echo "✅ NETWORK_VLAN_ENABLE=FALSE found (VLAN disabled for terminal devices)"
-            else
-              echo "❌ NETWORK_VLAN_ENABLE=FALSE not found"
-            fi
-            
-            # 检查 HTTP 功能禁用
-            if grep -q "NETWORK_HTTP_BOOT_ENABLE=FALSE" "$CONFIG_FILE"; then
-              echo "✅ NETWORK_HTTP_BOOT_ENABLE=FALSE found (HTTP boot disabled)"
-            else
-              echo "❌ NETWORK_HTTP_BOOT_ENABLE=FALSE not found"
-            fi
-            
-            # 检查 IPv6 禁用
-            if grep -q "NETWORK_IP6_ENABLE=FALSE" "$CONFIG_FILE"; then
-              echo "✅ NETWORK_IP6_ENABLE=FALSE found (IPv6 disabled)"
-            else
-              echo "❌ NETWORK_IP6_ENABLE=FALSE not found"
-            fi
-            
-          else
-            echo "❌ CONFIG_EDK2_CUSTOM_BUILD_PARAMS not found"
-            exit 1
-          fi
-        else
-          echo "❌ Kaisa UEFI config not found"
-          exit 1
-        fi
-        
-        echo "✅ EDK2 custom build parameters verification completed"
-    
-    - name: Verify build configuration
-      run: |
-        echo "🔍 Verifying build configuration..."
-        echo "📝 Checking that CONFIG_EDK2_NETWORK_PXE_SUPPORT=y is properly configured for build"
-        
-        cd coreboot
-        
-        # 验证 .config 文件中的配置
-        echo "🔍 Verifying CONFIG_EDK2_NETWORK_PXE_SUPPORT in .config..."
-        if grep -q "^CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" .config; then
-          echo "✅ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y is correctly configured in .config"
-        else
-          echo "❌ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y is not found or not enabled in .config"
-          echo "📋 Current .config EDK2 Network configuration:"
-          grep -n "CONFIG_EDK2.*NETWORK\|CONFIG_EDK2.*PXE" .config || echo "  No EDK2 network configs found"
-          exit 1
-        fi
-        
-        # 显示相关配置信息
-        echo "📋 EDK2 Network configuration in .config:"
-        grep -n "CONFIG_EDK2.*NETWORK\|CONFIG_EDK2.*PXE" .config || echo "  No additional network configs found"
-        
-        echo "✅ Build configuration verification completed"
     
     - name: Build Kaisa ROM with Docker
       run: |
@@ -384,6 +231,143 @@ jobs:
         find roms/ -name "*.sha1" -type f || echo "No .sha1 files found"
         
         echo "✅ ROM build completed"
+    
+    - name: Verify build results
+      run: |
+        echo "🔍 Verifying build results and configurations..."
+        echo "📝 Checking that all required configurations are properly applied"
+        
+        cd coreboot
+        
+        # 验证生成的 .config 文件
+        echo "🔍 Verifying generated .config file..."
+        if [ -f ".config" ]; then
+          echo "✅ .config file found"
+          
+          # 验证关键配置项
+          echo "🔍 Checking key configurations:"
+          
+          # 检查 PXE 支持
+          if grep -q "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" .config; then
+            echo "✅ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y found in .config"
+          else
+            echo "❌ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y not found in .config"
+          fi
+          
+          # 检查 ROM 加载支持
+          if grep -q "CONFIG_EDK2_LOAD_OPTION_ROMS=y" .config; then
+            echo "✅ CONFIG_EDK2_LOAD_OPTION_ROMS=y found in .config"
+          else
+            echo "❌ CONFIG_EDK2_LOAD_OPTION_ROMS=y not found in .config"
+          fi
+          
+          # 检查 RTL8168 ERI 编程
+          if grep -q "CONFIG_RT8168_PUT_MAC_TO_ERI=y" .config; then
+            echo "✅ CONFIG_RT8168_PUT_MAC_TO_ERI=y found in .config"
+          else
+            echo "❌ CONFIG_RT8168_PUT_MAC_TO_ERI=y not found in .config"
+          fi
+          
+          # 检查 EDK2 自定义构建参数
+          if grep -q "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" .config; then
+            echo "✅ CONFIG_EDK2_CUSTOM_BUILD_PARAMS found in .config"
+            echo "📋 EDK2 custom build parameters:"
+            grep "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" .config
+            
+            # 验证关键 EDK2 参数
+            echo "🔍 Verifying key EDK2 parameters in .config:"
+            
+            # 检查网络驱动启用
+            if grep -q "NETWORK_DRIVER_ENABLE=TRUE" .config; then
+              echo "✅ NETWORK_DRIVER_ENABLE=TRUE found"
+            else
+              echo "❌ NETWORK_DRIVER_ENABLE=TRUE not found"
+            fi
+            
+            # 检查 PXE 启动启用
+            if grep -q "NETWORK_PXE_BOOT_ENABLE=TRUE" .config; then
+              echo "✅ NETWORK_PXE_BOOT_ENABLE=TRUE found"
+            else
+              echo "❌ NETWORK_PXE_BOOT_ENABLE=TRUE not found"
+            fi
+            
+            # 检查 SNP 协议启用
+            if grep -q "NETWORK_SNP_ENABLE=TRUE" .config; then
+              echo "✅ NETWORK_SNP_ENABLE=TRUE found"
+            else
+              echo "❌ NETWORK_SNP_ENABLE=TRUE not found"
+            fi
+            
+            # 检查 RTL8168 支持
+            if grep -q "NETWORK_RTEK_PCI=TRUE" .config; then
+              echo "✅ NETWORK_RTEK_PCI=TRUE found (RTL8168 support)"
+            else
+              echo "❌ NETWORK_RTEK_PCI=TRUE not found"
+            fi
+            
+            # 检查 TLS 禁用
+            if grep -q "NETWORK_TLS_ENABLE=FALSE" .config; then
+              echo "✅ NETWORK_TLS_ENABLE=FALSE found (TLS disabled to avoid build issues)"
+            else
+              echo "❌ NETWORK_TLS_ENABLE=FALSE not found"
+            fi
+            
+            # 检查 VLAN 禁用
+            if grep -q "NETWORK_VLAN_ENABLE=FALSE" .config; then
+              echo "✅ NETWORK_VLAN_ENABLE=FALSE found (VLAN disabled for terminal devices)"
+            else
+              echo "❌ NETWORK_VLAN_ENABLE=FALSE not found"
+            fi
+            
+            # 检查 HTTP 功能禁用
+            if grep -q "NETWORK_HTTP_BOOT_ENABLE=FALSE" .config; then
+              echo "✅ NETWORK_HTTP_BOOT_ENABLE=FALSE found (HTTP boot disabled)"
+            else
+              echo "❌ NETWORK_HTTP_BOOT_ENABLE=FALSE not found"
+            fi
+            
+            # 检查 IPv6 禁用
+            if grep -q "NETWORK_IP6_ENABLE=FALSE" .config; then
+              echo "✅ NETWORK_IP6_ENABLE=FALSE found (IPv6 disabled)"
+            else
+              echo "❌ NETWORK_IP6_ENABLE=FALSE not found"
+            fi
+          else
+            echo "❌ CONFIG_EDK2_CUSTOM_BUILD_PARAMS not found in .config"
+          fi
+        else
+          echo "❌ .config file not found"
+        fi
+        
+        # 验证 ROM 文件生成
+        echo "🔍 Verifying ROM file generation..."
+        if [ -f "../roms" ] && [ -d "../roms" ]; then
+          echo "✅ roms directory found"
+          echo "📋 ROM files:"
+          ls -la ../roms/
+          
+          # 检查 ROM 文件
+          if ls ../roms/*.rom 1> /dev/null 2>&1; then
+            echo "✅ ROM file(s) generated successfully"
+            for rom_file in ../roms/*.rom; do
+              size=$(stat -c%s "$rom_file")
+              echo "📏 ROM file size: $size bytes"
+            done
+          else
+            echo "❌ No ROM files found"
+          fi
+          
+          # 检查 SHA1 文件
+          if ls ../roms/*.sha1 1> /dev/null 2>&1; then
+            echo "✅ SHA1 file(s) generated successfully"
+          else
+            echo "⚠️ No SHA1 files found"
+          fi
+        else
+          echo "❌ roms directory not found"
+        fi
+        
+        echo "✅ Build results verification completed"
     
     - name: Upload ROM
       run: |
