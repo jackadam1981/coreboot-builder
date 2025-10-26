@@ -26,3 +26,5 @@
  		printk(BIOS_ERR, "Couldn't find RO_VPD region.");
  		return CB_ERR;
  	}
+ 
+ 	search_address = rdev_mmap_full(&rdev);
