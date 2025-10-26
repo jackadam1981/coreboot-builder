@@ -158,6 +158,7 @@ jobs:
       run: |
         echo "🔧 Step 4: Applying RTL8168 driver patches..."
         echo "📝 Applying individual patches for RTL8168 driver fixes"
+        echo "⚠️  IMPORTANT: Patches must be applied in the correct order due to line number dependencies"
         
         cd coreboot
         R8168_DRIVER="src/drivers/net/r8168.c"
@@ -166,36 +167,36 @@ jobs:
         if [ -f "$R8168_DRIVER" ]; then
           echo "✅ RTL8168 driver found: $R8168_DRIVER"
           
-          # 4.1: 添加 VPD 头文件
+          # 4.1: 添加 VPD 头文件 (必须先应用，为后续 patch 提供依赖)
           if ! grep -q "#include <drivers/vpd/vpd.h>" "$R8168_DRIVER"; then
-            echo "📝 4.1: Adding VPD header include..."
+            echo "📝 4.1: Adding VPD header include (prerequisite for vpd_find function)..."
             patch -p1 < ../patches/fix-vpd-header.patch
             echo "✅ Applied VPD header patch"
           else
             echo "✅ VPD header already included"
           fi
           
-          # 4.2: 修复 VPD 解析
+          # 4.2: 修复 VPD 解析 (依赖步骤4.1的头文件)
           if ! grep -q "vpd_find" "$R8168_DRIVER"; then
-            echo "📝 4.2: Adding VPD parsing fix..."
+            echo "📝 4.2: Adding VPD parsing fix (depends on step 4.1 header)..."
             patch -p1 < ../patches/fix-vpd-parsing.patch
             echo "✅ Applied VPD parsing patch"
           else
             echo "✅ VPD parsing fix already applied"
           fi
           
-          # 4.3: 修复 get_mac_address 函数
+          # 4.3: 修复 get_mac_address 函数 (核心MAC地址解析bug修复)
           if ! grep -q "Check if both hex digits are valid" "$R8168_DRIVER"; then
-            echo "📝 4.3: Fixing get_mac_address function..."
+            echo "📝 4.3: Fixing get_mac_address function (core MAC address parsing bug fix)..."
             patch -p1 < ../patches/fix-get-mac-address.patch
             echo "✅ Applied get_mac_address fix patch"
           else
             echo "✅ get_mac_address function already fixed"
           fi
           
-          # 4.4: 添加 RTL8111H ERI 支持
+          # 4.4: 添加 RTL8111H ERI 支持 (最后应用，依赖前面的修改)
           if ! grep -q "case 12:" "$R8168_DRIVER"; then
-            echo "📝 4.4: Adding RTL8111H ERI support..."
+            echo "📝 4.4: Adding RTL8111H ERI support (applied last, depends on previous modifications)..."
             patch -p1 < ../patches/fix-rtl8111h-eri.patch
             echo "✅ Applied RTL8111H ERI patch"
           else
@@ -376,6 +377,11 @@ jobs:
     - name: "Verify Step 4: RTL8168 driver patches"
       run: |
         echo "🔍 Verifying Step 4: RTL8168 driver patches..."
+        echo "📝 Verifying patches applied in correct order:"
+        echo "   1. VPD header include (fix-vpd-header.patch)"
+        echo "   2. VPD parsing fix (fix-vpd-parsing.patch)"  
+        echo "   3. get_mac_address function fix (fix-get-mac-address.patch)"
+        echo "   4. RTL8111H ERI support (fix-rtl8111h-eri.patch)"
         cd coreboot
         
         R8168_DRIVER="src/drivers/net/r8168.c"
