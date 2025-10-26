@@ -373,9 +373,9 @@ jobs:
         
         echo "✅ Step 3 verification completed: EDK2 custom build parameters verified"
     
-    - name: "Verify Step 4: RTL8111H revision 12-15 ERI support"
+    - name: "Verify Step 4: RTL8168 driver patches"
       run: |
-        echo "🔍 Verifying Step 4: RTL8111H revision 12-15 ERI support..."
+        echo "🔍 Verifying Step 4: RTL8168 driver patches..."
         cd coreboot
         
         R8168_DRIVER="src/drivers/net/r8168.c"
@@ -384,7 +384,63 @@ jobs:
         if [ -f "$R8168_DRIVER" ]; then
           echo "✅ RTL8168 driver found: $R8168_DRIVER"
           
-          # 验证 RTL8111H revision 12-15 支持
+          # 4.1: 验证 VPD 头文件包含
+          if grep -q "#include <drivers/vpd/vpd.h>" "$R8168_DRIVER"; then
+            echo "✅ VPD header include found"
+          else
+            echo "❌ VPD header include not found"
+            exit 1
+          fi
+          
+          # 4.2: 验证 VPD 解析修复
+          if grep -q "vpd_find" "$R8168_DRIVER"; then
+            echo "✅ vpd_find() function call found"
+          else
+            echo "❌ vpd_find() function call not found"
+            exit 1
+          fi
+          
+          # 验证 VPD 解析调试输出
+          if grep -q "Found MAC in VPD using vpd_find" "$R8168_DRIVER"; then
+            echo "✅ VPD parsing debug output found"
+          else
+            echo "❌ VPD parsing debug output not found"
+            exit 1
+          fi
+          
+          # 4.3: 验证 get_mac_address 函数修复
+          if grep -q "Check if both hex digits are valid" "$R8168_DRIVER"; then
+            echo "✅ Hex digit validation code found in get_mac_address function"
+          else
+            echo "❌ Hex digit validation code not found in get_mac_address function"
+            exit 1
+          fi
+          
+          # 验证错误处理代码
+          if grep -q "Invalid hex digit in MAC address at position" "$R8168_DRIVER"; then
+            echo "✅ Error handling for invalid hex digits found"
+          else
+            echo "❌ Error handling for invalid hex digits not found"
+            exit 1
+          fi
+          
+          # 验证调试输出
+          if grep -q "Parsed MAC address:" "$R8168_DRIVER"; then
+            echo "✅ MAC address parsing debug output found"
+          else
+            echo "❌ MAC address parsing debug output not found"
+            exit 1
+          fi
+          
+          # 验证变量声明
+          if grep -q "u8 hex1, hex2;" "$R8168_DRIVER"; then
+            echo "✅ Hex digit variables declaration found"
+          else
+            echo "❌ Hex digit variables declaration not found"
+            exit 1
+          fi
+          
+          # 4.4: 验证 RTL8111H revision 12-15 支持
           if grep -q "case 12:" "$R8168_DRIVER" && grep -q "case 13:" "$R8168_DRIVER" && grep -q "case 14:" "$R8168_DRIVER" && grep -q "case 15:" "$R8168_DRIVER"; then
             echo "✅ RTL8111H revision 12-15 cases found in driver"
           else
@@ -416,121 +472,11 @@ jobs:
             exit 1
           fi
           
-          echo "✅ Step 4 verification completed: RTL8111H revision 12-15 ERI support verified"
+          echo "✅ Step 4 verification completed: All RTL8168 driver patches verified"
         else
           echo "❌ RTL8168 driver not found: $R8168_DRIVER"
           exit 1
         fi
-    
-    - name: "Verify Step 5: RTL8168 driver and VPD parsing"
-      run: |
-        echo "🔍 Verifying Step 5: RTL8168 driver and VPD parsing..."
-        cd coreboot
-        
-        R8168_DRIVER="src/drivers/net/r8168.c"
-        
-        # 验证 RTL8168 驱动文件存在
-        if [ -f "$R8168_DRIVER" ]; then
-          echo "✅ RTL8168 driver found: $R8168_DRIVER"
-          
-          # 5.1: 验证 VPD 解析修复
-          echo "🔍 5.1: Verifying VPD parsing fix..."
-          
-          # 验证 VPD 头文件包含
-          if grep -q "#include <drivers/vpd/vpd.h>" "$R8168_DRIVER"; then
-            echo "✅ VPD header include found"
-          else
-            echo "❌ VPD header include not found"
-            exit 1
-          fi
-        else
-          echo "❌ RTL8168 driver not found: $R8168_DRIVER"
-          exit 1
-        fi
-        
-        echo "✅ Step 5 verification completed: RTL8168 driver and VPD parsing verified"
-    
-    #       # 验证 vpd_find 函数调用
-    #       if grep -q "vpd_find" "$R8168_DRIVER"; then
-    #         echo "✅ vpd_find() function call found"
-    #       else
-    #         echo "❌ vpd_find() function call not found"
-    #         exit 1
-    #       fi
-          
-    #       # 验证 VPD 解析调试输出
-    #       if grep -q "Found MAC in VPD using vpd_find" "$R8168_DRIVER"; then
-    #         echo "✅ VPD parsing debug output found"
-    #       else
-    #         echo "❌ VPD parsing debug output not found"
-    #         exit 1
-    #       fi
-          
-    #       # 5.2: 验证 get_mac_address 函数修复
-    #       echo "🔍 5.2: Verifying get_mac_address function fix..."
-          
-    #       # 验证十六进制数字验证代码
-    #       if grep -q "Check if both hex digits are valid" "$R8168_DRIVER"; then
-    #         echo "✅ Hex digit validation code found in get_mac_address function"
-    #       else
-    #         echo "❌ Hex digit validation code not found in get_mac_address function"
-    #         exit 1
-    #       fi
-          
-    #       # 验证错误处理代码
-    #       if grep -q "Invalid hex digit in MAC address at position" "$R8168_DRIVER"; then
-    #         echo "✅ Error handling for invalid hex digits found"
-    #       else
-    #         echo "❌ Error handling for invalid hex digits not found"
-    #         exit 1
-    #       fi
-          
-    #       # 验证调试输出
-    #       if grep -q "Parsed MAC address:" "$R8168_DRIVER"; then
-    #         echo "✅ MAC address parsing debug output found"
-    #       else
-    #         echo "❌ MAC address parsing debug output not found"
-    #         exit 1
-    #       fi
-          
-    #       # 验证变量声明
-    #       if grep -q "u8 hex1, hex2;" "$R8168_DRIVER"; then
-    #         echo "✅ Hex digit variables declaration found"
-    #       else
-    #         echo "❌ Hex digit variables declaration not found"
-    #         exit 1
-    #       fi
-          
-    #       # 5.3: 验证 program_mac_address 调试输出
-    #       echo "🔍 5.3: Verifying program_mac_address debug output..."
-          
-    #       # 验证 macstrbuf 内容调试输出
-    #       if grep -q "macstrbuf content:" "$R8168_DRIVER"; then
-    #         echo "✅ macstrbuf content debug output found"
-    #       else
-    #         echo "❌ macstrbuf content debug output not found"
-    #         exit 1
-    #       fi
-          
-    #       # 验证 mac 数组调试输出
-    #       if grep -q "mac array after get_mac_address:" "$R8168_DRIVER"; then
-    #         echo "✅ mac array debug output found"
-    #       else
-    #         echo "❌ mac array debug output not found"
-    #         exit 1
-    #       fi
-          
-    #       # 调试：显示完整的 get_mac_address 函数
-    #       echo "📋 Debug: Complete get_mac_address function:"
-    #       echo "=========================================="
-    #       awk '/^static void get_mac_address/,/^}/' "$R8168_DRIVER"
-    #       echo "=========================================="
-          
-    #       echo "✅ Step 5 verification completed: RTL8168 driver and VPD parsing verified"
-    #     else
-    #       echo "❌ RTL8168 driver not found: $R8168_DRIVER"
-    #       exit 1
-    #     fi
     
     - name: Verify final build results
       run: |
