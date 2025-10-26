@@ -1,0 +1,12 @@
+--- a/src/drivers/net/r8168.c
++++ b/src/drivers/net/r8168.c
+@@ -8,6 +8,7 @@
+ #include <device/pci_ops.h>
+ #include <device/pci_ids.h>
+ #include <delay.h>
+ #include <fmap.h>
+ #include <types.h>
+ #include "chip.h"
++#include <drivers/vpd/vpd.h>
+ 
+ #define MACLEN 18

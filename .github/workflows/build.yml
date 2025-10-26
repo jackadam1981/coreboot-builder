@@ -154,10 +154,10 @@ jobs:
         
         echo "✅ EDK2 custom build parameters configuration completed"
     
-    - name: "Step 4: Add RTL8111H revision 12-15 ERI support"
+    - name: "Step 4: Apply RTL8168 driver patches"
       run: |
-        echo "🔧 Step 4: Adding RTL8111H revision 12-15 ERI programming support..."
-        echo "📝 Ensuring RTL8111H revision 12-15 case is properly supported in r8168.c"
+        echo "🔧 Step 4: Applying RTL8168 driver patches..."
+        echo "📝 Applying individual patches for RTL8168 driver fixes"
         
         cd coreboot
         R8168_DRIVER="src/drivers/net/r8168.c"
@@ -166,81 +166,47 @@ jobs:
         if [ -f "$R8168_DRIVER" ]; then
           echo "✅ RTL8168 driver found: $R8168_DRIVER"
           
-          # 检查是否已经有 case 15 支持
-          if grep -q "case 15:" "$R8168_DRIVER"; then
-            echo "✅ RTL8111H revision 15 support already present"
-          else
-            echo "📝 Adding RTL8111H revision 12-15 ERI programming support..."
-            
-            # 查找现有的 case 语句位置
-            if grep -q "case 9:" "$R8168_DRIVER"; then
-              echo "📝 Found existing case 9, adding RTL8111H revision 12-15 support..."
-              
-              # 在 case 9 之后添加 RTL8111H revision 12-15 支持
-              sed -i '/case 9:/a\\tcase 12:' "$R8168_DRIVER"
-              sed -i '/case 12:/a\\tcase 13:' "$R8168_DRIVER"
-              sed -i '/case 13:/a\\tcase 14:' "$R8168_DRIVER"
-              sed -i '/case 14:/a\\tcase 15:' "$R8168_DRIVER"
-              sed -i '/case 15:/a\\t\t/* RTL8111H revision 12-15 ERI programming */' "$R8168_DRIVER"
-              sed -i '/RTL8111H revision 12-15 ERI programming/a\\t\tprintk(BIOS_DEBUG, "r8168: Programming ERI for RTL8111H revision %d\\n", pci_read_config8(dev, PCI_REVISION_ID));' "$R8168_DRIVER"
-              sed -i '/Programming ERI for RTL8111H revision/a\\t\toutl(maclo, io_base + ERIDR);' "$R8168_DRIVER"
-              sed -i '/outl(maclo, io_base + ERIDR);/a\\t\tinl(io_base + ERIDR);' "$R8168_DRIVER"
-              sed -i '/inl(io_base + ERIDR);/a\\t\toutl(0x8000f0e0, io_base + ERIAR);' "$R8168_DRIVER"
-              sed -i '/outl(0x8000f0e0, io_base + ERIAR);/a\\t\tinl(io_base + ERIAR);' "$R8168_DRIVER"
-              sed -i '/inl(io_base + ERIAR);/a\\t\toutl(machi, io_base + ERIDR);' "$R8168_DRIVER"
-              sed -i '/outl(machi, io_base + ERIDR);/a\\t\tinl(io_base + ERIDR);' "$R8168_DRIVER"
-              sed -i '/inl(io_base + ERIDR);/a\\t\toutl(0x800030e4, io_base + ERIAR);' "$R8168_DRIVER"
-              sed -i '/outl(0x800030e4, io_base + ERIAR);/a\\t\tprintk(BIOS_DEBUG, "r8168: ERI programming completed for RTL8111H\\n");' "$R8168_DRIVER"
-              sed -i '/ERI programming completed for RTL8111H/a\\t\tbreak;' "$R8168_DRIVER"
-              
-              echo "✅ RTL8111H revision 12-15 support added"
-            else
-              echo "❌ Case 9 not found, cannot add RTL8111H support"
-              exit 1
-            fi
-          fi
-        else
-          echo "❌ RTL8168 driver not found: $R8168_DRIVER"
-          exit 1
-        fi
-        
-        echo "✅ Step 4 completed: RTL8111H revision 12-15 ERI support added"
-    
-    - name: "Step 5: Fix RTL8168 driver and VPD parsing"
-      run: |
-        echo "🔧 Step 5: Fixing RTL8168 driver and VPD parsing..."
-        echo "📝 Fixing get_mac_address function and adding VPD parsing fix"
-        
-        cd coreboot
-        R8168_DRIVER="src/drivers/net/r8168.c"
-        
-        # 检查驱动文件是否存在
-        if [ -f "$R8168_DRIVER" ]; then
-          echo "✅ RTL8168 driver found: $R8168_DRIVER"
-          
-          # 5.1: 添加 VPD 解析修复
-          echo "📝 5.1: Adding VPD parsing fix using vpd_find()..."
-          
-          # 添加 VPD 头文件
+          # 4.1: 添加 VPD 头文件
           if ! grep -q "#include <drivers/vpd/vpd.h>" "$R8168_DRIVER"; then
-            sed -i '/#include "chip.h"/a\\#include <drivers/vpd/vpd.h>' "$R8168_DRIVER"
-            echo "✅ Added VPD header include"
+            echo "📝 4.1: Adding VPD header include..."
+            patch -p1 < ../patches/fix-vpd-header.patch
+            echo "✅ Applied VPD header patch"
+          else
+            echo "✅ VPD header already included"
           fi
           
-          # 修复 fetch_mac_vpd_key 函数使用 vpd_find
+          # 4.2: 修复 VPD 解析
           if ! grep -q "vpd_find" "$R8168_DRIVER"; then
-            echo "📝 Adding vpd_find() VPD parsing fix using patch file..."
-            
-            # 应用 VPD 解析修复 patch
+            echo "📝 4.2: Adding VPD parsing fix..."
             patch -p1 < ../patches/fix-vpd-parsing.patch
-            echo "✅ Applied VPD parsing fix patch"
+            echo "✅ Applied VPD parsing patch"
+          else
+            echo "✅ VPD parsing fix already applied"
+          fi
+          
+          # 4.3: 修复 get_mac_address 函数
+          if ! grep -q "Check if both hex digits are valid" "$R8168_DRIVER"; then
+            echo "📝 4.3: Fixing get_mac_address function..."
+            patch -p1 < ../patches/fix-get-mac-address.patch
+            echo "✅ Applied get_mac_address fix patch"
+          else
+            echo "✅ get_mac_address function already fixed"
+          fi
+          
+          # 4.4: 添加 RTL8111H ERI 支持
+          if ! grep -q "case 12:" "$R8168_DRIVER"; then
+            echo "📝 4.4: Adding RTL8111H ERI support..."
+            patch -p1 < ../patches/fix-rtl8111h-eri.patch
+            echo "✅ Applied RTL8111H ERI patch"
+          else
+            echo "✅ RTL8111H ERI support already present"
           fi
         else
           echo "❌ RTL8168 driver not found: $R8168_DRIVER"
           exit 1
         fi
         
-        echo "✅ Step 5 completed: RTL8168 driver and VPD parsing fixed"
+        echo "✅ Step 4 completed: All RTL8168 driver patches applied"
     
     - name: Simulate build configuration
       run: |

@@ -1,23 +1,6 @@
 --- a/src/drivers/net/r8168.c
 +++ b/src/drivers/net/r8168.c
-@@ -1,5 +1,6 @@
- #include <cbfs.h>
- #include <acpi/acpi_device.h>
- #include <acpi/acpigen.h>
- #include <string.h>
- #include <arch/io.h>
- #include <console/console.h>
-@@ -8,6 +9,7 @@
- #include <device/pci_ops.h>
- #include <device/pci_ids.h>
- #include <delay.h>
- #include <fmap.h>
- #include <types.h>
- #include "chip.h"
-+#include <drivers/vpd/vpd.h>
- 
- #define MACLEN 18
-@@ -200,6 +202,20 @@ static enum cb_err fetch_mac_vpd_key(u8 *macstrbuf, const char *vpd_key)
+@@ -200,6 +200,20 @@ static enum cb_err fetch_mac_vpd_key(u8 *macstrbuf, const char *vpd_key)
  {
  	struct region_device rdev;
  	void *search_address;
