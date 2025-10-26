@@ -215,6 +215,15 @@ jobs:
           else
             echo "✅ RTL8111H ERI support already present"
           fi
+          
+          # 4.5: 添加 VPD 调试信息 (帮助诊断 MAC 地址读取问题)
+          if ! grep -q "fetch_mac_vpd_dev_idx: device_index" "$R8168_DRIVER"; then
+            echo "📝 4.5: Adding VPD debugging information..."
+            patch -p1 < ../patches/fix-vpd-debug.patch
+            echo "✅ Applied VPD debug patch"
+          else
+            echo "✅ VPD debug information already present"
+          fi
         else
           echo "❌ RTL8168 driver not found: $R8168_DRIVER"
           exit 1
@@ -419,6 +428,7 @@ jobs:
         echo "   2. VPD parsing fix (fix-vpd-parsing.patch)"  
         echo "   3. get_mac_address function fix (fix-get-mac-address.patch)"
         echo "   4. RTL8111H ERI support (fix-rtl8111h-eri.patch)"
+        echo "   5. VPD debugging information (fix-vpd-debug.patch)"
         cd coreboot
         
         R8168_DRIVER="src/drivers/net/r8168.c"
@@ -507,13 +517,35 @@ jobs:
             exit 1
           fi
           
-          # 验证完成调试输出
-          if grep -q "ERI programming completed for RTL8111H" "$R8168_DRIVER"; then
-            echo "✅ RTL8111H ERI programming completion debug output found"
-          else
-            echo "❌ RTL8111H ERI programming completion debug output not found"
-            exit 1
-          fi
+        # 验证完成调试输出
+        if grep -q "ERI programming completed for RTL8111H" "$R8168_DRIVER"; then
+          echo "✅ RTL8111H ERI programming completion debug output found"
+        else
+          echo "❌ RTL8111H ERI programming completion debug output not found"
+          exit 1
+        fi
+        
+        # 4.5: 验证 VPD 调试信息
+        if grep -q "fetch_mac_vpd_dev_idx: device_index" "$R8168_DRIVER"; then
+          echo "✅ VPD debugging information found"
+        else
+          echo "❌ VPD debugging information not found"
+          exit 1
+        fi
+        
+        if grep -q "Searching for VPD key:" "$R8168_DRIVER"; then
+          echo "✅ VPD key search debug output found"
+        else
+          echo "❌ VPD key search debug output not found"
+          exit 1
+        fi
+        
+        if grep -q "vpd_find result:" "$R8168_DRIVER"; then
+          echo "✅ VPD find result debug output found"
+        else
+          echo "❌ VPD find result debug output not found"
+          exit 1
+        fi
           
           echo "✅ Step 4 verification completed: All RTL8168 driver patches verified"
         else
