@@ -1,0 +1,35 @@
+diff --git a/src/drivers/net/r8168.c b/src/drivers/net/r8168.c
+index 4157db9ab0..b2d90bc745 100644
+--- a/src/drivers/net/r8168.c
++++ b/src/drivers/net/r8168.c
+@@ -21,6 +21,8 @@
+ #include <fmap.h>
+ #include <types.h>
+ 
++
++#include <drivers/vpd/vpd.h>
+ #include "chip.h"
+ 
+ #include <drivers/vpd/vpd.h>
+@@ -111,6 +113,21 @@ static enum cb_err fetch_mac_vpd_key(u8 *macstrbuf, const char *vpd_key)
+ 	}
+ 	printk(BIOS_DEBUG, "r8168: vpd_find failed, trying legacy method\n");
+ 
++	/* Try using the proper VPD parsing function first */
++	const char *vpd_value;
++	int vpd_size;
++	printk(BIOS_DEBUG, "r8168: Searching for VPD key: '%s\n", vpd_key);
++	vpd_value = vpd_find(vpd_key, &vpd_size, VPD_RO);
++	printk(BIOS_DEBUG, "r8168: vpd_find result: vpd_value=%p, vpd_size=%d\n", vpd_value, vpd_size);
++	if (vpd_value && vpd_size > 0) {
++		int copy_size = MIN(vpd_size, MACLEN - 1);
++		memcpy(macstrbuf, vpd_value, copy_size);
++		macstrbuf[copy_size] = '\0';
++		printk(BIOS_DEBUG, "r8168: Found MAC in VPD using vpd_find: %s\n", macstrbuf);
++		return CB_SUCCESS;
++	}
++	printk(BIOS_DEBUG, "r8168: vpd_find failed, trying legacy method\n");
++
+ 	if (fmap_locate_area_as_rdev("RO_VPD", &rdev)) {
+ 		printk(BIOS_ERR, "Couldn't find RO_VPD region.");
+ 		return CB_ERR;
