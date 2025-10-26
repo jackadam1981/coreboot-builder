@@ -6,7 +6,7 @@
  
 +	/* Try using the proper VPD parsing function first */
 +	const char *vpd_value;
-+	size_t vpd_size;
++	int vpd_size;
 +	vpd_value = vpd_find(vpd_key, &vpd_size, VPD_RO);
 +	if (vpd_value && vpd_size > 0) {
 +		/* Copy the value to macstrbuf, ensuring null termination */
