@@ -203,16 +203,38 @@ config RT8168_PUT_MAC_TO_ERI
     bool "Put MAC address to ERI registers"
     depends on REALTEK_8168_RESET  # 添加此依赖关系
 ```
-## 🚀 GitHub Actions 编译
+## 🚀 构建方法
+
+### 方法 1: 本地 Docker 构建（推荐）
+
+```bash
+# 1. 克隆本仓库
+git clone https://github.com/your-username/coreboot-builder.git
+cd coreboot-builder
+
+# 2. 运行本地构建脚本
+./local-build.sh
+
+# 3. 构建完成后，ROM 文件将位于 roms/ 目录
+```
+
+**优点**：
+- ✅ 无需 GitHub Actions 配额
+- ✅ 构建速度快
+- ✅ 本地调试方便
+- ✅ 完全自动化
+
+### 方法 2: GitHub Actions 编译
 
 ### 工作流说明
-- **build-kaisa-production.yml**: 生产环境构建，支持多种选项
-- **build-kaisa-simple.yml**: 简化构建，快速测试
-- **test-kaisa.yml**: 仅验证修改，不进行完整编译
+- **build.yml**: 自动化构建流程
 
 ### 使用方法
 1. 进入 GitHub Actions 页面
-2. 选择 "Build Kaisa Production ROM"
-3. 点击 "Run workflow"
-4. 选择构建类型和选项
-5. 下载构建产物
+2. 触发构建
+3. 下载构建产物
+
+**缺点**：
+- ❌ 需要 GitHub Actions 配额
+- ❌ 构建速度较慢
+- ❌ 调试不方便
