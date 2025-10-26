@@ -226,19 +226,19 @@ jobs:
             sed -i '/#include "chip.h"/a\\#include <drivers/vpd/vpd.h>' "$R8168_DRIVER"
             echo "✅ Added VPD header include"
           fi
+          
+          # 修复 fetch_mac_vpd_key 函数使用 vpd_find
+          if ! grep -q "vpd_find" "$R8168_DRIVER"; then
+            # 在 fetch_mac_vpd_key 函数开头添加 vpd_find 尝试
+            sed -i '/struct region_device rdev;/i\\\t/* Try using the proper VPD parsing function first */\n\tconst char *vpd_value;\n\tsize_t vpd_size;\n\tvpd_value = vpd_find(vpd_key, &vpd_size, VPD_RO);\n\tif (vpd_value && vpd_size > 0) {\n\t\t/* Copy the value to macstrbuf, ensuring null termination */\n\t\tint copy_size = MIN(vpd_size, MACLEN - 1);\n\t\tmemcpy(macstrbuf, vpd_value, copy_size);\n\t\tmacstrbuf[copy_size] = '\''\\0'\'';\n\t\tprintk(BIOS_DEBUG, "r8168: Found MAC in VPD using vpd_find: %s\\n", macstrbuf);\n\t\treturn CB_SUCCESS;\n\t}\n\tprintk(BIOS_DEBUG, "r8168: vpd_find failed, trying legacy method\\n");' "$R8168_DRIVER"
+            echo "✅ Added vpd_find() VPD parsing fix"
+          fi
         else
           echo "❌ RTL8168 driver not found: $R8168_DRIVER"
           exit 1
         fi
         
         echo "✅ Step 5 completed: RTL8168 driver and VPD parsing fixed"
-          
-    #       # 修复 fetch_mac_vpd_key 函数使用 vpd_find
-    #       if ! grep -q "vpd_find" "$R8168_DRIVER"; then
-    #         # 在 fetch_mac_vpd_key 函数开头添加 vpd_find 尝试
-    #         sed -i '/struct region_device rdev;/i\\\t/* Try using the proper VPD parsing function first */\n\tconst char *vpd_value;\n\tsize_t vpd_size;\n\tvpd_value = vpd_find(vpd_key, &vpd_size, VPD_RO);\n\tif (vpd_value && vpd_size > 0) {\n\t\t/* Copy the value to macstrbuf, ensuring null termination */\n\t\tint copy_size = MIN(vpd_size, MACLEN - 1);\n\t\tmemcpy(macstrbuf, vpd_value, copy_size);\n\t\tmacstrbuf[copy_size] = '\''\\0'\'';\n\t\tprintk(BIOS_DEBUG, "r8168: Found MAC in VPD using vpd_find: %s\\n", macstrbuf);\n\t\treturn CB_SUCCESS;\n\t}\n\tprintk(BIOS_DEBUG, "r8168: vpd_find failed, trying legacy method\\n");' "$R8168_DRIVER"
-    #         echo "✅ Added vpd_find() VPD parsing fix"
-    #       fi
           
     #       # 5.2: 修复 get_mac_address 函数
     #       echo "📝 5.2: Fixing get_mac_address function validation..."
