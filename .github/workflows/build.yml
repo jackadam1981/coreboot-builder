@@ -428,7 +428,7 @@ jobs:
           fi
           
           # 5. ERI 编程代码
-          if grep -q "Programming ERI for RTL8111H revision" "$R8168_DRIVER"; then
+          if grep -qE "RTL8111H revision.*ERI programming" "$R8168_DRIVER"; then
             echo "✅ RTL8111H ERI programming code found"
           else
             echo "❌ RTL8111H ERI programming code not found"
