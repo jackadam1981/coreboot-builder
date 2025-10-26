@@ -1,20 +1,12 @@
 --- a/src/drivers/net/r8168.c
 +++ b/src/drivers/net/r8168.c
-@@ -250,6 +250,7 @@ static void get_mac_address(u8 *macaddr, const u8 *strbuf)
- 	size_t offset = 0;
- 	int i;
- 
-+	/* Validate MAC address format */
- 	if ((strbuf[2] != ':') || (strbuf[5] != ':') ||
- 	    (strbuf[8] != ':') || (strbuf[11] != ':') ||
- 	    (strbuf[14] != ':')) {
-@@ -257,10 +258,20 @@ static void get_mac_address(u8 *macaddr, const u8 *strbuf)
- 		return;
+@@ -207,11 +207,21 @@
  	}
  
-+	/* Parse MAC address with proper validation */
  	for (i = 0; i < 6; i++) {
 -		macaddr[i] = 0;
+-		macaddr[i] |= get_hex_digit(strbuf[offset]) << 4;
+-		macaddr[i] |= get_hex_digit(strbuf[offset + 1]);
 +		u8 hex1, hex2;
 +		hex1 = get_hex_digit(strbuf[offset]);
 +		hex2 = get_hex_digit(strbuf[offset + 1]);

@@ -1,9 +1,0 @@
---- a/src/drivers/net/r8168.c
-+++ b/src/drivers/net/r8168.c
-@@ -22,6 +22,7 @@
- #include <types.h>
- 
- #include "chip.h"
-+#include <drivers/vpd/vpd.h>
- 
- #define NIC_TIMEOUT		1000

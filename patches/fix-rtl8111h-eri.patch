@@ -1,33 +1,23 @@
 --- a/src/drivers/net/r8168.c
 +++ b/src/drivers/net/r8168.c
-@@ -300,6 +300,18 @@ static void program_mac_address(struct device *dev)
- 		case 9:
- 			/* RTL8111H revision 9 ERI programming */
- 			printk(BIOS_DEBUG, "r8168: Programming ERI for RTL8111H revision %d\n", pci_read_config8(dev, PCI_REVISION_ID));
- 			outl(maclo, io_base + ERIDR);
- 			inl(io_base + ERIDR);
- 			outl(0x8000f0e0, io_base + ERIAR);
- 			inl(io_base + ERIAR);
- 			outl(machi, io_base + ERIDR);
- 			inl(io_base + ERIDR);
- 			outl(0x800030e4, io_base + ERIAR);
- 			printk(BIOS_DEBUG, "r8168: ERI programming completed for RTL8111H\n");
+@@ -281,6 +281,18 @@
+ 			outl(0x8000f0f4, io_base + ERIAR);
  			break;
+ 		case 9:
 +		case 12:
 +		case 13:
 +		case 14:
 +		case 15:
 +			/* RTL8111H revision 12-15 ERI programming */
 +			printk(BIOS_DEBUG, "r8168: Programming ERI for RTL8111H revision %d\n", pci_read_config8(dev, PCI_REVISION_ID));
-+			outl(maclo, io_base + ERIDR);
-+			inl(io_base + ERIDR);
-+			outl(0x8000f0e0, io_base + ERIAR);
-+			inl(io_base + ERIAR);
-+			outl(machi, io_base + ERIDR);
-+			inl(io_base + ERIDR);
-+			outl(0x800030e4, io_base + ERIAR);
+ 			outl(maclo, io_base + ERIDR);
+ 			inl(io_base + ERIDR);
+ 			outl(0x8000f0e0, io_base + ERIAR);
+@@ -288,6 +300,7 @@
+ 			outl(machi, io_base + ERIDR);
+ 			inl(io_base + ERIDR);
+ 			outl(0x800030e4, io_base + ERIAR);
 +			printk(BIOS_DEBUG, "r8168: ERI programming completed for RTL8111H\n");
-+			break;
- 		default:
- 			printk(BIOS_WARNING, "r8168: Unsupported revision %d\n", pci_read_config8(dev, PCI_REVISION_ID));
  			break;
+ 		}
+ 		udelay(1000);

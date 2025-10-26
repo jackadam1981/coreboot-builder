@@ -1,12 +1,9 @@
 --- a/src/drivers/net/r8168.c
 +++ b/src/drivers/net/r8168.c
-@@ -200,6 +200,20 @@ static enum cb_err fetch_mac_vpd_key(u8 *macstrbuf, const char *vpd_key)
- {
- 	struct region_device rdev;
- 	void *search_address;
+@@ -97,6 +97,20 @@
  	size_t search_length;
  	size_t offset;
-+
+ 
 +	/* Try using the proper VPD parsing function first */
 +	const char *vpd_value;
 +	size_t vpd_size;
@@ -20,6 +17,7 @@
 +		return CB_SUCCESS;
 +	}
 +	printk(BIOS_DEBUG, "r8168: vpd_find failed, trying legacy method\n");
- 
++
  	if (fmap_locate_area_as_rdev("RO_VPD", &rdev)) {
  		printk(BIOS_ERR, "Couldn't find RO_VPD region.");
+ 		return CB_ERR;

@@ -1,9 +1,0 @@
---- a/configs/cml/config.kaisa.uefi
-+++ b/configs/cml/config.kaisa.uefi
-@@ -7,3 +7,7 @@ CONFIG_HAVE_ME_BIN=y
- CONFIG_DO_NOT_TOUCH_DESCRIPTOR_REGION=y
- CONFIG_NO_GFX_INIT=y
-+
-+# Custom PXE ROM support configuration
-+CONFIG_EDK2_NETWORK_PXE_SUPPORT=y
-+CONFIG_EDK2_LOAD_OPTION_ROMS=y
