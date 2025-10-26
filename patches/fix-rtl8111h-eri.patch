@@ -1,6 +1,6 @@
 --- a/src/drivers/net/r8168.c
 +++ b/src/drivers/net/r8168.c
-@@ -281,6 +281,12 @@
+@@ -279,6 +279,12 @@
  			outl(0x8000f0f4, io_base + ERIAR);
  			break;
  		case 9:
@@ -13,7 +13,7 @@
  			outl(maclo, io_base + ERIDR);
  			inl(io_base + ERIDR);
  			outl(0x8000f0e0, io_base + ERIAR);
-@@ -288,6 +294,7 @@
+@@ -286,6 +292,7 @@
  			outl(machi, io_base + ERIDR);
  			inl(io_base + ERIDR);
  			outl(0x800030e4, io_base + ERIAR);

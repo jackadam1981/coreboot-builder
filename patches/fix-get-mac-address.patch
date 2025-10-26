@@ -1,6 +1,6 @@
 --- a/src/drivers/net/r8168.c
 +++ b/src/drivers/net/r8168.c
-@@ -207,9 +207,19 @@
+@@ -194,9 +194,19 @@
  	}
  
  	for (i = 0; i < 6; i++) {
