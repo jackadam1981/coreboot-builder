@@ -1,6 +1,6 @@
 --- a/src/drivers/net/r8168.c
 +++ b/src/drivers/net/r8168.c
-@@ -97,8 +97,22 @@ static enum cb_err fetch_mac_vpd_key(u8 *macstrbuf, const char *vpd_key)
+@@ -97,6 +97,20 @@ static enum cb_err fetch_mac_vpd_key(u8 *macstrbuf, const char *vpd_key)
  	struct region_device rdev;
  	void *search_address;
  	size_t search_length;
@@ -25,5 +25,3 @@
  	if (fmap_locate_area_as_rdev("RO_VPD", &rdev)) {
  		printk(BIOS_ERR, "Couldn't find RO_VPD region.");
  		return CB_ERR;
- 	}
- 
