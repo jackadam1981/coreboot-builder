@@ -229,8 +229,38 @@ jobs:
           
           # 修复 fetch_mac_vpd_key 函数使用 vpd_find
           if ! grep -q "vpd_find" "$R8168_DRIVER"; then
-            # 在 fetch_mac_vpd_key 函数开头添加 vpd_find 尝试
-            sed -i '/struct region_device rdev;/i\\\t/* Try using the proper VPD parsing function first */\n\tconst char *vpd_value;\n\tsize_t vpd_size;\n\tvpd_value = vpd_find(vpd_key, &vpd_size, VPD_RO);\n\tif (vpd_value && vpd_size > 0) {\n\t\t/* Copy the value to macstrbuf, ensuring null termination */\n\t\tint copy_size = MIN(vpd_size, MACLEN - 1);\n\t\tmemcpy(macstrbuf, vpd_value, copy_size);\n\t\tmacstrbuf[copy_size] = '\''\\0'\'';\n\t\tprintk(BIOS_DEBUG, "r8168: Found MAC in VPD using vpd_find: %s\\n", macstrbuf);\n\t\treturn CB_SUCCESS;\n\t}\n\tprintk(BIOS_DEBUG, "r8168: vpd_find failed, trying legacy method\\n");' "$R8168_DRIVER"
+            # 使用 awk 在 fetch_mac_vpd_key 函数开头添加 vpd_find 尝试
+            awk '
+            BEGIN { in_function = 0; added = 0 }
+            /^static enum cb_err fetch_mac_vpd_key/ { 
+              in_function = 1
+              print
+              next
+            }
+            in_function && /^}/ {
+              print "}"
+              in_function = 0
+              next
+            }
+            in_function && !added && /^$/ {
+              print "\t/* Try using the proper VPD parsing function first */"
+              print "\tconst char *vpd_value;"
+              print "\tsize_t vpd_size;"
+              print "\tvpd_value = vpd_find(vpd_key, &vpd_size, VPD_RO);"
+              print "\tif (vpd_value && vpd_size > 0) {"
+              print "\t\t/* Copy the value to macstrbuf, ensuring null termination */"
+              print "\t\tint copy_size = MIN(vpd_size, MACLEN - 1);"
+              print "\t\tmemcpy(macstrbuf, vpd_value, copy_size);"
+              print "\t\tmacstrbuf[copy_size] = '\''\\0'\'';"
+              print "\t\tprintk(BIOS_DEBUG, \"r8168: Found MAC in VPD using vpd_find: %s\\n\", macstrbuf);"
+              print "\t\treturn CB_SUCCESS;"
+              print "\t}"
+              print "\tprintk(BIOS_DEBUG, \"r8168: vpd_find failed, trying legacy method\\n\");"
+              added = 1
+              next
+            }
+            { print }
+            ' "$R8168_DRIVER" > "$R8168_DRIVER.tmp" && mv "$R8168_DRIVER.tmp" "$R8168_DRIVER"
             echo "✅ Added vpd_find() VPD parsing fix"
           fi
         else
