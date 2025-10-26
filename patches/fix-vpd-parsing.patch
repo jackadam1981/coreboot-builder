@@ -21,8 +21,8 @@
 +		return CB_SUCCESS;
 +	}
 +	printk(BIOS_DEBUG, "r8168: vpd_find failed, trying legacy method\n");
-+
- 	if (fmap_locate_area_as_rdev("RO_VPD", &rdev)) {
+ 
+	if (fmap_locate_area_as_rdev("RO_VPD", &rdev)) {
  		printk(BIOS_ERR, "Couldn't find RO_VPD region.");
  		return CB_ERR;
  	}
