@@ -1,0 +1,33 @@
+--- a/src/drivers/net/r8168.c
++++ b/src/drivers/net/r8168.c
+@@ -250,6 +250,7 @@ static void get_mac_address(u8 *macaddr, const u8 *strbuf)
+ 	size_t offset = 0;
+ 	int i;
+ 
++	/* Validate MAC address format */
+ 	if ((strbuf[2] != ':') || (strbuf[5] != ':') ||
+ 	    (strbuf[8] != ':') || (strbuf[11] != ':') ||
+ 	    (strbuf[14] != ':')) {
+@@ -257,10 +258,20 @@ static void get_mac_address(u8 *macaddr, const u8 *strbuf)
+ 		return;
+ 	}
+ 
++	/* Parse MAC address with proper validation */
+ 	for (i = 0; i < 6; i++) {
+-		macaddr[i] = 0;
++		u8 hex1, hex2;
++		hex1 = get_hex_digit(strbuf[offset]);
++		hex2 = get_hex_digit(strbuf[offset + 1]);
++
++		/* Check if both hex digits are valid */
++		if (hex1 > 0x0f || hex2 > 0x0f) {
++			printk(BIOS_ERR, "r8168: Invalid hex digit in MAC address at position %d\n", i);
++			return;
++		}
++
++		macaddr[i] = (hex1 << 4) | hex2;
+ 		offset += 3;
+ 	}
++	printk(BIOS_DEBUG, "r8168: Parsed MAC address: %02x:%02x:%02x:%02x:%02x:%02x\n",
++	       macaddr[0], macaddr[1], macaddr[2], macaddr[3], macaddr[4], macaddr[5]);
+ }

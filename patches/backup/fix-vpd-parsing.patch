@@ -1,0 +1,25 @@
+--- a/src/drivers/net/r8168.c
++++ b/src/drivers/net/r8168.c
+@@ -200,6 +200,20 @@ static enum cb_err fetch_mac_vpd_key(u8 *macstrbuf, const char *vpd_key)
+ {
+ 	struct region_device rdev;
+ 	void *search_address;
+ 	size_t search_length;
+ 	size_t offset;
++
++	/* Try using the proper VPD parsing function first */
++	const char *vpd_value;
++	size_t vpd_size;
++	vpd_value = vpd_find(vpd_key, &vpd_size, VPD_RO);
++	if (vpd_value && vpd_size > 0) {
++		/* Copy the value to macstrbuf, ensuring null termination */
++		int copy_size = MIN(vpd_size, MACLEN - 1);
++		memcpy(macstrbuf, vpd_value, copy_size);
++		macstrbuf[copy_size] = '\0';
++		printk(BIOS_DEBUG, "r8168: Found MAC in VPD using vpd_find: %s\n", macstrbuf);
++		return CB_SUCCESS;
++	}
++	printk(BIOS_DEBUG, "r8168: vpd_find failed, trying legacy method\n");
+ 
+ 	if (fmap_locate_area_as_rdev("RO_VPD", &rdev)) {
+ 		printk(BIOS_ERR, "Couldn't find RO_VPD region.");
