@@ -91,10 +91,19 @@ jobs:
           echo "✅ RT8168_SUPPORT_LEGACY_VPD_MAC already present"
         fi
         
+        # 检查并添加 RT8168_GET_MAC_FROM_VPD 支持
+        if ! grep -q "select RT8168_GET_MAC_FROM_VPD" "$PUFF_KCONFIG"; then
+          echo "📝 Adding RT8168_GET_MAC_FROM_VPD support..."
+          sed -i '/select RT8168_SUPPORT_LEGACY_VPD_MAC/a\\tselect RT8168_GET_MAC_FROM_VPD' "$PUFF_KCONFIG"
+          echo "✅ RT8168_GET_MAC_FROM_VPD support added"
+        else
+          echo "✅ RT8168_GET_MAC_FROM_VPD already present"
+        fi
+        
         # 检查并添加 RT8168_PUT_MAC_TO_ERI 支持
         if ! grep -q "select RT8168_PUT_MAC_TO_ERI" "$PUFF_KCONFIG"; then
           echo "📝 Adding RT8168_PUT_MAC_TO_ERI support..."
-          sed -i '/select RT8168_SUPPORT_LEGACY_VPD_MAC/a\\tselect RT8168_PUT_MAC_TO_ERI' "$PUFF_KCONFIG"
+          sed -i '/select RT8168_GET_MAC_FROM_VPD/a\\tselect RT8168_PUT_MAC_TO_ERI' "$PUFF_KCONFIG"
           echo "✅ RT8168_PUT_MAC_TO_ERI support added"
         else
           echo "✅ RT8168_PUT_MAC_TO_ERI already present"
@@ -115,6 +124,10 @@ jobs:
         echo "# EDK2 Network PXE Support" >> "$CONFIG_FILE"
         echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> "$CONFIG_FILE"
         echo "CONFIG_EDK2_LOAD_OPTION_ROMS=y" >> "$CONFIG_FILE"
+        echo "" >> "$CONFIG_FILE"
+        echo "# EDK2 Boot Manager Settings" >> "$CONFIG_FILE"
+        echo "CONFIG_EDK2_BOOT_TIMEOUT=10" >> "$CONFIG_FILE"
+        echo "CONFIG_EDK2_BOOT_MANAGER_ESCAPE=y" >> "$CONFIG_FILE"
         echo "" >> "$CONFIG_FILE"
         echo "# RTL8168 MAC Address ERI Programming" >> "$CONFIG_FILE"
         echo "CONFIG_RT8168_PUT_MAC_TO_ERI=y" >> "$CONFIG_FILE"
@@ -253,6 +266,14 @@ jobs:
           exit 1
         fi
         
+        # 验证 RT8168_GET_MAC_FROM_VPD 支持
+        if grep -q "select RT8168_GET_MAC_FROM_VPD" "$PUFF_KCONFIG"; then
+          echo "✅ RT8168_GET_MAC_FROM_VPD support found in puff/Kconfig"
+        else
+          echo "❌ RT8168_GET_MAC_FROM_VPD support not found in puff/Kconfig"
+          exit 1
+        fi
+        
         # 验证 RT8168_PUT_MAC_TO_ERI 支持
         if grep -q "select RT8168_PUT_MAC_TO_ERI" "$PUFF_KCONFIG"; then
           echo "✅ RT8168_PUT_MAC_TO_ERI support found in puff/Kconfig"
@@ -283,6 +304,22 @@ jobs:
           echo "✅ CONFIG_EDK2_LOAD_OPTION_ROMS=y found in config.kaisa.uefi"
         else
           echo "❌ CONFIG_EDK2_LOAD_OPTION_ROMS=y not found in config.kaisa.uefi"
+          exit 1
+        fi
+        
+        # 验证 EDK2 启动超时配置
+        if grep -q "CONFIG_EDK2_BOOT_TIMEOUT=10" "$CONFIG_FILE"; then
+          echo "✅ CONFIG_EDK2_BOOT_TIMEOUT=10 found in config.kaisa.uefi"
+        else
+          echo "❌ CONFIG_EDK2_BOOT_TIMEOUT=10 not found in config.kaisa.uefi"
+          exit 1
+        fi
+        
+        # 验证 EDK2 启动管理器配置
+        if grep -q "CONFIG_EDK2_BOOT_MANAGER_ESCAPE=y" "$CONFIG_FILE"; then
+          echo "✅ CONFIG_EDK2_BOOT_MANAGER_ESCAPE=y found in config.kaisa.uefi"
+        else
+          echo "❌ CONFIG_EDK2_BOOT_MANAGER_ESCAPE=y not found in config.kaisa.uefi"
           exit 1
         fi
         
@@ -527,17 +564,15 @@ jobs:
           
           echo "✅ ROM build completed"
     
-    - name: Upload ROM
+    - name: Check ROM files
       run: |
-        echo "📋 Files to upload:"
+        echo "📋 Generated ROM files:"
         echo "ROM files:"
         ls -la roms/*.rom || echo "No ROM files found"
         echo "SHA1 files:"
         ls -la roms/*.sha1 || echo "No SHA1 files found"
         echo "All files in roms directory:"
         ls -la roms/
-        
-        echo "📤 Uploading artifacts..."
     
     - name: Upload ROM Artifacts
       uses: actions/upload-artifact@v4
