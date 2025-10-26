@@ -863,21 +863,20 @@ jobs:
               exit 1
             fi
             
-          # 检查 EDK2 子模块状态
-          echo '📋 Checking EDK2 submodule status:'
-          git submodule status payloads/external/edk2 || echo 'EDK2 submodule not found'
-          
-          # 检查 r8168.c 语法（跳过，因为需要完整的构建环境）
-          echo '📋 Skipping r8168.c syntax check (requires full build environment)'
-          echo '✅ Proceeding with build process...'
-          
-          
-          # 清理 build 目录权限问题
+            # 检查 EDK2 子模块状态
+            echo '📋 Checking EDK2 submodule status:'
+            git submodule status payloads/external/edk2 || echo 'EDK2 submodule not found'
+            
+            # 检查 r8168.c 语法（跳过，因为需要完整的构建环境）
+            echo '📋 Skipping r8168.c syntax check (requires full build environment)'
+            echo '✅ Proceeding with build process...'
+            
+            # 清理 build 目录权限问题
             echo '🧹 Cleaning build directory permissions...'
-            sudo rm -rf ./build || true
+            rm -rf ./build || true
             mkdir -p ./build
             
-          # 运行构建脚本
+            # 运行构建脚本
             echo '🚀 Starting build process...'
             echo '📋 Running: ./build-uefi.sh kaisa'
             
