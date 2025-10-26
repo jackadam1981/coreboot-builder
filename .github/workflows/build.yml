@@ -227,11 +227,32 @@ jobs:
             echo "✅ Added VPD header include"
           fi
           
-          # 修复 fetch_mac_vpd_key 函数使用 vpd_find (暂时注释掉，避免 YAML 语法问题)
-          # if ! grep -q "vpd_find" "$R8168_DRIVER"; then
-          #   echo "📝 Adding vpd_find() VPD parsing fix..."
-          #   echo "✅ VPD parsing fix would be added here"
-          # fi
+          # 修复 fetch_mac_vpd_key 函数使用 vpd_find
+          if ! grep -q "vpd_find" "$R8168_DRIVER"; then
+            echo "📝 Adding vpd_find() VPD parsing fix..."
+            
+            # 使用 echo 创建临时脚本文件
+            echo '#!/bin/bash' > /tmp/vpd_fix.sh
+            echo 'sed -i "/struct region_device rdev;/i\\' >> /tmp/vpd_fix.sh
+            echo '\\t/* Try using the proper VPD parsing function first */\\' >> /tmp/vpd_fix.sh
+            echo '\\tconst char *vpd_value;\\' >> /tmp/vpd_fix.sh
+            echo '\\tsize_t vpd_size;\\' >> /tmp/vpd_fix.sh
+            echo '\\tvpd_value = vpd_find(vpd_key, &vpd_size, VPD_RO);\\' >> /tmp/vpd_fix.sh
+            echo '\\tif (vpd_value && vpd_size > 0) {\\' >> /tmp/vpd_fix.sh
+            echo '\\t\\t/* Copy the value to macstrbuf, ensuring null termination */\\' >> /tmp/vpd_fix.sh
+            echo '\\t\\tint copy_size = MIN(vpd_size, MACLEN - 1);\\' >> /tmp/vpd_fix.sh
+            echo '\\t\\tmemcpy(macstrbuf, vpd_value, copy_size);\\' >> /tmp/vpd_fix.sh
+            echo '\\t\\tmacstrbuf[copy_size] = '\''\\0'\'';\\' >> /tmp/vpd_fix.sh
+            echo '\\t\\tprintk(BIOS_DEBUG, \"r8168: Found MAC in VPD using vpd_find: %s\\n\", macstrbuf);\\' >> /tmp/vpd_fix.sh
+            echo '\\t\\treturn CB_SUCCESS;\\' >> /tmp/vpd_fix.sh
+            echo '\\t}\\' >> /tmp/vpd_fix.sh
+            echo '\\tprintk(BIOS_DEBUG, \"r8168: vpd_find failed, trying legacy method\\n\");" "$1"' >> /tmp/vpd_fix.sh
+            
+            chmod +x /tmp/vpd_fix.sh
+            /tmp/vpd_fix.sh "$R8168_DRIVER"
+            rm /tmp/vpd_fix.sh
+            echo "✅ Added vpd_find() VPD parsing fix"
+          fi
         else
           echo "❌ RTL8168 driver not found: $R8168_DRIVER"
           exit 1
