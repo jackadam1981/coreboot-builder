@@ -206,26 +206,32 @@ jobs:
         
         echo "✅ Step 4 completed: RTL8111H revision 12-15 ERI support added"
     
-    # - name: "Step 5: Fix RTL8168 driver and VPD parsing"
-    #   run: |
-    #     echo "🔧 Step 5: Fixing RTL8168 driver and VPD parsing..."
-    #     echo "📝 Fixing get_mac_address function and adding VPD parsing fix"
+    - name: "Step 5: Fix RTL8168 driver and VPD parsing"
+      run: |
+        echo "🔧 Step 5: Fixing RTL8168 driver and VPD parsing..."
+        echo "📝 Fixing get_mac_address function and adding VPD parsing fix"
         
-    #     cd coreboot
-    #     R8168_DRIVER="src/drivers/net/r8168.c"
+        cd coreboot
+        R8168_DRIVER="src/drivers/net/r8168.c"
         
-    #     # 检查驱动文件是否存在
-    #     if [ -f "$R8168_DRIVER" ]; then
-    #       echo "✅ RTL8168 driver found: $R8168_DRIVER"
+        # 检查驱动文件是否存在
+        if [ -f "$R8168_DRIVER" ]; then
+          echo "✅ RTL8168 driver found: $R8168_DRIVER"
           
-    #       # 5.1: 添加 VPD 解析修复
-    #       echo "📝 5.1: Adding VPD parsing fix using vpd_find()..."
+          # 5.1: 添加 VPD 解析修复
+          echo "📝 5.1: Adding VPD parsing fix using vpd_find()..."
           
-    #       # 添加 VPD 头文件
-    #       if ! grep -q "#include <drivers/vpd/vpd.h>" "$R8168_DRIVER"; then
-    #         sed -i '/#include "chip.h"/a\\#include <drivers/vpd/vpd.h>' "$R8168_DRIVER"
-    #         echo "✅ Added VPD header include"
-    #       fi
+          # 添加 VPD 头文件
+          if ! grep -q "#include <drivers/vpd/vpd.h>" "$R8168_DRIVER"; then
+            sed -i '/#include "chip.h"/a\\#include <drivers/vpd/vpd.h>' "$R8168_DRIVER"
+            echo "✅ Added VPD header include"
+          fi
+        else
+          echo "❌ RTL8168 driver not found: $R8168_DRIVER"
+          exit 1
+        fi
+        
+        echo "✅ Step 5 completed: RTL8168 driver and VPD parsing fixed"
           
     #       # 修复 fetch_mac_vpd_key 函数使用 vpd_find
     #       if ! grep -q "vpd_find" "$R8168_DRIVER"; then
@@ -539,28 +545,34 @@ jobs:
           exit 1
         fi
     
-    # - name: "Verify Step 5: RTL8168 driver and VPD parsing"
-    #   run: |
-    #     echo "🔍 Verifying Step 5: RTL8168 driver and VPD parsing..."
-    #     cd coreboot
+    - name: "Verify Step 5: RTL8168 driver and VPD parsing"
+      run: |
+        echo "🔍 Verifying Step 5: RTL8168 driver and VPD parsing..."
+        cd coreboot
         
-    #     R8168_DRIVER="src/drivers/net/r8168.c"
+        R8168_DRIVER="src/drivers/net/r8168.c"
         
-    #     # 验证 RTL8168 驱动文件存在
-    #     if [ -f "$R8168_DRIVER" ]; then
-    #       echo "✅ RTL8168 driver found: $R8168_DRIVER"
+        # 验证 RTL8168 驱动文件存在
+        if [ -f "$R8168_DRIVER" ]; then
+          echo "✅ RTL8168 driver found: $R8168_DRIVER"
           
-    #       # 5.1: 验证 VPD 解析修复
-    #       echo "🔍 5.1: Verifying VPD parsing fix..."
+          # 5.1: 验证 VPD 解析修复
+          echo "🔍 5.1: Verifying VPD parsing fix..."
           
-    #       # 验证 VPD 头文件包含
-    #       if grep -q "#include <drivers/vpd/vpd.h>" "$R8168_DRIVER"; then
-    #         echo "✅ VPD header include found"
-    #       else
-    #         echo "❌ VPD header include not found"
-    #         exit 1
-    #       fi
-          
+          # 验证 VPD 头文件包含
+          if grep -q "#include <drivers/vpd/vpd.h>" "$R8168_DRIVER"; then
+            echo "✅ VPD header include found"
+          else
+            echo "❌ VPD header include not found"
+            exit 1
+          fi
+        else
+          echo "❌ RTL8168 driver not found: $R8168_DRIVER"
+          exit 1
+        fi
+        
+        echo "✅ Step 5 verification completed: RTL8168 driver and VPD parsing verified"
+    
     #       # 验证 vpd_find 函数调用
     #       if grep -q "vpd_find" "$R8168_DRIVER"; then
     #         echo "✅ vpd_find() function call found"
@@ -643,185 +655,22 @@ jobs:
     #       exit 1
     #     fi
     
-    # - name: Verify final build results
-    #   run: |
-    #     echo "🔍 Verifying final build results..."
-    #     echo "📝 Checking that all configurations are properly applied in generated .config"
+    - name: Verify final build results
+      run: |
+        echo "🔍 Verifying final build results..."
+        echo "📝 Checking RTL8168 driver source code modifications..."
+
+        R8168_DRIVER="src/drivers/net/r8168.c"
         
-    #     cd coreboot
+        cd coreboot
+          
+        # 显示完整的 r8168.c 文件内容用于验证
+        echo "📋 Complete RTL8168 driver source code:"
+        echo "=========================================="
+        cat "$R8168_DRIVER"
+        echo "=========================================="          
         
-    #     # 验证生成的 .config 文件
-    #     echo "🔍 Verifying generated .config file..."
-    #     if [ -f ".config" ]; then
-    #       echo "✅ .config file found"
-          
-    #       # 验证关键配置项
-    #       echo "🔍 Checking key configurations in .config:"
-          
-    #       # 检查 PXE 支持
-    #       if grep -q "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" .config; then
-    #         echo "✅ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y found in .config"
-    #       else
-    #         echo "❌ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y not found in .config"
-    #       fi
-          
-    #       # 检查 ROM 加载支持
-    #       if grep -q "CONFIG_EDK2_LOAD_OPTION_ROMS=y" .config; then
-    #         echo "✅ CONFIG_EDK2_LOAD_OPTION_ROMS=y found in .config"
-    #       else
-    #         echo "❌ CONFIG_EDK2_LOAD_OPTION_ROMS=y not found in .config"
-    #       fi
-          
-    #       # 检查 RTL8168 ERI 编程
-    #       if grep -q "CONFIG_RT8168_PUT_MAC_TO_ERI=y" .config; then
-    #         echo "✅ CONFIG_RT8168_PUT_MAC_TO_ERI=y found in .config"
-    #       else
-    #         echo "❌ CONFIG_RT8168_PUT_MAC_TO_ERI=y not found in .config"
-    #       fi
-          
-    #       # 检查 RTL8168 基础重置配置
-    #       if grep -q "CONFIG_REALTEK_8168_RESET=y" .config; then
-    #         echo "✅ CONFIG_REALTEK_8168_RESET=y found in .config"
-    #       else
-    #         echo "❌ CONFIG_REALTEK_8168_RESET=y not found in .config"
-    #       fi
-          
-    #       # 检查传统 VPD MAC 支持
-    #       if grep -q "CONFIG_RT8168_SUPPORT_LEGACY_VPD_MAC=y" .config; then
-    #         echo "✅ CONFIG_RT8168_SUPPORT_LEGACY_VPD_MAC=y found in .config"
-    #       else
-    #         echo "❌ CONFIG_RT8168_SUPPORT_LEGACY_VPD_MAC=y not found in .config"
-    #       fi
-          
-    #       # 检查 EDK2 自定义构建参数
-    #       if grep -q "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" .config; then
-    #         echo "✅ CONFIG_EDK2_CUSTOM_BUILD_PARAMS found in .config"
-    #         echo "📋 EDK2 custom build parameters:"
-    #         grep "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" .config
-            
-    #         # 验证关键 EDK2 参数
-    #         echo "🔍 Verifying key EDK2 parameters in .config:"
-            
-    #         # 检查网络驱动启用
-    #         if grep -q "NETWORK_DRIVER_ENABLE=TRUE" .config; then
-    #           echo "✅ NETWORK_DRIVER_ENABLE=TRUE found"
-    #         else
-    #           echo "❌ NETWORK_DRIVER_ENABLE=TRUE not found"
-    #         fi
-            
-    #         # 检查 PXE 启动启用
-    #         if grep -q "NETWORK_PXE_BOOT_ENABLE=TRUE" .config; then
-    #           echo "✅ NETWORK_PXE_BOOT_ENABLE=TRUE found"
-    #         else
-    #           echo "❌ NETWORK_PXE_BOOT_ENABLE=TRUE not found"
-    #         fi
-            
-    #         # 检查 SNP 协议启用
-    #         if grep -q "NETWORK_SNP_ENABLE=TRUE" .config; then
-    #           echo "✅ NETWORK_SNP_ENABLE=TRUE found"
-    #         else
-    #           echo "❌ NETWORK_SNP_ENABLE=TRUE not found"
-    #         fi
-            
-    #         # 检查 RTL8168 支持
-    #         if grep -q "NETWORK_RTEK_PCI=TRUE" .config; then
-    #           echo "✅ NETWORK_RTEK_PCI=TRUE found (RTL8168 support)"
-    #         else
-    #           echo "❌ NETWORK_RTEK_PCI=TRUE not found"
-    #         fi
-            
-    #         # 检查 TLS 禁用
-    #         if grep -q "NETWORK_TLS_ENABLE=FALSE" .config; then
-    #           echo "✅ NETWORK_TLS_ENABLE=FALSE found (TLS disabled to avoid build issues)"
-    #         else
-    #           echo "❌ NETWORK_TLS_ENABLE=FALSE not found"
-    #         fi
-            
-    #         # 检查 VLAN 禁用
-    #         if grep -q "NETWORK_VLAN_ENABLE=FALSE" .config; then
-    #           echo "✅ NETWORK_VLAN_ENABLE=FALSE found (VLAN disabled for terminal devices)"
-    #         else
-    #           echo "❌ NETWORK_VLAN_ENABLE=FALSE not found"
-    #         fi
-            
-    #         # 检查 HTTP 功能禁用
-    #         if grep -q "NETWORK_HTTP_BOOT_ENABLE=FALSE" .config; then
-    #           echo "✅ NETWORK_HTTP_BOOT_ENABLE=FALSE found (HTTP boot disabled)"
-    #         else
-    #           echo "❌ NETWORK_HTTP_BOOT_ENABLE=FALSE not found"
-    #         fi
-            
-    #         # 检查 IPv6 禁用
-    #         if grep -q "NETWORK_IP6_ENABLE=FALSE" .config; then
-    #           echo "✅ NETWORK_IP6_ENABLE=FALSE found (IPv6 disabled)"
-    #         else
-    #           echo "❌ NETWORK_IP6_ENABLE=FALSE not found"
-    #         fi
-    #       else
-    #         echo "❌ CONFIG_EDK2_CUSTOM_BUILD_PARAMS not found in .config"
-    #       fi
-    #     else
-    #       echo "❌ .config file not found"
-    #     fi
-        
-    #     # 验证 RTL8168 驱动源码修改
-    #     echo "🔍 Verifying RTL8168 driver source code modifications..."
-    #     R8168_DRIVER="src/drivers/net/r8168.c"
-        
-    #     if [ -f "$R8168_DRIVER" ]; then
-    #       echo "✅ RTL8168 driver found: $R8168_DRIVER"
-          
-    #       # 显示完整的 r8168.c 文件内容用于验证
-    #       echo "📋 Complete RTL8168 driver source code:"
-    #       echo "=========================================="
-    #       cat "$R8168_DRIVER"
-    #       echo "=========================================="
-          
-    #       # 验证关键修改点
-    #       echo "🔍 Verifying key modifications in RTL8168 driver:"
-          
-    #       # 验证 VPD 头文件包含
-    #       if grep -q "#include <drivers/vpd/vpd.h>" "$R8168_DRIVER"; then
-    #         echo "✅ VPD header include found"
-    #       else
-    #         echo "❌ VPD header include not found"
-    #       fi
-          
-    #       # 验证 vpd_find 函数调用
-    #       if grep -q "vpd_find" "$R8168_DRIVER"; then
-    #         echo "✅ vpd_find() function call found"
-    #       else
-    #         echo "❌ vpd_find() function call not found"
-    #       fi
-          
-    #       # 验证 RTL8111H ERI 支持
-    #       if grep -q "case 12:" "$R8168_DRIVER" && grep -q "case 13:" "$R8168_DRIVER" && grep -q "case 14:" "$R8168_DRIVER" && grep -q "case 15:" "$R8168_DRIVER"; then
-    #         echo "✅ RTL8111H ERI support (revision 12-15) found"
-    #       elif grep -q "RTL8111H revision 12-15 ERI programming" "$R8168_DRIVER"; then
-    #         echo "✅ RTL8111H ERI support (revision 12-15) found (alternative pattern)"
-    #       else
-    #         echo "❌ RTL8111H ERI support not found"
-    #       fi
-          
-    #       # 验证 get_mac_address 函数修复
-    #       if grep -q "Check if both hex digits are valid" "$R8168_DRIVER"; then
-    #         echo "✅ get_mac_address function validation fix found"
-    #       else
-    #         echo "❌ get_mac_address function validation fix not found"
-    #       fi
-          
-    #       # 验证调试输出
-    #       if grep -q "Parsed MAC address:" "$R8168_DRIVER"; then
-    #         echo "✅ MAC address parsing debug output found"
-    #       else
-    #         echo "❌ MAC address parsing debug output not found"
-    #       fi
-          
-    #     else
-    #       echo "❌ RTL8168 driver not found: $R8168_DRIVER"
-    #     fi
-        
-    #     echo "✅ Final build results verification completed"
+        echo "✅ Final build results verification completed"
       
     - name: Build Kaisa ROM with Docker
       run: |
