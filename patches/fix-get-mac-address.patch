@@ -1,6 +1,6 @@
 --- a/src/drivers/net/r8168.c
 +++ b/src/drivers/net/r8168.c
-@@ -207,11 +207,21 @@
+@@ -207,9 +207,19 @@
  	}
  
  	for (i = 0; i < 6; i++) {
@@ -23,3 +23,5 @@
 +	printk(BIOS_DEBUG, "r8168: Parsed MAC address: %02x:%02x:%02x:%02x:%02x:%02x\n",
 +	       macaddr[0], macaddr[1], macaddr[2], macaddr[3], macaddr[4], macaddr[5]);
  }
+ 
+ static void program_mac_address(struct device *dev, u16 io_base)
