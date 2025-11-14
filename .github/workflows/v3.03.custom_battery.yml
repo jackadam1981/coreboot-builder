@@ -322,6 +322,56 @@ jobs:
           echo "✅ Battery device inclusion made conditional"
         fi
         
+        # 保护所有对 BAT0 的引用
+        echo "📝 Protecting BAT0 references with conditional compilation..."
+        
+        # 使用简单的 sed 替换：在每个 Notify (BAT0, ...) 行前后添加条件编译
+        # 先备份原文件
+        cp "$EC_ASL" "${EC_ASL}.bak"
+        
+        # 使用 perl 一行命令处理（更可靠）
+        perl -i -pe '
+          if (/^(\s*)Notify \(BAT0,/) {
+            $indent = $1;
+            $line = $_;
+            unless ($prev =~ /#ifdef EC_ENABLE_BATTERY_DEVICE/) {
+              $_ = "${indent}#ifdef EC_ENABLE_BATTERY_DEVICE\n${indent}\t$line${indent}#endif\n";
+            } else {
+              $_ = $line;
+            }
+          }
+          $prev = $_;
+        ' "$EC_ASL"
+        
+        # 如果 perl 不可用，使用 awk 作为备选
+        if [ $? -ne 0 ]; then
+          echo "⚠️  Perl not available, using awk instead..."
+          awk '
+          /^[[:space:]]*Notify \(BAT0,/ {
+            indent = match($0, /[^[:space:]]/) - 1
+            if (prev !~ /#ifdef EC_ENABLE_BATTERY_DEVICE/) {
+              printf "%*s#ifdef EC_ENABLE_BATTERY_DEVICE\n", indent, ""
+            }
+            printf "%*s\t", indent, ""
+            print substr($0, indent + 1)
+            if (getline next_line > 0 && next_line !~ /#endif/) {
+              printf "%*s#endif\n", indent, ""
+              print next_line
+              next
+            } else {
+              printf "%*s#endif\n", indent, ""
+              if (next_line) print next_line
+              next
+            }
+          }
+          { prev = $0; print }
+          ' "${EC_ASL}.bak" > "$EC_ASL"
+        fi
+        
+        rm -f "${EC_ASL}.bak"
+        
+        echo "✅ BAT0 references protected with conditional compilation"
+        
         # 验证 puff/ec.h 不定义 EC_ENABLE_BATTERY_DEVICE
         echo "📝 Verifying puff/ec.h does not enable battery device..."
         PUFF_EC_H="src/mainboard/google/puff/variants/baseboard/include/puff/ec.h"
@@ -657,6 +707,22 @@ jobs:
         else
           echo "❌ Battery device is not conditionally included in ec.asl"
           exit 1
+        fi
+        
+        # 验证所有 BAT0 引用都被条件编译保护
+        echo "📝 Checking BAT0 references are protected..."
+        if grep -q "Notify (BAT0," "$EC_ASL"; then
+          # 检查是否有未保护的 BAT0 引用
+          unprotected=$(grep -B 1 "Notify (BAT0," "$EC_ASL" | grep -v "#ifdef EC_ENABLE_BATTERY_DEVICE" | grep -v "#endif" | grep "Notify (BAT0," || true)
+          if [ -n "$unprotected" ]; then
+            echo "❌ Found unprotected BAT0 references:"
+            echo "$unprotected"
+            exit 1
+          else
+            echo "✅ All BAT0 references are protected with conditional compilation"
+          fi
+        else
+          echo "✅ No BAT0 references found (all removed)"
         fi
         
         # 验证 puff/ec.h 不定义 EC_ENABLE_BATTERY_DEVICE
