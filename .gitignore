@@ -25,3 +25,6 @@ __pycache__/
 *.egg-info/
 dist/
 
+# 设备相关目录（包含刷写记录和 ROM 文件）
+device_*/
+
