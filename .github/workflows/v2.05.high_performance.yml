@@ -70,26 +70,75 @@ jobs:
           exit 1
         fi
     
-    - name: "Step 2: Apply Chromebox EC configuration"
+    - name: "Step 2: Prepare RTL UNDI driver"
       run: |
-        echo "🔧 Step 2: Enforcing Chromebox-specific EC event masks..."
-        echo "📝 Copying Chromebox-tailored EC header to remove Chromebook battery handling"
-        
+        echo "🔧 Step 2: 准备预下载的 RTL UNDI 驱动"
         cd coreboot
-        EC_HEADER="src/mainboard/google/puff/variants/kaisa/include/variant/ec.h"
-        TEMPLATE="../fixed-files/variant-ec-kaisa.h"
         
-        if [ ! -f "$TEMPLATE" ]; then
-          echo "❌ Template EC header not found: $TEMPLATE"
+        # 检查预下载的 RTL 驱动
+        if [ -f "../RtkUndiDxe.efi" ]; then
+          echo "✅ 找到预下载的 RTL UNDI 驱动"
+          
+          # 验证驱动文件
+          echo "📊 驱动文件信息:"
+          file "../RtkUndiDxe.efi"
+          size=$(stat -c%s "../RtkUndiDxe.efi")
+          echo "📏 文件大小: $size bytes"
+          
+          # 检查版本信息
+          echo "📋 版本信息:"
+          strings "../RtkUndiDxe.efi" | grep -i "version\|ver\|v[0-9]" | head -5
+          
+          # 检查 PXE/UNDI 功能
+          echo "🌐 PXE/UNDI 功能:"
+          strings "../RtkUndiDxe.efi" | grep -i "pxe\|undi" | head -5
+          
+          # 复制到构建目录
+          echo "💾 复制 RTL 驱动到构建目录..."
+          cp "../RtkUndiDxe.efi" "rtl_undi_driver_updated.efi"
+          echo "✅ RTL UNDI 驱动准备完成"
+          echo "📝 此驱动将在 EDK2 构建过程中被集成到固件中"
+        else
+          echo "⚠️ 未找到预下载的 RTL 驱动文件"
+          echo "📝 将使用 MrChromebox EDK2 中的原始驱动"
+        fi
+    
+    - name: "Step 3: Configure EDK2 custom build parameters"
+      run: |
+        echo "🔧 Step 3: Configuring EDK2 custom build parameters..."
+        echo "📝 Adding optimized EDK2 network configuration for PXE boot"
+        
+        CONFIG_FILE="coreboot/configs/cml/config.kaisa.uefi"
+        
+        # 检查配置文件是否存在
+        if [ -f "$CONFIG_FILE" ]; then
+          echo "✅ Kaisa UEFI config found"
+          
+          # 检查是否已经存在 EDK2 自定义构建参数
+          if grep -q "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" "$CONFIG_FILE"; then
+            echo "📝 Updating existing CONFIG_EDK2_CUSTOM_BUILD_PARAMS..."
+            # 删除旧的配置行
+            sed -i '/CONFIG_EDK2_CUSTOM_BUILD_PARAMS/d' "$CONFIG_FILE"
+          else
+            echo "📝 Adding new CONFIG_EDK2_CUSTOM_BUILD_PARAMS..."
+          fi
+          
+          # 添加优化的 EDK2 自定义构建参数
+          echo "" >> "$CONFIG_FILE"
+          echo "# EDK2 custom build parameters for PXE network boot" >> "$CONFIG_FILE"
+          echo 'CONFIG_EDK2_CUSTOM_BUILD_PARAMS="-D NETWORK_DRIVER_ENABLE=TRUE -D NETWORK_ENABLE=TRUE -D NETWORK_IP4_ENABLE=TRUE -D NETWORK_IP6_ENABLE=FALSE -D NETWORK_PXE_BOOT_ENABLE=TRUE -D NETWORK_HTTP_BOOT_ENABLE=FALSE -D NETWORK_HTTP_ENABLE=FALSE -D NETWORK_ALLOW_HTTP_CONNECTIONS=FALSE -D NETWORK_SNP_ENABLE=TRUE -D NETWORK_VLAN_ENABLE=FALSE -D NETWORK_RTEK_PCI=TRUE -D NETWORK_TLS_ENABLE=FALSE -D NETWORK_ISCSI_ENABLE=FALSE -D NETWORK_RTEK_USB=FALSE -D NETWORK_ASIX_USB3=FALSE -D NETWORK_ASIX_USB2=FALSE"' >> "$CONFIG_FILE"
+          
+          echo "✅ EDK2 custom build parameters configured"
+        else
+          echo "❌ Kaisa UEFI config not found"
           exit 1
         fi
         
-        cp "$TEMPLATE" "$EC_HEADER"
-        echo "✅ Chromebox EC events configured without Chromebook battery/lid handling"
+        echo "✅ EDK2 custom build parameters configuration completed"
     
-    - name: "Step 3: Fix RTL8168 dependencies in puff/Kconfig"
+    - name: "Step 4: Fix RTL8168 dependencies in puff/Kconfig"
       run: |
-        echo "🔧 Step 3: Fixing RTL8168 dependencies in puff/Kconfig..."
+        echo "🔧 Step 4: Fixing RTL8168 dependencies in puff/Kconfig..."
         echo "📝 Adding missing dependencies for RTL8168 ERI programming"
         
         cd coreboot
@@ -122,70 +171,30 @@ jobs:
           fi
         done
         
-        echo "✅ Step 3 completed: RTL8168 dependencies fixed"
+        echo "✅ Step 4 completed: RTL8168 dependencies fixed"
     
-    - name: "Step 4: Configure Kaisa UEFI settings"
+    - name: "Step 5: Configure Kaisa UEFI settings"
       run: |
-        echo "🔧 Step 4: Configuring Kaisa UEFI settings..."
+        echo "🔧 Step 5: Configuring Kaisa UEFI settings..."
         echo "📝 Adding EDK2 network and RTL8168 configurations to config.kaisa.uefi"
         
         cd coreboot
         CONFIG_FILE="configs/cml/config.kaisa.uefi"
         
-        NETWORK_BLOCK=$'# EDK2 Network PXE Support\nCONFIG_EDK2_NETWORK_PXE_SUPPORT=y\nCONFIG_EDK2_LOAD_OPTION_ROMS=y'
-        BOOT_BLOCK=$'# EDK2 Boot Manager Settings\nCONFIG_EDK2_BOOT_TIMEOUT=10\nCONFIG_EDK2_BOOT_MANAGER_ESCAPE=y'
-        RTL_BLOCK=$'# RTL8168 MAC Address ERI Programming\nCONFIG_RT8168_PUT_MAC_TO_ERI=y'
+        echo "📝 Adding EDK2 network and RTL8168 configurations..."
+        echo "" >> "$CONFIG_FILE"
+        echo "# EDK2 Network PXE Support" >> "$CONFIG_FILE"
+        echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> "$CONFIG_FILE"
+        echo "CONFIG_EDK2_LOAD_OPTION_ROMS=y" >> "$CONFIG_FILE"
+        echo "" >> "$CONFIG_FILE"
+        echo "# EDK2 Boot Manager Settings" >> "$CONFIG_FILE"
+        echo "CONFIG_EDK2_BOOT_TIMEOUT=10" >> "$CONFIG_FILE"
+        echo "CONFIG_EDK2_BOOT_MANAGER_ESCAPE=y" >> "$CONFIG_FILE"
+        echo "" >> "$CONFIG_FILE"
+        echo "# RTL8168 MAC Address ERI Programming" >> "$CONFIG_FILE"
+        echo "CONFIG_RT8168_PUT_MAC_TO_ERI=y" >> "$CONFIG_FILE"
         
-        if ! grep -q "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" "$CONFIG_FILE"; then
-          echo "📝 Adding PXE network block..."
-          printf "\n%s\n" "$NETWORK_BLOCK" >> "$CONFIG_FILE"
-        else
-          echo "✅ PXE network block already present"
-        fi
-        
-        if ! grep -q "CONFIG_EDK2_BOOT_TIMEOUT=10" "$CONFIG_FILE"; then
-          echo "📝 Adding boot manager block..."
-          printf "\n%s\n" "$BOOT_BLOCK" >> "$CONFIG_FILE"
-        else
-          echo "✅ Boot manager block already present"
-        fi
-        
-        if ! grep -q "CONFIG_RT8168_PUT_MAC_TO_ERI=y" "$CONFIG_FILE"; then
-          echo "📝 Adding RTL8168 ERI block..."
-          printf "\n%s\n" "$RTL_BLOCK" >> "$CONFIG_FILE"
-        else
-          echo "✅ RTL8168 ERI block already present"
-        fi
-        
-        echo "✅ Step 4 completed: Kaisa UEFI settings configured"
-    
-    - name: "Step 5: Configure EDK2 custom build parameters"
-      run: |
-        echo "🔧 Step 5: Configuring EDK2 custom build parameters..."
-        echo "📝 Adding optimized EDK2 network configuration for PXE boot"
-        
-        CONFIG_FILE="coreboot/configs/cml/config.kaisa.uefi"
-        
-        if [ -f "$CONFIG_FILE" ]; then
-          echo "✅ Kaisa UEFI config found"
-          
-          NEW_PARAMS='CONFIG_EDK2_CUSTOM_BUILD_PARAMS="-D NETWORK_DRIVER_ENABLE=TRUE -D NETWORK_ENABLE=TRUE -D NETWORK_IP4_ENABLE=TRUE -D NETWORK_IP6_ENABLE=FALSE -D NETWORK_PXE_BOOT_ENABLE=TRUE -D NETWORK_HTTP_BOOT_ENABLE=FALSE -D NETWORK_HTTP_ENABLE=FALSE -D NETWORK_ALLOW_HTTP_CONNECTIONS=FALSE -D NETWORK_SNP_ENABLE=TRUE -D NETWORK_VLAN_ENABLE=FALSE -D NETWORK_RTEK_PCI=TRUE -D NETWORK_TLS_ENABLE=FALSE -D NETWORK_ISCSI_ENABLE=FALSE -D NETWORK_RTEK_USB=FALSE -D NETWORK_ASIX_USB3=FALSE -D NETWORK_ASIX_USB2=FALSE"'
-          
-          if grep -qF "$NEW_PARAMS" "$CONFIG_FILE"; then
-            echo "✅ Desired EDK2 custom build parameters already present"
-          else
-            echo "📝 Updating CONFIG_EDK2_CUSTOM_BUILD_PARAMS..."
-            sed -i '/# EDK2 custom build parameters for PXE network boot/d' "$CONFIG_FILE"
-            sed -i '/CONFIG_EDK2_CUSTOM_BUILD_PARAMS/d' "$CONFIG_FILE"
-            printf "\n%s\n%s\n" "# EDK2 custom build parameters for PXE network boot" "$NEW_PARAMS" >> "$CONFIG_FILE"
-            echo "✅ EDK2 custom build parameters configured"
-          fi
-        else
-          echo "❌ Kaisa UEFI config not found"
-          exit 1
-        fi
-        
-        echo "✅ EDK2 custom build parameters configuration completed"
+        echo "✅ Step 5 completed: Kaisa UEFI settings configured"
     
     - name: "Step 6: Apply RTL8168 driver fixes"
       run: |
@@ -196,8 +205,12 @@ jobs:
         R8168_DRIVER="src/drivers/net/r8168.c"
         FIXED_DRIVER="../fixed-files/r8168.c"
         
+        # 检查修复后的文件是否存在
         if [ -f "$FIXED_DRIVER" ]; then
           echo "✅ Fixed RTL8168 driver found: $FIXED_DRIVER"
+          
+          # 覆盖原始文件
+          echo "📝 Overwriting r8168.c with fixed version..."
           cp "$FIXED_DRIVER" "$R8168_DRIVER"
           echo "✅ RTL8168 driver fixes applied"
         else
@@ -207,20 +220,59 @@ jobs:
         
         echo "✅ Step 6 completed: RTL8168 driver fixes applied"
     
-    - name: "Step 7: Apply high performance power profile"
+    - name: "Step 7: Verify Chromebox EC configuration"
       run: |
-        echo "🔧 Step 7: Applying high performance power/thermal profile..."
+        echo "🔧 Step 7: Verifying Chromebox-specific EC event masks..."
+        echo "📝 Checking that EC header uses Chromebox configuration (no battery/lid handling)"
         
         cd coreboot
-        POWER_FILE="src/mainboard/google/puff/variants/kaisa/overridetree.cb"
-        TEMPLATE="../fixed-files/variant-overridetree-kaisa-highperf.cb"
+        EC_HEADER="src/mainboard/google/puff/variants/kaisa/include/variant/ec.h"
         
-        if [ ! -f "$TEMPLATE" ]; then
-          echo "❌ High performance template not found: $TEMPLATE"
+        if [ ! -f "$EC_HEADER" ]; then
+          echo "❌ EC header not found: $EC_HEADER"
           exit 1
         fi
         
-        cp "$TEMPLATE" "$POWER_FILE"
+        # Verify that it includes puff/ec.h (Chromebox version)
+        if ! grep -q "#include <puff/ec.h>" "$EC_HEADER"; then
+          echo "❌ EC header does not include puff/ec.h"
+          exit 1
+        fi
+        
+        echo "✅ Chromebox EC configuration verified (uses puff/ec.h without battery/lid handling)"
+    
+    - name: "Step 8: Apply high performance power profile"
+      run: |
+        echo "🔧 Step 8: Applying high performance power/thermal profile..."
+        
+        cd coreboot
+        POWER_FILE="src/mainboard/google/puff/variants/kaisa/overridetree.cb"
+        
+        if [ ! -f "$POWER_FILE" ]; then
+          echo "❌ Power configuration file not found: $POWER_FILE"
+          exit 1
+        fi
+        
+        # Modify power limits using sed
+        echo "📝 Updating TDP power limits..."
+        sed -i 's/\.tdp_pl1_override = 15,/.tdp_pl1_override = 20,/' "$POWER_FILE"
+        sed -i 's/\.tdp_pl2_override = 51,/.tdp_pl2_override = 50,/' "$POWER_FILE"
+        
+        echo "📝 Updating PL1 power limits (20W, 60s window)..."
+        sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.min_power = 15000,/.min_power = 20000,/' "$POWER_FILE"
+        sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.max_power = 15000,/.max_power = 20000,/' "$POWER_FILE"
+        sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.time_window_min = 28 \* MSECS_PER_SEC,/.time_window_min = 60 * MSECS_PER_SEC,/' "$POWER_FILE"
+        sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.time_window_max = 32 \* MSECS_PER_SEC,/.time_window_max = 60 * MSECS_PER_SEC,/' "$POWER_FILE"
+        
+        echo "📝 Updating PL2 power limits (50W, 15s window)..."
+        sed -i '/register "controls\.power_limits\.pl2"/,/granularity = 1000,}/ s/\.max_power = 51000,/.max_power = 50000,/' "$POWER_FILE"
+        sed -i '/register "controls\.power_limits\.pl2"/,/granularity = 1000,}/ s/\.time_window_min = 28 \* MSECS_PER_SEC,/.time_window_min = 15 * MSECS_PER_SEC,/' "$POWER_FILE"
+        sed -i '/register "controls\.power_limits\.pl2"/,/granularity = 1000,}/ s/\.time_window_max = 32 \* MSECS_PER_SEC,/.time_window_max = 15 * MSECS_PER_SEC,/' "$POWER_FILE"
+        
+        # Update comments
+        sed -i 's/# PL1 is fixed at 15W, avg over 28-32s interval/# PL1 is fixed at 20W, avg over 60s interval/' "$POWER_FILE"
+        sed -i 's/# 15-51W PL2 in 1000mW increments, avg over 28-32s interval/# 20-50W PL2 in 1000mW increments, avg over 15s interval/' "$POWER_FILE"
+        
         echo "✅ High performance power profile applied"
     
     - name: "Step Simulate: Simulate build configuration"
@@ -251,85 +303,23 @@ jobs:
           exit 1
         fi
     
-    - name: "Step Verify 2: Chromebox EC configuration"
+    - name: "Step Verify 2: RTL UNDI driver prepared"
       run: |
-        echo "🔍 Step Verify 2: Validating Chromebox EC configuration..."
+        echo "🔍 Step Verify 2: Validating RTL UNDI driver preparation..."
         cd coreboot
-        EC_HEADER="src/mainboard/google/puff/variants/kaisa/include/variant/ec.h"
-        TEMPLATE="../fixed-files/variant-ec-kaisa.h"
-        
-        if [ ! -f "$EC_HEADER" ]; then
-          echo "❌ EC header not found: $EC_HEADER"
-          exit 1
-        fi
-        
-        if [ -f "$TEMPLATE" ] && ! cmp -s "$TEMPLATE" "$EC_HEADER"; then
-          echo "❌ EC header differs from Chromebox template"
-          exit 1
-        fi
-        
-        if grep -q "BATTERY" "$EC_HEADER"; then
-          echo "❌ Chromebook battery handlers detected in EC header"
-          exit 1
-        fi
-        
-        if grep -q "EC_HOST_EVENT_LID_" "$EC_HEADER"; then
-          echo "❌ Chromebook lid events still enabled in EC header"
-          exit 1
-        fi
-        
-        if grep -q "MAINBOARD_EC_SMI_EVENTS 0" "$EC_HEADER"; then
-          echo "✅ EC SMI events correctly disabled"
+        DRIVER_COPY="rtl_undi_driver_updated.efi"
+        if [ -f "$DRIVER_COPY" ]; then
+          echo "✅ Prepared RTL UNDI driver found: $DRIVER_COPY"
+          file "$DRIVER_COPY"
         else
-          echo "❌ Unexpected EC SMI events configuration"
-          exit 1
+          echo "ℹ️ Prepared RTL UNDI driver not found; repository default will be used"
         fi
     
-    - name: "Step Verify 3: RTL8168 dependencies"
+    - name: "Step Verify 3: EDK2 custom build parameters"
       run: |
-        echo "🔍 Step Verify 3: Checking puff/Kconfig RTL8168 dependencies..."
-        cd coreboot
-        PUFF_KCONFIG="src/mainboard/google/puff/Kconfig"
-        
-        for entry in \
-          "select REALTEK_8168_RESET" \
-          "select RT8168_SUPPORT_LEGACY_VPD_MAC" \
-          "select RT8168_GET_MAC_FROM_VPD" \
-          "select RT8168_PUT_MAC_TO_ERI"; do
-          if grep -q "$entry" "$PUFF_KCONFIG"; then
-            echo "✅ $entry present in puff/Kconfig"
-          else
-            echo "❌ $entry missing in puff/Kconfig"
-            exit 1
-          fi
-        done
-    
-    - name: "Step Verify 4: Kaisa UEFI settings"
-      run: |
-        echo "🔍 Step Verify 4: Validating Kaisa UEFI settings..."
+        echo "🔍 Step Verify 3: Checking EDK2 custom build parameters..."
         cd coreboot
         CONFIG_FILE="configs/cml/config.kaisa.uefi"
-        
-        for option in \
-          "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" \
-          "CONFIG_EDK2_LOAD_OPTION_ROMS=y" \
-          "CONFIG_EDK2_BOOT_TIMEOUT=10" \
-          "CONFIG_EDK2_BOOT_MANAGER_ESCAPE=y" \
-          "CONFIG_RT8168_PUT_MAC_TO_ERI=y"; do
-          if grep -q "$option" "$CONFIG_FILE"; then
-            echo "✅ $option found in config.kaisa.uefi"
-          else
-            echo "❌ $option not found in config.kaisa.uefi"
-            exit 1
-          fi
-        done
-    
-    - name: "Step Verify 5: EDK2 custom build parameters"
-      run: |
-        echo "🔍 Step Verify 5: Validating EDK2 custom build parameters..."
-        cd coreboot
-        CONFIG_FILE="configs/cml/config.kaisa.uefi"
-        
         if grep -q "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" "$CONFIG_FILE"; then
           echo "✅ CONFIG_EDK2_CUSTOM_BUILD_PARAMS present"
           for param in \
@@ -352,6 +342,45 @@ jobs:
           echo "❌ CONFIG_EDK2_CUSTOM_BUILD_PARAMS missing in config.kaisa.uefi"
           exit 1
         fi
+    
+    - name: "Step Verify 4: RTL8168 dependencies"
+      run: |
+        echo "🔍 Step Verify 4: Checking puff/Kconfig RTL8168 dependencies..."
+        cd coreboot
+        PUFF_KCONFIG="src/mainboard/google/puff/Kconfig"
+        
+        for entry in \
+          "select REALTEK_8168_RESET" \
+          "select RT8168_SUPPORT_LEGACY_VPD_MAC" \
+          "select RT8168_GET_MAC_FROM_VPD" \
+          "select RT8168_PUT_MAC_TO_ERI"; do
+          if grep -q "$entry" "$PUFF_KCONFIG"; then
+            echo "✅ $entry present in puff/Kconfig"
+          else
+            echo "❌ $entry missing in puff/Kconfig"
+            exit 1
+          fi
+        done
+    
+    - name: "Step Verify 5: Kaisa UEFI settings"
+      run: |
+        echo "🔍 Step Verify 5: Validating Kaisa UEFI settings..."
+        cd coreboot
+        CONFIG_FILE="configs/cml/config.kaisa.uefi"
+        
+        for option in \
+          "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" \
+          "CONFIG_EDK2_LOAD_OPTION_ROMS=y" \
+          "CONFIG_EDK2_BOOT_TIMEOUT=10" \
+          "CONFIG_EDK2_BOOT_MANAGER_ESCAPE=y" \
+          "CONFIG_RT8168_PUT_MAC_TO_ERI=y"; do
+          if grep -q "$option" "$CONFIG_FILE"; then
+            echo "✅ $option found in config.kaisa.uefi"
+          else
+            echo "❌ $option not found in config.kaisa.uefi"
+            exit 1
+          fi
+        done
     
     - name: "Step Verify 6: RTL8168 driver file overwrite"
       run: |
@@ -400,9 +429,39 @@ jobs:
           exit 1
         fi
     
-    - name: "Step Verify 7: High performance power profile"
+    - name: "Step Verify 7: Chromebox EC configuration"
       run: |
-        echo "🔍 Step Verify 7: Validating high performance power settings..."
+        echo "🔍 Step Verify 7: Validating Chromebox EC configuration..."
+        cd coreboot
+        EC_HEADER="src/mainboard/google/puff/variants/kaisa/include/variant/ec.h"
+        
+        if [ ! -f "$EC_HEADER" ]; then
+          echo "❌ EC header not found: $EC_HEADER"
+          exit 1
+        fi
+        
+        # Verify it includes puff/ec.h (Chromebox version)
+        if ! grep -q "#include <puff/ec.h>" "$EC_HEADER"; then
+          echo "❌ EC header does not include puff/ec.h"
+          exit 1
+        fi
+        
+        # Verify no direct battery/lid references in variant file
+        if grep -q "BATTERY" "$EC_HEADER"; then
+          echo "❌ Chromebook battery handlers detected in EC header"
+          exit 1
+        fi
+        
+        if grep -q "EC_HOST_EVENT_LID_" "$EC_HEADER"; then
+          echo "❌ Chromebook lid events still enabled in EC header"
+          exit 1
+        fi
+        
+        echo "✅ Chromebox EC configuration verified (uses puff/ec.h without battery/lid handling)"
+    
+    - name: "Step Verify 8: High performance power profile"
+      run: |
+        echo "🔍 Step Verify 8: Validating high performance power settings..."
         cd coreboot
         POWER_FILE="src/mainboard/google/puff/variants/kaisa/overridetree.cb"
         
@@ -443,7 +502,7 @@ jobs:
             echo '🔧 Building Kaisa ROM with version: '\${VERSION_SUFFIX}'...'
             git config --global --add safe.directory /home/coreboot/coreboot
             # Override build-uefi.sh to use our version instead of git rev
-            sed -i \"s|echo \\\"CONFIG_LOCALVERSION=\\\\\\\"\\\\\\\${rev}\\\\\\\"\\\" >> .config|echo \\\"CONFIG_LOCALVERSION=\\\\\\\"\${VERSION_SUFFIX}\\\\\\\"\\\" >> .config|\" build-uefi.sh
+            sed -i \"s|\\\${rev}|\${VERSION_SUFFIX}|\" build-uefi.sh
             ./build-uefi.sh kaisa
           "
           

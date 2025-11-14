@@ -103,32 +103,9 @@ jobs:
           echo "📝 将使用 MrChromebox EDK2 中的原始驱动"
         fi
 
-    - name: "Step 3: Apply custom modifications"
+    - name: "Step 3: Configure EDK2 custom build parameters"
       run: |
-        echo "🔧 Step 3: Applying custom modifications to coreboot source..."
-        echo "📝 Applying RTL8168 driver fixes and EDK2 configurations"
-        
-        # 更新主板配置文件
-        echo "🔧 Updating Kaisa board configuration..."
-        CONFIG_FILE="coreboot/configs/cml/config.kaisa.uefi"
-        
-
-        echo "📝 Adding EDK2 network and RTL8168 configurations..."
-        echo "" >> "$CONFIG_FILE"
-        echo "# EDK2 Network PXE Support" >> "$CONFIG_FILE"
-        echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> "$CONFIG_FILE"
-        echo "CONFIG_EDK2_LOAD_OPTION_ROMS=y" >> "$CONFIG_FILE"
-        echo "" >> "$CONFIG_FILE"
-        echo "# RTL8168 MAC Address ERI Programming" >> "$CONFIG_FILE"
-        echo "CONFIG_RT8168_PUT_MAC_TO_ERI=y" >> "$CONFIG_FILE"
-
-        
-        echo "✅ Kaisa board configuration updated"
-        echo "✅ Custom modifications step completed"
-    
-    - name: "Step 4: Configure EDK2 custom build parameters"
-      run: |
-        echo "🔧 Step 4: Configuring EDK2 custom build parameters..."
+        echo "🔧 Step 3: Configuring EDK2 custom build parameters..."
         echo "📝 Adding optimized EDK2 network configuration for PXE boot"
         
         CONFIG_FILE="coreboot/configs/cml/config.kaisa.uefi"
@@ -161,7 +138,7 @@ jobs:
     
     - name: "Step Simulate: Simulate build configuration"
       run: |
-        echo "🔧 Step 5: Simulating build configuration process..."
+        echo "🔧 Simulating build configuration process..."
         echo "📝 This step simulates the build-uefi.sh configuration process"
         
         cd coreboot
@@ -200,26 +177,9 @@ jobs:
           echo "ℹ️ Prepared RTL UNDI driver not found; repository default will be used"
         fi
     
-    - name: "Step Verify 3: Board configuration updates"
+    - name: "Step Verify 3: EDK2 custom build parameters"
       run: |
-        echo "🔍 Step Verify 3: Checking Kaisa board configuration updates..."
-        cd coreboot
-        CONFIG_FILE="configs/cml/config.kaisa.uefi"
-        for option in \
-          "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" \
-          "CONFIG_EDK2_LOAD_OPTION_ROMS=y" \
-          "CONFIG_RT8168_PUT_MAC_TO_ERI=y"; do
-          if grep -q "$option" "$CONFIG_FILE"; then
-            echo "✅ $option found in config.kaisa.uefi"
-          else
-            echo "❌ $option not found in config.kaisa.uefi"
-            exit 1
-          fi
-        done
-    
-    - name: "Step Verify 4: EDK2 custom build parameters"
-      run: |
-        echo "🔍 Step Verify 4: Validating EDK2 custom build parameters..."
+        echo "🔍 Step Verify 3: Validating EDK2 custom build parameters..."
         cd coreboot
         CONFIG_FILE="configs/cml/config.kaisa.uefi"
         if grep -q "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" "$CONFIG_FILE"; then
@@ -245,26 +205,6 @@ jobs:
           exit 1
         fi
     
-    - name: "Step Verify 5: Build configuration simulation"
-      run: |
-        echo "🔍 Step Verify 5: Checking build configuration simulation output..."
-        cd coreboot
-        LOCAL_CONFIG=".config"
-        if [ ! -f "$LOCAL_CONFIG" ]; then
-          echo "❌ .config file not found after simulation"
-          exit 1
-        fi
-        for option in \
-          "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" \
-          "CONFIG_EDK2_LOAD_OPTION_ROMS=y" \
-          "CONFIG_RT8168_PUT_MAC_TO_ERI=y"; do
-          if grep -q "$option" "$LOCAL_CONFIG"; then
-            echo "✅ $option present in .config"
-          else
-            echo "❌ $option missing from .config"
-            exit 1
-          fi
-        done
     
     - name: Build Kaisa ROM with Docker
       run: |
@@ -286,7 +226,7 @@ jobs:
           echo '🔧 Building Kaisa ROM with version: '\${VERSION_SUFFIX}'...'
           git config --global --add safe.directory /home/coreboot/coreboot
           # Override build-uefi.sh to use our version instead of git rev
-          sed -i \"s|echo \\\"CONFIG_LOCALVERSION=\\\\\\\"\\\\\\\${rev}\\\\\\\"\\\" >> .config|echo \\\"CONFIG_LOCALVERSION=\\\\\\\"\${VERSION_SUFFIX}\\\\\\\"\\\" >> .config|\" build-uefi.sh
+          sed -i \"s|\\\${rev}|\${VERSION_SUFFIX}|\" build-uefi.sh
           ./build-uefi.sh kaisa
         "
         

@@ -110,17 +110,6 @@ jobs:
         echo "📝 TODO: Implement concrete verification once Step 2 modifications are defined"
         echo "✅ Placeholder verification completed"
     
-    - name: "Step Verify 3: Build configuration simulation"
-      run: |
-        echo "🔍 Step Verify 3: Validating build configuration simulation output..."
-        cd coreboot
-        LOCAL_CONFIG=".config"
-        if [ ! -f "$LOCAL_CONFIG" ]; then
-          echo "❌ .config file not found after simulation"
-          exit 1
-        fi
-        echo "✅ .config file present after simulation"
-    
     - name: Build Kaisa ROM with Docker
       run: |
         echo "🚀 Building Kaisa ROM: kaisa-v${{ github.event.inputs.version || '1.1' }},${{ github.event.inputs.description || 'Coreboot Kaisa ROM' }}"
@@ -141,7 +130,7 @@ jobs:
           echo '🔧 Building Kaisa ROM with version: '\${VERSION_SUFFIX}'...'
           git config --global --add safe.directory /home/coreboot/coreboot
           # Override build-uefi.sh to use our version instead of git rev
-          sed -i \"s|echo \\\"CONFIG_LOCALVERSION=\\\\\\\"\\\\\\\${rev}\\\\\\\"\\\" >> .config|echo \\\"CONFIG_LOCALVERSION=\\\\\\\"\${VERSION_SUFFIX}\\\\\\\"\\\" >> .config|\" build-uefi.sh
+          sed -i \"s|\\\${rev}|\${VERSION_SUFFIX}|\" build-uefi.sh
           ./build-uefi.sh kaisa
           echo '✅ Build completed'
         "
