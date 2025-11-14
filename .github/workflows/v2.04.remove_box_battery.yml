@@ -3,10 +3,15 @@ name: 04.remove box battery - Build Kaisa ROM
 on:
   workflow_dispatch:
     inputs:
-      release_name:
-        description: 'Release name (e.g., kaisa-v1.0)'
+      version:
+        description: 'Version number (e.g., 1.4)'
         required: false
-        default: 'kaisa-v1.3,定制编译网卡驱动'
+        default: '1.4'
+        type: string
+      description:
+        description: 'Release description'
+        required: false
+        default: '定制编译网卡驱动'
         type: string
 
 jobs:
@@ -52,7 +57,8 @@ jobs:
         
         cd coreboot
         CONFIG_FILE="configs/cml/config.kaisa.uefi"
-        VERSION_SUFFIX="$(date +%Y%m%d)-1.4"
+        VERSION="${{ github.event.inputs.version || '1.4' }}"
+        VERSION_SUFFIX="$(date +%Y%m%d)-${VERSION}"
         
         if [ -f "$CONFIG_FILE" ]; then
           echo "📝 Updating CONFIG_LOCALVERSION in $CONFIG_FILE"
@@ -234,7 +240,8 @@ jobs:
         echo "🔍 Step Verify 1: Checking ROM version string..."
         cd coreboot
         CONFIG_FILE="configs/cml/config.kaisa.uefi"
-        VERSION_SUFFIX="$(date +%Y%m%d)-1.4"
+        VERSION="${{ github.event.inputs.version || '1.4' }}"
+        VERSION_SUFFIX="$(date +%Y%m%d)-${VERSION}"
         
         if grep -q "CONFIG_LOCALVERSION=\"${VERSION_SUFFIX}\"" "$CONFIG_FILE"; then
           echo "✅ CONFIG_LOCALVERSION matches ${VERSION_SUFFIX}"
@@ -394,7 +401,7 @@ jobs:
     
     - name: Build Kaisa ROM with Docker
       run: |
-          echo "🚀 Building Kaisa ROM: ${{ github.event.inputs.release_name || 'kaisa' }}"
+          echo "🚀 Building Kaisa ROM: kaisa-v${{ github.event.inputs.version || '1.4' }},${{ github.event.inputs.description || 'Coreboot Kaisa ROM' }}"
           echo "🐳 Using coreboot/coreboot-sdk Docker image..."
           
           cd coreboot
@@ -402,11 +409,17 @@ jobs:
           # Create output directory
           mkdir -p ../roms
           
+          # Prepare version string
+          VERSION="${{ github.event.inputs.version || '1.4' }}"
+          VERSION_SUFFIX="$(date +%Y%m%d)-${VERSION}"
+          
           # Build using Docker
-          echo "🔧 Starting Docker build..."
-          docker run --rm --user root -v "$(pwd)":/home/coreboot/coreboot -v "$(pwd)/../roms":/home/coreboot/roms -w /home/coreboot/coreboot coreboot/coreboot-sdk:latest bash -c "
-            echo '🔧 Building Kaisa ROM...'
+          echo "🔧 Starting Docker build with version: ${VERSION_SUFFIX}..."
+          docker run --rm --user root -v "$(pwd)":/home/coreboot/coreboot -v "$(pwd)/../roms":/home/coreboot/roms -w /home/coreboot/coreboot -e VERSION_SUFFIX="${VERSION_SUFFIX}" coreboot/coreboot-sdk:latest bash -c "
+            echo '🔧 Building Kaisa ROM with version: '\${VERSION_SUFFIX}'...'
             git config --global --add safe.directory /home/coreboot/coreboot
+            # Override build-uefi.sh to use our version instead of git rev
+            sed -i \"s|echo \\\"CONFIG_LOCALVERSION=\\\\\\\"\\\\\\\${rev}\\\\\\\"\\\" >> .config|echo \\\"CONFIG_LOCALVERSION=\\\\\\\"\${VERSION_SUFFIX}\\\\\\\"\\\" >> .config|\" build-uefi.sh
             ./build-uefi.sh kaisa
           "
           
@@ -438,11 +451,11 @@ jobs:
         compression-level: 0
     
     - name: Create Release
-      if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.release_name }}
+      if: ${{ github.event_name != 'workflow_dispatch' || (github.event.inputs.version || github.event.inputs.description) }}
       uses: softprops/action-gh-release@v1
       with:
         tag_name: kaisa-${{ github.run_number }}
-        name: "${{ github.event.inputs.release_name || 'Coreboot Kaisa ROM' }} #${{ github.run_number }}"
+        name: "kaisa-v${{ github.event.inputs.version || '1.4' }},${{ github.event.inputs.description || 'Coreboot Kaisa ROM' }} #${{ github.run_number }}"
         body: |
           # 🎯 Kaisa ROM 构建成功
           
