@@ -1,5 +1,4 @@
-name: 03.fix_r8168.yml - Build Kaisa ROM
-
+name: 02.custom_edk2.yml - Build Kaisa ROM
 
 on:
   workflow_dispatch:
@@ -7,7 +6,7 @@ on:
       release_name:
         description: 'Release name (e.g., kaisa-v1.0)'
         required: false
-        default: 'kaisa-v1.2,定制编译网卡驱动'
+        default: 'kaisa-v1.1,配置EDK2_custom_build_params,定制编译EDK2'
         type: string
 
 jobs:
@@ -53,7 +52,7 @@ jobs:
         
         cd coreboot
         CONFIG_FILE="configs/cml/config.kaisa.uefi"
-        VERSION_SUFFIX="$(date +%Y%m%d)-1.3"
+        VERSION_SUFFIX="$(date +%Y%m%d)-1.2"
         
         if [ -f "$CONFIG_FILE" ]; then
           echo "📝 Updating CONFIG_LOCALVERSION in $CONFIG_FILE"
@@ -65,74 +64,61 @@ jobs:
           exit 1
         fi
     
-    - name: "Step 2: Fix RTL8168 dependencies in puff/Kconfig"
+    - name: "Step 2: Prepare RTL UNDI driver"
       run: |
-        echo "🔧 Step 2: Fixing RTL8168 dependencies in puff/Kconfig..."
-        echo "📝 Adding missing dependencies for RTL8168 ERI programming"
-        
+        echo "🔧 Step 2: 准备预下载的 RTL UNDI 驱动"
         cd coreboot
-        PUFF_KCONFIG="src/mainboard/google/puff/Kconfig"
         
-        # 检查并添加 REALTEK_8168_RESET 依赖
-        if ! grep -q "select REALTEK_8168_RESET" "$PUFF_KCONFIG"; then
-          echo "📝 Adding REALTEK_8168_RESET dependency..."
-          sed -i '/select RT8168_GEN_ACPI_POWER_RESOURCE/a\\tselect REALTEK_8168_RESET' "$PUFF_KCONFIG"
-          echo "✅ REALTEK_8168_RESET dependency added"
+        # 检查预下载的 RTL 驱动
+        if [ -f "../RtkUndiDxe.efi" ]; then
+          echo "✅ 找到预下载的 RTL UNDI 驱动"
+          
+          # 验证驱动文件
+          echo "📊 驱动文件信息:"
+          file "../RtkUndiDxe.efi"
+          size=$(stat -c%s "../RtkUndiDxe.efi")
+          echo "📏 文件大小: $size bytes"
+          
+          # 检查版本信息
+          echo "📋 版本信息:"
+          strings "../RtkUndiDxe.efi" | grep -i "version\|ver\|v[0-9]" | head -5
+          
+          # 检查 PXE/UNDI 功能
+          echo "🌐 PXE/UNDI 功能:"
+          strings "../RtkUndiDxe.efi" | grep -i "pxe\|undi" | head -5
+          
+          # 复制到构建目录
+          echo "💾 复制 RTL 驱动到构建目录..."
+          cp "../RtkUndiDxe.efi" "rtl_undi_driver_updated.efi"
+          echo "✅ RTL UNDI 驱动准备完成"
+          echo "📝 此驱动将在 EDK2 构建过程中被集成到固件中"
         else
-          echo "✅ REALTEK_8168_RESET already present"
+          echo "⚠️ 未找到预下载的 RTL 驱动文件"
+          echo "📝 将使用 MrChromebox EDK2 中的原始驱动"
         fi
-        
-        # 检查并添加 RT8168_SUPPORT_LEGACY_VPD_MAC 支持
-        if ! grep -q "select RT8168_SUPPORT_LEGACY_VPD_MAC" "$PUFF_KCONFIG"; then
-          echo "📝 Adding RT8168_SUPPORT_LEGACY_VPD_MAC support..."
-          sed -i '/select RT8168_SET_LED_MODE/a\\tselect RT8168_SUPPORT_LEGACY_VPD_MAC' "$PUFF_KCONFIG"
-          echo "✅ RT8168_SUPPORT_LEGACY_VPD_MAC support added"
-        else
-          echo "✅ RT8168_SUPPORT_LEGACY_VPD_MAC already present"
-        fi
-        
-        # 检查并添加 RT8168_GET_MAC_FROM_VPD 支持
-        if ! grep -q "select RT8168_GET_MAC_FROM_VPD" "$PUFF_KCONFIG"; then
-          echo "📝 Adding RT8168_GET_MAC_FROM_VPD support..."
-          sed -i '/select RT8168_SUPPORT_LEGACY_VPD_MAC/a\\tselect RT8168_GET_MAC_FROM_VPD' "$PUFF_KCONFIG"
-          echo "✅ RT8168_GET_MAC_FROM_VPD support added"
-        else
-          echo "✅ RT8168_GET_MAC_FROM_VPD already present"
-        fi
-        
-        # 检查并添加 RT8168_PUT_MAC_TO_ERI 支持
-        if ! grep -q "select RT8168_PUT_MAC_TO_ERI" "$PUFF_KCONFIG"; then
-          echo "📝 Adding RT8168_PUT_MAC_TO_ERI support..."
-          sed -i '/select RT8168_GET_MAC_FROM_VPD/a\\tselect RT8168_PUT_MAC_TO_ERI' "$PUFF_KCONFIG"
-          echo "✅ RT8168_PUT_MAC_TO_ERI support added"
-        else
-          echo "✅ RT8168_PUT_MAC_TO_ERI already present"
-        fi
-        
-        echo "✅ Step 2 completed: RTL8168 dependencies fixed"
-    
-    - name: "Step 3: Configure Kaisa UEFI settings"
+
+    - name: "Step 3: Apply custom modifications"
       run: |
-        echo "🔧 Step 3: Configuring Kaisa UEFI settings..."
-        echo "📝 Adding EDK2 network and RTL8168 configurations to config.kaisa.uefi"
+        echo "🔧 Step 3: Applying custom modifications to coreboot source..."
+        echo "📝 Applying RTL8168 driver fixes and EDK2 configurations"
         
-        cd coreboot
-        CONFIG_FILE="configs/cml/config.kaisa.uefi"
+        # 更新主板配置文件
+        echo "🔧 Updating Kaisa board configuration..."
+        CONFIG_FILE="coreboot/configs/cml/config.kaisa.uefi"
         
+
         echo "📝 Adding EDK2 network and RTL8168 configurations..."
         echo "" >> "$CONFIG_FILE"
         echo "# EDK2 Network PXE Support" >> "$CONFIG_FILE"
         echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> "$CONFIG_FILE"
         echo "CONFIG_EDK2_LOAD_OPTION_ROMS=y" >> "$CONFIG_FILE"
         echo "" >> "$CONFIG_FILE"
-        echo "# EDK2 Boot Manager Settings" >> "$CONFIG_FILE"
-        echo "CONFIG_EDK2_BOOT_TIMEOUT=10" >> "$CONFIG_FILE"
-        echo "CONFIG_EDK2_BOOT_MANAGER_ESCAPE=y" >> "$CONFIG_FILE"
-        echo "" >> "$CONFIG_FILE"
         echo "# RTL8168 MAC Address ERI Programming" >> "$CONFIG_FILE"
         echo "CONFIG_RT8168_PUT_MAC_TO_ERI=y" >> "$CONFIG_FILE"
+
         
-        echo "✅ Step 3 completed: Kaisa UEFI settings configured"
+        echo "✅ Kaisa board configuration updated"
+        echo "✅ Custom modifications step completed"
     
     - name: "Step 4: Configure EDK2 custom build parameters"
       run: |
@@ -167,49 +153,19 @@ jobs:
         
         echo "✅ EDK2 custom build parameters configuration completed"
     
-    - name: "Step 5: Apply RTL8168 driver fixes"
-      run: |
-        echo "🔧 Step 5: Applying RTL8168 driver fixes..."
-        echo "📝 Overwriting r8168.c with fixed version..."
-        
-        cd coreboot
-        R8168_DRIVER="src/drivers/net/r8168.c"
-        FIXED_DRIVER="../fixed-files/r8168.c"
-        
-        # 检查修复后的文件是否存在
-        if [ -f "$FIXED_DRIVER" ]; then
-          echo "✅ Fixed RTL8168 driver found: $FIXED_DRIVER"
-          
-          # 覆盖原始文件
-          echo "📝 Overwriting r8168.c with fixed version..."
-          cp "$FIXED_DRIVER" "$R8168_DRIVER"
-          echo "✅ RTL8168 driver fixes applied"
-        else
-          echo "❌ Fixed RTL8168 driver not found: $FIXED_DRIVER"
-          echo "⚠️  Skipping driver fixes (using original version)"
-        fi
-        
-        echo "✅ Step 5 completed: RTL8168 driver fixes applied"
-    
     - name: "Step Simulate: Simulate build configuration"
       run: |
-        echo "🔧 Step 6: Simulating build configuration process..."
+        echo "🔧 Step 5: Simulating build configuration process..."
         echo "📝 This step simulates the build-uefi.sh configuration process"
         
         cd coreboot
-        
-        # 复制配置文件到根目录（参考 build-uefi.sh 第31行）
         cfg_file="configs/cml/config.kaisa.uefi"
         echo "📋 Copying $cfg_file to .config"
         cp "$cfg_file" .config
-        
-        # 执行 make clean 和 make olddefconfig（参考 build-uefi.sh 第33-34行）
         echo "🧹 Running make clean..."
         make clean
-        
         echo "⚙️ Running make olddefconfig..."
         make olddefconfig
-        
         echo "✅ Build configuration simulation completed"
     
     - name: "Step Verify 1: ROM version string"
@@ -217,7 +173,7 @@ jobs:
         echo "🔍 Step Verify 1: Checking ROM version string..."
         cd coreboot
         CONFIG_FILE="configs/cml/config.kaisa.uefi"
-        VERSION_SUFFIX="$(date +%Y%m%d)-1.3"
+        VERSION_SUFFIX="$(date +%Y%m%d)-1.2"
         if grep -q "CONFIG_LOCALVERSION=\"${VERSION_SUFFIX}\"" "$CONFIG_FILE"; then
           echo "✅ CONFIG_LOCALVERSION matches ${VERSION_SUFFIX}"
         else
@@ -225,34 +181,26 @@ jobs:
           exit 1
         fi
     
-    - name: "Step Verify 2: RTL8168 dependencies"
+    - name: "Step Verify 2: RTL UNDI driver prepared"
       run: |
-        echo "🔍 Step Verify 2: Checking puff/Kconfig RTL8168 dependencies..."
+        echo "🔍 Step Verify 2: Validating RTL UNDI driver preparation..."
         cd coreboot
-        PUFF_KCONFIG="src/mainboard/google/puff/Kconfig"
-        for entry in \
-          "select REALTEK_8168_RESET" \
-          "select RT8168_SUPPORT_LEGACY_VPD_MAC" \
-          "select RT8168_GET_MAC_FROM_VPD" \
-          "select RT8168_PUT_MAC_TO_ERI"; do
-          if grep -q "$entry" "$PUFF_KCONFIG"; then
-            echo "✅ $entry present in puff/Kconfig"
-          else
-            echo "❌ $entry missing in puff/Kconfig"
-            exit 1
-          fi
-        done
+        DRIVER_COPY="rtl_undi_driver_updated.efi"
+        if [ -f "$DRIVER_COPY" ]; then
+          echo "✅ Prepared RTL UNDI driver found: $DRIVER_COPY"
+          file "$DRIVER_COPY"
+        else
+          echo "ℹ️ Prepared RTL UNDI driver not found; repository default will be used"
+        fi
     
-    - name: "Step Verify 3: Kaisa UEFI settings"
+    - name: "Step Verify 3: Board configuration updates"
       run: |
-        echo "🔍 Step Verify 3: Validating Kaisa UEFI settings..."
+        echo "🔍 Step Verify 3: Checking Kaisa board configuration updates..."
         cd coreboot
         CONFIG_FILE="configs/cml/config.kaisa.uefi"
         for option in \
           "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" \
           "CONFIG_EDK2_LOAD_OPTION_ROMS=y" \
-          "CONFIG_EDK2_BOOT_TIMEOUT=10" \
-          "CONFIG_EDK2_BOOT_MANAGER_ESCAPE=y" \
           "CONFIG_RT8168_PUT_MAC_TO_ERI=y"; do
           if grep -q "$option" "$CONFIG_FILE"; then
             echo "✅ $option found in config.kaisa.uefi"
@@ -264,7 +212,7 @@ jobs:
     
     - name: "Step Verify 4: EDK2 custom build parameters"
       run: |
-        echo "🔍 Step Verify 4: Checking EDK2 custom build parameters..."
+        echo "🔍 Step Verify 4: Validating EDK2 custom build parameters..."
         cd coreboot
         CONFIG_FILE="configs/cml/config.kaisa.uefi"
         if grep -q "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" "$CONFIG_FILE"; then
@@ -290,73 +238,52 @@ jobs:
           exit 1
         fi
     
-    - name: "Step Verify 5: RTL8168 driver file overwrite"
+    - name: "Step Verify 5: Build configuration simulation"
       run: |
-        echo "🔍 Step Verify 5: Checking RTL8168 driver overwrite..."
+        echo "🔍 Step Verify 5: Checking build configuration simulation output..."
         cd coreboot
-        R8168_DRIVER="src/drivers/net/r8168.c"
-        if [ ! -f "$R8168_DRIVER" ]; then
-          echo "❌ RTL8168 driver not found: $R8168_DRIVER"
+        LOCAL_CONFIG=".config"
+        if [ ! -f "$LOCAL_CONFIG" ]; then
+          echo "❌ .config file not found after simulation"
           exit 1
         fi
-        for check in \
-          "#include <drivers/vpd/vpd.h>" \
-          "vpd_find" \
-          "Check if both hex digits are valid"; do
-          if grep -q "$check" "$R8168_DRIVER"; then
-            echo "✅ '$check' found in r8168.c"
+        for option in \
+          "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" \
+          "CONFIG_EDK2_LOAD_OPTION_ROMS=y" \
+          "CONFIG_RT8168_PUT_MAC_TO_ERI=y"; do
+          if grep -q "$option" "$LOCAL_CONFIG"; then
+            echo "✅ $option present in .config"
           else
-            echo "❌ '$check' missing from r8168.c"
+            echo "❌ $option missing from .config"
             exit 1
           fi
         done
-        if grep -q "case 12:" "$R8168_DRIVER" && \
-           grep -q "case 13:" "$R8168_DRIVER" && \
-           grep -q "case 14:" "$R8168_DRIVER" && \
-           grep -q "case 15:" "$R8168_DRIVER"; then
-          echo "✅ RTL8111H revision 12-15 cases found"
-        else
-          echo "❌ RTL8111H revision 12-15 cases missing"
-          exit 1
-        fi
-        if grep -qE "RTL8111H revision.*ERI programming" "$R8168_DRIVER"; then
-          echo "✅ ERI programming code detected"
-        else
-          echo "❌ ERI programming code missing"
-          exit 1
-        fi
-        if grep -qE "const void \*vpd_value" "$R8168_DRIVER"; then
-          echo "✅ vpd_value type is const void *"
-        else
-          echo "❌ vpd_value type incorrect"
-          exit 1
-        fi
     
     - name: Build Kaisa ROM with Docker
       run: |
-          echo "🚀 Building Kaisa ROM: ${{ github.event.inputs.release_name || 'kaisa' }}"
-          echo "🐳 Using coreboot/coreboot-sdk Docker image..."
-          
-          cd coreboot
-          
-          # Create output directory
-          mkdir -p ../roms
-          
-          # Build using Docker
-          echo "🔧 Starting Docker build..."
-          docker run --rm --user root -v "$(pwd)":/home/coreboot/coreboot -v "$(pwd)/../roms":/home/coreboot/roms -w /home/coreboot/coreboot coreboot/coreboot-sdk:latest bash -c "
-            echo '🔧 Building Kaisa ROM...'
-            git config --global --add safe.directory /home/coreboot/coreboot
-            ./build-uefi.sh kaisa
-          "
-          
-          # Check generated files
-          echo "📋 Checking generated files in roms directory:"
-          ls -la roms/ || echo "roms directory not found"
-          echo "📋 Looking for .sha1 files:"
-          find roms/ -name "*.sha1" -type f || echo "No .sha1 files found"
-          
-          echo "✅ ROM build completed"
+        echo "🚀 Building Kaisa ROM: ${{ github.event.inputs.release_name || 'kaisa' }}"
+        echo "🐳 Using coreboot/coreboot-sdk Docker image..."
+        
+        cd coreboot
+        
+        # Create output directory
+        mkdir -p ../roms
+        
+        # Build using Docker
+        echo "🔧 Starting Docker build..."
+        docker run --rm --user root -v "$(pwd)":/home/coreboot/coreboot -v "$(pwd)/../roms":/home/coreboot/roms -w /home/coreboot/coreboot coreboot/coreboot-sdk:latest bash -c "
+          echo '🔧 Building Kaisa ROM...'
+          git config --global --add safe.directory /home/coreboot/coreboot
+          ./build-uefi.sh kaisa
+        "
+        
+        # 检查生成的文件
+        echo "📋 Checking generated files in roms directory:"
+        ls -la roms/ || echo "roms directory not found"
+        echo "📋 Looking for .sha1 files:"
+        find roms/ -name "*.sha1" -type f || echo "No .sha1 files found"
+        
+        echo "✅ ROM build completed"
     
     - name: Check ROM files
       run: |

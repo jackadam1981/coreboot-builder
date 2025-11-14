@@ -1,0 +1,190 @@
+name: 01.base_build.yml - Build Kaisa ROM
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_name:
+        description: 'Release name (e.g., kaisa-v1.0)'
+        required: false
+        default: 'kaisa-v1.0,最简单的mrchromebox默认编译kaisa'
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      actions: write
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Pull Docker image
+      run: |
+        echo "🐳 Pulling coreboot/coreboot-sdk Docker image..."
+        docker pull coreboot/coreboot-sdk:latest
+        echo "✅ Docker image ready"
+    
+    - name: Clone MrChromebox coreboot
+      run: |
+        echo "📥 Cloning MrChromebox coreboot repository..."
+        if [ ! -d "coreboot" ]; then
+          echo "📥 Cache miss, cloning repository..."
+          git clone https://github.com/mrchromebox/coreboot.git
+        else
+          echo "✅ Cache hit, using cached repository"
+        fi
+        
+        cd coreboot
+        echo "📦 Updating submodules..."
+        git submodule update --init --checkout --recursive
+        echo "🔧 Setting proper permissions..."
+        chmod -R 755 .
+        echo "✅ Source code ready"
+    
+    - name: "Step 1: Set ROM version string"
+      run: |
+        echo "🔧 Step 1: Setting custom ROM version string..."
+        
+        cd coreboot
+        CONFIG_FILE="configs/cml/config.kaisa.uefi"
+        VERSION_SUFFIX="$(date +%Y%m%d)-1.1"
+        
+        if [ -f "$CONFIG_FILE" ]; then
+          echo "📝 Updating CONFIG_LOCALVERSION in $CONFIG_FILE"
+          sed -i '/^CONFIG_LOCALVERSION/d' "$CONFIG_FILE"
+          printf '\nCONFIG_LOCALVERSION="%s"\n' "$VERSION_SUFFIX" >> "$CONFIG_FILE"
+          echo "✅ CONFIG_LOCALVERSION set to $VERSION_SUFFIX"
+        else
+          echo "❌ Config file not found: $CONFIG_FILE"
+          exit 1
+        fi
+    
+    - name: "Step 2: Apply custom modifications"
+      run: |
+        echo "🔧 Step 2: Applying custom modifications to coreboot source..."
+        echo "📝 This step will apply RTL8168 driver fixes and EDK2 configurations"
+        echo "🚧 TODO: Add specific modifications here"
+        echo "✅ Custom modifications step completed"
+    
+    - name: "Step Simulate: Simulate build configuration"
+      run: |
+        echo "🔧 Simulating build configuration process..."
+        cd coreboot
+        cfg_file="configs/cml/config.kaisa.uefi"
+        echo "📋 Copying $cfg_file to .config"
+        cp "$cfg_file" .config
+        echo "🧹 Running make clean..."
+        make clean
+        echo "⚙️ Running make olddefconfig..."
+        make olddefconfig
+        echo "✅ Build configuration simulation completed"
+    
+    - name: "Step Verify 1: ROM version string"
+      run: |
+        echo "🔍 Step Verify 1: Checking ROM version string..."
+        cd coreboot
+        CONFIG_FILE="configs/cml/config.kaisa.uefi"
+        VERSION_SUFFIX="$(date +%Y%m%d)-1.1"
+        if grep -q "CONFIG_LOCALVERSION=\"${VERSION_SUFFIX}\"" "$CONFIG_FILE"; then
+          echo "✅ CONFIG_LOCALVERSION matches ${VERSION_SUFFIX}"
+        else
+          echo "❌ CONFIG_LOCALVERSION does not match ${VERSION_SUFFIX}"
+          exit 1
+        fi
+    
+    - name: "Step Verify 2: Custom modifications applied"
+      run: |
+        echo "🔍 Step Verify 2: Checking custom modifications placeholder..."
+        echo "📝 TODO: Implement concrete verification once Step 2 modifications are defined"
+        echo "✅ Placeholder verification completed"
+    
+    - name: "Step Verify 3: Build configuration simulation"
+      run: |
+        echo "🔍 Step Verify 3: Validating build configuration simulation output..."
+        cd coreboot
+        LOCAL_CONFIG=".config"
+        if [ ! -f "$LOCAL_CONFIG" ]; then
+          echo "❌ .config file not found after simulation"
+          exit 1
+        fi
+        echo "✅ .config file present after simulation"
+    
+    - name: Build Kaisa ROM with Docker
+      run: |
+        echo "🚀 Building Kaisa ROM: ${{ github.event.inputs.release_name || 'kaisa' }}"
+        echo "🐳 Using coreboot/coreboot-sdk Docker image..."
+        
+        cd coreboot
+        
+        # Create output directory
+        mkdir -p ../roms
+        
+        # Build using Docker
+        docker run --rm --user root -v "$(pwd)":/home/coreboot/coreboot -v "$(pwd)/../roms":/home/coreboot/roms -w /home/coreboot/coreboot coreboot/coreboot-sdk:latest bash -c "
+          echo '🔧 Building Kaisa ROM...'
+          git config --global --add safe.directory /home/coreboot/coreboot
+          ./build-uefi.sh kaisa
+          echo '✅ Build completed'
+        "
+        
+        echo "✅ ROM build completed"
+    
+    - name: Check ROM files
+      run: |
+        echo "📋 Generated ROM files:"
+        echo "ROM files:"
+        ls -la roms/*.rom || echo "No ROM files found"
+        echo "SHA1 files:"
+        ls -la roms/*.sha1 || echo "No SHA1 files found"
+        echo "All files in roms directory:"
+        ls -la roms/
+    
+    - name: Upload ROM Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: kaisa-rom
+        path: |
+          roms/*.rom
+          roms/*.sha1
+        compression-level: 0
+    
+    - name: Create Release
+      if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.release_name }}
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: kaisa-${{ github.run_number }}
+        name: "${{ github.event.inputs.release_name || 'Coreboot Kaisa ROM' }} #${{ github.run_number }}"
+        body: |
+          # 🎯 Kaisa ROM 构建成功
+          
+          ## 🔧 构建信息
+          - **主板型号**: Google Kaisa (Puff)
+          - **构建时间**: ${{ github.event.repository.updated_at }}
+          - **构建编号**: #${{ github.run_number }}
+          
+          ## 📦 包含文件
+          - `coreboot.rom` - 主固件文件
+          - `coreboot.rom.sha1` - SHA1 校验文件
+          
+          ## 🚀 使用方法
+          1. 下载 `coreboot.rom` 文件
+          2. 使用刷写工具刷入主板
+          3. 重启后即可使用
+          
+          ## ⚠️ 注意事项
+          - 刷写前请备份原始固件
+          - 确保主板型号为 Google Kaisa
+          - 刷写失败可能导致主板无法启动
+        files: |
+          roms/*.rom
+          roms/*.sha1
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
