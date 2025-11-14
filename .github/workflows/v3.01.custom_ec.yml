@@ -276,6 +276,26 @@ jobs:
           exit 1
         fi
         
+        # 4. 启用 Chrome EC 自动风扇控制（用于 BIOS 显示）
+        echo "📝 Enabling Chrome EC automatic fan control for BIOS display..."
+        CONFIG_FILE="configs/cml/config.kaisa.uefi"
+        if [ -f "$CONFIG_FILE" ]; then
+          if grep -q "CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL" "$CONFIG_FILE"; then
+            echo "✅ CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL already present"
+            # 确保它是启用的
+            sed -i 's/^CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL=.*/CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL=y/' "$CONFIG_FILE"
+          else
+            echo "📝 Adding CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL..."
+            echo "" >> "$CONFIG_FILE"
+            echo "# Chrome EC automatic fan control (for BIOS display)" >> "$CONFIG_FILE"
+            echo "CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL=y" >> "$CONFIG_FILE"
+            echo "✅ CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL added"
+          fi
+        else
+          echo "❌ Config file not found: $CONFIG_FILE"
+          exit 1
+        fi
+        
         echo "✅ Step 7 completed: EC settings configured"
     
     - name: "Step Simulate: Simulate build configuration"
@@ -426,6 +446,16 @@ jobs:
           echo "✅ DPTF_ENABLE_FAN_CONTROL is defined"
         else
           echo "❌ DPTF_ENABLE_FAN_CONTROL is not defined"
+          exit 1
+        fi
+        
+        # 验证 Chrome EC 自动风扇控制
+        echo "📝 Checking CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL..."
+        CONFIG_FILE="configs/cml/config.kaisa.uefi"
+        if grep -q "^CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL=y" "$CONFIG_FILE"; then
+          echo "✅ CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL is enabled"
+        else
+          echo "❌ CONFIG_EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL is not enabled"
           exit 1
         fi
         
