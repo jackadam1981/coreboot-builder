@@ -1,0 +1,533 @@
+name: 03.fix_r8168.yml - Build Kaisa ROM (VPD + ERI 双重方案 - 解决 PXE MAC 全0问题)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., v1.3)'
+        required: false
+        default: 'v1.3'
+        type: string
+      description:
+        description: 'Release description'
+        required: false
+        default: 'VPD + ERI 双重方案 - 解决 PXE MAC 全0问题'
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      actions: write
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Pull Docker image
+      run: |
+        echo "🐳 Pulling coreboot/coreboot-sdk Docker image..."
+        docker pull coreboot/coreboot-sdk:latest
+        echo "✅ Docker image ready"
+    
+    - name: Clone MrChromebox coreboot
+      run: |
+        echo "📥 Cloning MrChromebox coreboot repository..."
+        if [ ! -d "coreboot" ]; then
+          echo "📥 Cache miss, cloning repository..."
+          git clone https://github.com/mrchromebox/coreboot.git
+        else
+          echo "✅ Cache hit, using cached repository"
+        fi
+        
+        cd coreboot
+        echo "📦 Updating submodules..."
+        git submodule update --init --checkout --recursive
+        echo "🔧 Setting proper permissions..."
+        chmod -R 755 .
+        echo "✅ Source code ready"
+    
+    - name: "Step 1: Set ROM version string"
+      run: |
+        echo "🔧 Step 1: Setting custom ROM version string..."
+        
+        cd coreboot
+        CONFIG_FILE="configs/cml/config.kaisa.uefi"
+        # Extract version number from input (remove 'v' prefix if present)
+        VERSION_INPUT="${{ github.event.inputs.version || 'v1.3' }}"
+        VERSION_NUMBER="${VERSION_INPUT#v}"  # Remove 'v' prefix if present
+        VERSION_SUFFIX="$(date +%Y%m%d)-${VERSION_NUMBER}"
+        
+        if [ -f "$CONFIG_FILE" ]; then
+          echo "📝 Updating CONFIG_LOCALVERSION in $CONFIG_FILE"
+          sed -i '/^CONFIG_LOCALVERSION/d' "$CONFIG_FILE"
+          printf '\nCONFIG_LOCALVERSION="%s"\n' "$VERSION_SUFFIX" >> "$CONFIG_FILE"
+          echo "✅ CONFIG_LOCALVERSION set to $VERSION_SUFFIX"
+        else
+          echo "❌ Config file not found: $CONFIG_FILE"
+          exit 1
+        fi
+    
+    - name: "Step 2: Fix RTL8168 dependencies in puff/Kconfig (VPD + ERI 双重方案)"
+      run: |
+        echo "🔧 Step 2: Fixing RTL8168 dependencies in puff/Kconfig..."
+        echo "📝 Adding VPD + ERI 双重方案依赖，解决 PXE MAC 全0问题"
+        
+        cd coreboot
+        PUFF_KCONFIG="src/mainboard/google/puff/Kconfig"
+        
+        # 检查并添加 REALTEK_8168_RESET 依赖
+        if ! grep -q "select REALTEK_8168_RESET" "$PUFF_KCONFIG"; then
+          echo "📝 Adding REALTEK_8168_RESET dependency..."
+          sed -i '/select RT8168_GEN_ACPI_POWER_RESOURCE/a\\tselect REALTEK_8168_RESET' "$PUFF_KCONFIG"
+          echo "✅ REALTEK_8168_RESET dependency added"
+        else
+          echo "✅ REALTEK_8168_RESET already present"
+        fi
+        
+        # 检查并添加 RT8168_GET_MAC_FROM_VPD 支持（VPD 方案）
+        if ! grep -q "select RT8168_GET_MAC_FROM_VPD" "$PUFF_KCONFIG"; then
+          echo "📝 Adding RT8168_GET_MAC_FROM_VPD support (VPD 方案)..."
+          sed -i '/select RT8168_SET_LED_MODE/a\\tselect RT8168_GET_MAC_FROM_VPD' "$PUFF_KCONFIG"
+          echo "✅ RT8168_GET_MAC_FROM_VPD support added"
+        else
+          echo "✅ RT8168_GET_MAC_FROM_VPD already present"
+        fi
+        
+        # 检查并添加 RT8168_PUT_MAC_TO_ERI 支持（ERI 方案，双重保障）
+        if ! grep -q "select RT8168_PUT_MAC_TO_ERI" "$PUFF_KCONFIG"; then
+          echo "📝 Adding RT8168_PUT_MAC_TO_ERI support (ERI 方案，双重保障)..."
+          sed -i '/select RT8168_GET_MAC_FROM_VPD/a\\tselect RT8168_PUT_MAC_TO_ERI' "$PUFF_KCONFIG"
+          echo "✅ RT8168_PUT_MAC_TO_ERI support added"
+        else
+          echo "✅ RT8168_PUT_MAC_TO_ERI already present"
+        fi
+        
+        echo "✅ Step 2 completed: RTL8168 VPD + ERI 双重方案依赖配置完成"
+    
+    - name: "Step 3: Configure Kaisa UEFI settings"
+      run: |
+        echo "🔧 Step 3: Configuring Kaisa UEFI settings..."
+        echo "📝 Adding EDK2 network and RTL8168 configurations to config.kaisa.uefi"
+        
+        cd coreboot
+        CONFIG_FILE="configs/cml/config.kaisa.uefi"
+        
+        echo "📝 Adding EDK2 network and RTL8168 configurations..."
+        echo "" >> "$CONFIG_FILE"
+        echo "# EDK2 Network PXE Support" >> "$CONFIG_FILE"
+        echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> "$CONFIG_FILE"
+        echo "CONFIG_EDK2_LOAD_OPTION_ROMS=y" >> "$CONFIG_FILE"
+        echo "" >> "$CONFIG_FILE"
+        echo "# EDK2 Boot Manager Settings" >> "$CONFIG_FILE"
+        echo "CONFIG_EDK2_BOOT_TIMEOUT=10" >> "$CONFIG_FILE"
+        echo "CONFIG_EDK2_BOOT_MANAGER_ESCAPE=y" >> "$CONFIG_FILE"
+        echo "" >> "$CONFIG_FILE"
+        echo "# RTL8168 VPD + ERI 双重方案 - 解决 PXE MAC 全0问题" >> "$CONFIG_FILE"
+        echo "# CONFIG_RT8168_GET_MAC_FROM_VPD 已在主板 Kconfig 中 select" >> "$CONFIG_FILE"
+        echo "CONFIG_RT8168_PUT_MAC_TO_ERI=y" >> "$CONFIG_FILE"
+        echo "# 同时启用 ERI 方案作为双重保障，确保 MAC 地址在网卡重置后保持" >> "$CONFIG_FILE"
+        
+        echo "✅ Step 3 completed: Kaisa UEFI settings configured (VPD + ERI 双重方案)"
+    
+    - name: "Step 4: Configure EDK2 custom build parameters"
+      run: |
+        echo "🔧 Step 4: Configuring EDK2 custom build parameters..."
+        echo "📝 Adding optimized EDK2 network configuration for PXE boot"
+        
+        CONFIG_FILE="coreboot/configs/cml/config.kaisa.uefi"
+        
+        # 检查配置文件是否存在
+        if [ -f "$CONFIG_FILE" ]; then
+          echo "✅ Kaisa UEFI config found"
+          
+          # 检查是否已经存在 EDK2 自定义构建参数
+          if grep -q "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" "$CONFIG_FILE"; then
+            echo "📝 Updating existing CONFIG_EDK2_CUSTOM_BUILD_PARAMS..."
+            # 删除旧的配置行
+            sed -i '/CONFIG_EDK2_CUSTOM_BUILD_PARAMS/d' "$CONFIG_FILE"
+          else
+            echo "📝 Adding new CONFIG_EDK2_CUSTOM_BUILD_PARAMS..."
+          fi
+          
+          # 添加优化的 EDK2 自定义构建参数
+          echo "" >> "$CONFIG_FILE"
+          echo "# EDK2 custom build parameters for PXE network boot" >> "$CONFIG_FILE"
+          echo 'CONFIG_EDK2_CUSTOM_BUILD_PARAMS="-D NETWORK_DRIVER_ENABLE=TRUE -D NETWORK_ENABLE=TRUE -D NETWORK_IP4_ENABLE=TRUE -D NETWORK_IP6_ENABLE=FALSE -D NETWORK_PXE_BOOT_ENABLE=TRUE -D NETWORK_HTTP_BOOT_ENABLE=FALSE -D NETWORK_HTTP_ENABLE=FALSE -D NETWORK_ALLOW_HTTP_CONNECTIONS=FALSE -D NETWORK_SNP_ENABLE=TRUE -D NETWORK_VLAN_ENABLE=FALSE -D NETWORK_RTEK_PCI=TRUE -D NETWORK_TLS_ENABLE=FALSE -D NETWORK_ISCSI_ENABLE=FALSE -D NETWORK_RTEK_USB=FALSE -D NETWORK_ASIX_USB3=FALSE -D NETWORK_ASIX_USB2=FALSE"' >> "$CONFIG_FILE"
+          
+          echo "✅ EDK2 custom build parameters configured"
+        else
+          echo "❌ Kaisa UEFI config not found"
+          exit 1
+        fi
+        
+        echo "✅ EDK2 custom build parameters configuration completed"
+    
+    - name: "Step 5: Apply RTL8168 driver fixes (VPD 方案)"
+      run: |
+        echo "🔧 Step 5: Applying RTL8168 driver fixes..."
+        echo "📝 使用修复后的驱动文件，添加 RTL8111H 支持，解决 PXE MAC 全0问题（VPD 方案）"
+        
+        cd coreboot
+        R8168_DRIVER="src/drivers/net/r8168.c"
+        FIXED_DRIVER="../fixed-files/r8168.c"
+        
+        # 检查修复后的文件是否存在
+        if [ ! -f "$FIXED_DRIVER" ]; then
+          echo "❌ Fixed RTL8168 driver not found: $FIXED_DRIVER"
+          echo "⚠️  请确保 fixed-files/r8168.c 文件存在并包含 RTL8111H 支持"
+          exit 1
+        fi
+        
+        # 检查原始驱动文件是否存在
+        if [ ! -f "$R8168_DRIVER" ]; then
+          echo "❌ RTL8168 driver not found: $R8168_DRIVER"
+          exit 1
+        fi
+        
+        echo "📝 备份原始驱动文件..."
+        cp "$R8168_DRIVER" "${R8168_DRIVER}.backup"
+        
+        echo "📝 使用修复后的驱动文件覆盖原始文件..."
+        cp "$FIXED_DRIVER" "$R8168_DRIVER"
+        
+        # 验证修复是否成功
+        if grep -q "case 12:" "$R8168_DRIVER" && \
+           grep -q "case 13:" "$R8168_DRIVER" && \
+           grep -q "case 14:" "$R8168_DRIVER" && \
+           grep -q "case 15:" "$R8168_DRIVER"; then
+          echo "✅ RTL8111H revision 12-15 支持已确认"
+        else
+          echo "❌ RTL8111H 支持验证失败"
+          exit 1
+        fi
+        
+        echo "✅ RTL8168 驱动已修改支持 RTL8111H (VPD 方案)"
+        echo "✅ Step 5 completed: RTL8168 driver fixes applied"
+    
+    - name: "Step Simulate: Simulate build configuration"
+      run: |
+        echo "🔧 Step 6: Simulating build configuration process..."
+        echo "📝 This step simulates the build-uefi.sh configuration process"
+        
+        cd coreboot
+        
+        # 复制配置文件到根目录（参考 build-uefi.sh 第31行）
+        cfg_file="configs/cml/config.kaisa.uefi"
+        echo "📋 Copying $cfg_file to .config"
+        cp "$cfg_file" .config
+        
+        # 执行 make clean 和 make olddefconfig（参考 build-uefi.sh 第33-34行）
+        echo "🧹 Running make clean..."
+        make clean
+        
+        echo "⚙️ Running make olddefconfig..."
+        make olddefconfig
+        
+        echo "✅ Build configuration simulation completed"
+    
+    - name: "Step Verify 1: ROM version string"
+      run: |
+        echo "🔍 Step Verify 1: Checking ROM version string..."
+        cd coreboot
+        CONFIG_FILE="configs/cml/config.kaisa.uefi"
+        VERSION_INPUT="${{ github.event.inputs.version || 'v1.3' }}"
+        VERSION_NUMBER="${VERSION_INPUT#v}"  # Remove 'v' prefix if present
+        VERSION_SUFFIX="$(date +%Y%m%d)-${VERSION_NUMBER}"
+        if grep -q "CONFIG_LOCALVERSION=\"${VERSION_SUFFIX}\"" "$CONFIG_FILE"; then
+          echo "✅ CONFIG_LOCALVERSION matches ${VERSION_SUFFIX}"
+        else
+          echo "❌ CONFIG_LOCALVERSION does not match ${VERSION_SUFFIX}"
+          exit 1
+        fi
+    
+    - name: "Step Verify 2: RTL8168 dependencies (VPD + ERI 双重方案)"
+      run: |
+        echo "🔍 Step Verify 2: Checking puff/Kconfig RTL8168 dependencies (VPD + ERI 双重方案)..."
+        cd coreboot
+        PUFF_KCONFIG="src/mainboard/google/puff/Kconfig"
+        
+        # 检查 VPD + ERI 双重方案必需的依赖
+        for entry in \
+          "select REALTEK_8168_RESET" \
+          "select RT8168_GET_MAC_FROM_VPD" \
+          "select RT8168_PUT_MAC_TO_ERI"; do
+          if grep -q "$entry" "$PUFF_KCONFIG"; then
+            echo "✅ $entry present in puff/Kconfig"
+          else
+            echo "❌ $entry missing in puff/Kconfig"
+            exit 1
+          fi
+        done
+        
+        echo "✅ Step Verify 2 completed: VPD + ERI 双重方案依赖验证通过"
+    
+    - name: "Step Verify 3: Kaisa UEFI settings (VPD + ERI 双重方案)"
+      run: |
+        echo "🔍 Step Verify 3: Validating Kaisa UEFI settings (VPD + ERI 双重方案)..."
+        cd coreboot
+        CONFIG_FILE="configs/cml/config.kaisa.uefi"
+        
+        # 检查必需的 EDK2 配置
+        for option in \
+          "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" \
+          "CONFIG_EDK2_LOAD_OPTION_ROMS=y" \
+          "CONFIG_EDK2_BOOT_TIMEOUT=10" \
+          "CONFIG_EDK2_BOOT_MANAGER_ESCAPE=y" \
+          "CONFIG_RT8168_PUT_MAC_TO_ERI=y"; do
+          if grep -q "$option" "$CONFIG_FILE"; then
+            echo "✅ $option found in config.kaisa.uefi"
+          else
+            echo "❌ $option not found in config.kaisa.uefi"
+            exit 1
+          fi
+        done
+        
+        echo "✅ Step Verify 3 completed: VPD + ERI 双重方案配置验证通过"
+    
+    - name: "Step Verify 4: EDK2 custom build parameters"
+      run: |
+        echo "🔍 Step Verify 4: Checking EDK2 custom build parameters..."
+        cd coreboot
+        CONFIG_FILE="configs/cml/config.kaisa.uefi"
+        if grep -q "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" "$CONFIG_FILE"; then
+          echo "✅ CONFIG_EDK2_CUSTOM_BUILD_PARAMS present"
+          for param in \
+            "NETWORK_DRIVER_ENABLE=TRUE" \
+            "NETWORK_PXE_BOOT_ENABLE=TRUE" \
+            "NETWORK_SNP_ENABLE=TRUE" \
+            "NETWORK_RTEK_PCI=TRUE" \
+            "NETWORK_TLS_ENABLE=FALSE" \
+            "NETWORK_VLAN_ENABLE=FALSE" \
+            "NETWORK_HTTP_BOOT_ENABLE=FALSE" \
+            "NETWORK_IP6_ENABLE=FALSE"; do
+            if grep -q "$param" "$CONFIG_FILE"; then
+              echo "✅ $param found"
+            else
+              echo "❌ $param missing"
+              exit 1
+            fi
+          done
+        else
+          echo "❌ CONFIG_EDK2_CUSTOM_BUILD_PARAMS missing in config.kaisa.uefi"
+          exit 1
+        fi
+    
+    - name: "Step Verify 5: RTL8168 driver RTL8111H support (VPD + ERI 双重方案)"
+      run: |
+        echo "🔍 Step Verify 5: Checking RTL8168 driver RTL8111H support (VPD + ERI 双重方案)..."
+        cd coreboot
+        R8168_DRIVER="src/drivers/net/r8168.c"
+        
+        if [ ! -f "$R8168_DRIVER" ]; then
+          echo "❌ RTL8168 driver not found: $R8168_DRIVER"
+          exit 1
+        fi
+        
+        # 检查 RTL8111H 相关注释（支持多种可能的注释格式）
+        echo "📝 Checking RTL8111H support code..."
+        if grep -qi "RTL8111H" "$R8168_DRIVER"; then
+          echo "✅ RTL8111H related code found"
+          grep -i "RTL8111H" "$R8168_DRIVER" | head -3 | sed 's/^/    /'
+        else
+          echo "❌ RTL8111H related code missing"
+          exit 1
+        fi
+        
+        # 检查 revision 12-15 支持
+        echo "📝 Checking revision 12-15 support..."
+        if grep -q "case 12:" "$R8168_DRIVER" && \
+           grep -q "case 13:" "$R8168_DRIVER" && \
+           grep -q "case 14:" "$R8168_DRIVER" && \
+           grep -q "case 15:" "$R8168_DRIVER"; then
+          echo "✅ RTL8111H revision 12-15 cases found"
+        else
+          echo "❌ RTL8111H revision 12-15 cases missing"
+          exit 1
+        fi
+        
+        # 检查 ERI 编程代码
+        echo "📝 Checking ERI programming code..."
+        if grep -q "0x8000f0e0" "$R8168_DRIVER" && \
+           grep -q "0x800030e4" "$R8168_DRIVER"; then
+          echo "✅ ERI programming code detected (解决 PXE MAC 全0问题)"
+        else
+          echo "❌ ERI programming code missing"
+          exit 1
+        fi
+        
+        echo "✅ Step Verify 5 completed: RTL8168 driver RTL8111H support verified"
+    
+    - name: Build Kaisa ROM with Docker
+      run: |
+          echo "🚀 Building Kaisa ROM (VPD + ERI 双重方案): ${{ github.event.inputs.version || 'v1.3' }}, ${{ github.event.inputs.description || 'VPD + ERI 双重方案 - 解决 PXE MAC 全0问题' }}"
+          echo "🐳 Using coreboot/coreboot-sdk Docker image..."
+          
+          cd coreboot
+          
+          # Prepare clean output directory
+          rm -rf ../roms
+          mkdir -p ../roms
+          
+          # Create a wrapper script that preserves CONFIG_LOCALVERSION from config file
+          echo "📝 Creating modified build-uefi.sh that preserves version from config file..."
+          cat > build-uefi-custom.sh << 'EOF'
+          #!/usr/bin/env bash
+          set -e
+          
+          platforms=('snb_ivb' 'hsw' 'byt' 'bdw' 'bsw' 'skl' 'apl' 'kbl' 'whl' 'glk' \
+                     'cml' 'jsl' 'tgl' 'adl' 'adl_n' 'mtl' 'str' 'pco' 'czn' 'mdn')
+          build_targets=()
+          
+          output_folder="../roms"
+          mkdir -p ${output_folder}
+          
+          if [ -z "$1" ]; then
+          	for subdir in "${platforms[@]}"; do
+          		for cfg in configs/"$subdir"/config*.*; do
+          			build_targets+=("$(basename "$cfg" | cut -f2 -d'.')")
+          		done
+          	done
+          else
+          	build_targets=("$@")
+          fi
+          
+          # get git rev (fallback)
+          rev=$(git describe --tags --dirty)
+          
+          for device in "${build_targets[@]}"; do
+          	rm -rf ./build
+          	cfg_file=$(find ./configs -name "config.$device.uefi")
+          	cp "$cfg_file" .config
+          	
+          	# Get build date (fallback if not in version)
+          	BUILD_DATE=$(date +"%Y%m%d")
+          	
+          	# Only set CONFIG_LOCALVERSION if not already set in config file
+          	if ! grep -q "^CONFIG_LOCALVERSION=" .config; then
+          		echo "Setting CONFIG_LOCALVERSION to git rev: ${rev}"
+          		echo "CONFIG_LOCALVERSION=\"${rev}\"" >> .config
+          		VERSION_FOR_ROM="${rev}"
+          		# Use build date and git rev for filename
+          		VERSION_NUMBER="git-${rev}"
+          	else
+          		EXISTING_VERSION=$(grep "^CONFIG_LOCALVERSION=" .config | cut -d'"' -f2)
+          		echo "Using existing CONFIG_LOCALVERSION from config file: ${EXISTING_VERSION}"
+          		VERSION_FOR_ROM="${EXISTING_VERSION}"
+          		# Extract date and version number from version string (format: YYYYMMDD-1.X)
+          		if [[ "${EXISTING_VERSION}" =~ ^([0-9]{8})-([0-9]+\.[0-9]+)$ ]]; then
+          			# Version contains date and version number
+          			BUILD_DATE="${BASH_REMATCH[1]}"
+          			VERSION_NUMBER="v${BASH_REMATCH[2]}"
+          		else
+          			# Version format not recognized, use build date and full version
+          			VERSION_NUMBER="v${EXISTING_VERSION}"
+          		fi
+          	fi
+          	
+          	# Generate filename with date and version number
+          	filename="coreboot_edk2-${device}-mrchromebox_${BUILD_DATE}-${VERSION_NUMBER}.rom"
+          	echo "Generated filename: ${filename} (version in ROM: ${VERSION_FOR_ROM})"
+          	rm -f ${output_folder}/"${filename}"*
+          	
+          	make clean
+          	make olddefconfig
+          	if ! make -j"$(nproc)"; then
+          		echo -e "Error building $device"
+          		exit 1
+          	fi
+          	cp ./build/coreboot.rom ./"${filename}"
+          	sha1sum "${filename}" > "${filename}.sha1"
+          	mv "${filename}"* "${output_folder}"
+          done
+          EOF
+          chmod +x build-uefi-custom.sh
+          
+          # Build using Docker
+          echo "🔧 Starting Docker build..."
+          docker run --rm --user root -v "$(pwd)":/home/coreboot/coreboot -v "$(pwd)/../roms":/home/coreboot/roms -w /home/coreboot/coreboot coreboot/coreboot-sdk:latest bash -c "
+            echo '🔧 Building Kaisa ROM...'
+            git config --global --add safe.directory /home/coreboot/coreboot
+            ./build-uefi-custom.sh kaisa
+          "
+          
+          # Check generated files
+          echo "📋 Checking generated files in roms directory:"
+          ls -la roms/ || echo "roms directory not found"
+          echo "📋 Looking for .sha1 files:"
+          find roms/ -name "*.sha1" -type f || echo "No .sha1 files found"
+          
+          echo "✅ ROM build completed"
+    
+    - name: Check ROM files
+      run: |
+        echo "📋 Generated ROM files:"
+        echo "ROM files:"
+        ls -la roms/*.rom || echo "No ROM files found"
+        echo "SHA1 files:"
+        ls -la roms/*.sha1 || echo "No SHA1 files found"
+        echo "All files in roms directory:"
+        ls -la roms/
+    
+    - name: Upload ROM Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: kaisa-rom-${{ github.event.inputs.version || 'v1.3' }}
+        path: |
+          roms/*.rom
+          roms/*.sha1
+        compression-level: 0
+    
+    - name: Create Release
+      if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.version }}
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: kaisa-${{ github.event.inputs.version || 'v1.3' }}
+        name: "kaisa-${{ github.event.inputs.version || 'v1.3' }},${{ github.event.inputs.description || 'VPD + ERI 双重方案 - 解决 PXE MAC 全0问题' }} #${{ github.run_number }}"
+        body: |
+          # 🎯 Kaisa ROM 构建成功 (VPD + ERI 双重方案)
+          
+          ## 🔧 构建信息
+          - **主板型号**: Google Kaisa (Puff)
+          - **技术方案**: VPD + ERI 双重方案（解决 PXE MAC 全0问题）
+          - **版本**: ${{ github.event.inputs.version || 'v1.3' }}
+          - **构建时间**: ${{ github.event.repository.updated_at }}
+          - **构建编号**: #${{ github.run_number }}
+          
+          ## 🎯 解决的问题
+          - ✅ 修复 RTL8111H 芯片在 PXE 网络引导时 MAC 地址显示为全0的问题
+          - ✅ 支持 RTL8111H revision 12-15
+          - ✅ 实现 MAC 地址持久化存储
+          
+          ## 🔧 技术方案
+          - **VPD 方案**: 从 VPD 读取 MAC 地址（主要方案）
+          - **ERI 方案**: 同时写入 ERI 寄存器（双重保障）
+          - **双重保障**: 确保 MAC 地址在网卡重置后能够正确保持
+          
+          ## 📦 包含文件
+          - `coreboot.rom` - 主固件文件
+          - `coreboot.rom.sha1` - SHA1 校验文件
+          
+          ## 🚀 使用方法
+          1. 下载 `coreboot.rom` 文件
+          2. 使用刷写工具刷入主板
+          3. 重启后验证 PXE 引导功能
+          4. 检查 MAC 地址是否正确显示（不再是全0）
+          
+          ## ⚠️ 注意事项
+          - 刷写前请备份原始固件
+          - 确保主板型号为 Google Kaisa
+          - 刷写失败可能导致主板无法启动
+          - 本版本同时使用 VPD 和 ERI 方案，提供双重保障
+        files: |
+          roms/*.rom
+          roms/*.sha1
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

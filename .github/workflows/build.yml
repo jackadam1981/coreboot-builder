@@ -1,9 +1,6 @@
 name: Build Kaisa ROM
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       release_name:
