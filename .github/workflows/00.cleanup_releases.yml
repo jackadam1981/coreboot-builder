@@ -1,0 +1,111 @@
+name: 00.cleanup releases - Delete release history
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      actions: write
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Ensure GitHub CLI
+      run: |
+        if ! command -v gh >/dev/null 2>&1; then
+          echo "📥 Installing GitHub CLI..."
+          sudo apt-get update
+          sudo apt-get install -y gh
+        else
+          echo "✅ GitHub CLI already available"
+        fi
+    
+    - name: Delete all releases and tags
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_REPO: ${{ github.repository }}
+      run: |
+        echo "📦 Fetching release list for ${GH_REPO}..."
+        releases=$(gh release list --limit 1000 --json tagName --jq '.[].tagName')
+        
+        if [ -z "$releases" ]; then
+          echo "✅ No releases found. Nothing to delete."
+          exit 0
+        fi
+        
+        echo "⚠️  Following releases will be deleted:"
+        echo "$releases"
+        
+        for tag in $releases; do
+          echo "🗑️  Deleting release: $tag"
+          if gh release delete "$tag" -y >/dev/null 2>&1; then
+            echo "✅ Release $tag deleted"
+          else
+            echo "⚠️  Release $tag could not be deleted (maybe already removed)"
+          fi
+          
+          echo "🏷️  Deleting tag: $tag"
+          if gh api --method DELETE "repos/${GH_REPO}/git/refs/tags/${tag}" >/dev/null 2>&1; then
+            echo "✅ Tag $tag deleted"
+          else
+            echo "ℹ️  Tag $tag not found or already deleted"
+          fi
+        done
+        
+        echo "✅ All releases have been deleted."
+        echo "📂 Verifying remaining releases..."
+        gh release list || echo "No releases remain."
+
+    - name: Delete all workflow runs
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_REPO: ${{ github.repository }}
+        CURRENT_RUN: ${{ github.run_id }}
+      run: |
+        echo "🧹 Begin deleting workflow runs for ${GH_REPO}..."
+        
+        while true; do
+          sleep 2
+          
+          if ! runs=$(gh run list --limit 50 --json databaseId --jq '.[].databaseId' 2>/tmp/gh_run_list_err); then
+            echo "⚠️  Failed to fetch workflow runs (rate limit or permission issue):"
+            cat /tmp/gh_run_list_err
+            echo "↩️  Stopping workflow-run cleanup early to avoid repeated failures."
+            break
+          fi
+
+          if [ -z "$runs" ]; then
+            echo "✅ No more workflow runs to delete."
+            break
+          fi
+          
+          deleted_any=0
+          
+          for run_id in $runs; do
+            if [ "$run_id" = "$CURRENT_RUN" ]; then
+              echo "⏭️  Skipping current workflow run ($run_id)"
+              continue
+            fi
+            
+            echo "🗑️  Deleting workflow run: $run_id"
+            if gh run delete "$run_id" >/dev/null 2>&1; then
+              echo "✅ Workflow run $run_id deleted"
+              deleted_any=1
+            else
+              echo "⚠️  Workflow run $run_id could not be deleted (maybe already removed)"
+            fi
+          done
+          
+          if [ "$deleted_any" -eq 0 ]; then
+            echo "ℹ️  No deletable workflow runs found in this iteration. Exiting cleanup loop."
+            break
+          fi
+          
+          echo "😴 Sleeping 5 seconds before next batch to respect API limits..."
+          sleep 5
+        done
