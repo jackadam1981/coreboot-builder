@@ -1,4 +1,4 @@
-name: 02.custom_edk2.yml - Build Kaisa ROM
+name: old.custom_edk2.yml - Build Kaisa ROM
 
 on:
   workflow_dispatch:

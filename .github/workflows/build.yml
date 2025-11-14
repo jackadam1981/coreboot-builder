@@ -1,4 +1,4 @@
-name: Build Kaisa ROM
+name: old Build Kaisa ROM
 
 on:
   workflow_dispatch:

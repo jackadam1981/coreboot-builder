@@ -1,4 +1,4 @@
-name: 01.base_build.yml - Build Kaisa ROM
+name: old.base_build.yml - Build Kaisa ROM
 
 on:
   workflow_dispatch:
