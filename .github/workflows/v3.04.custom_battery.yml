@@ -37,12 +37,7 @@ jobs:
     - name: Clone MrChromebox coreboot
       run: |
         echo "📥 Cloning MrChromebox coreboot repository..."
-        if [ ! -d "coreboot" ]; then
-          echo "📥 Cache miss, cloning repository..."
-          git clone https://github.com/mrchromebox/coreboot.git
-        else
-          echo "✅ Cache hit, using cached repository"
-        fi
+        git clone https://github.com/mrchromebox/coreboot.git
         
         cd coreboot
         echo "📦 Updating submodules..."
