@@ -521,15 +521,15 @@ jobs:
         fi
         
         for pattern in \
-          'tdp_pl1_override = 25' \
-          'tdp_pl2_override = 50' \
-          'min_power = 25000' \
-          'max_power = 25000' \
-          'time_window_min = 64 \* MSECS_PER_SEC' \
-          'time_window_max = 64 \* MSECS_PER_SEC' \
-          'max_power = 50000' \
-          'time_window_min = 32 \* MSECS_PER_SEC' \
-          'time_window_max = 32 \* MSECS_PER_SEC'; do
+          '\.tdp_pl1_override = 25,' \
+          '\.tdp_pl2_override = 50,' \
+          '\.min_power = 25000,' \
+          '\.max_power = 25000,' \
+          '\.time_window_min = 64 \* MSECS_PER_SEC,' \
+          '\.time_window_max = 64 \* MSECS_PER_SEC,' \
+          '\.max_power = 50000,' \
+          '\.time_window_min = 32 \* MSECS_PER_SEC,' \
+          '\.time_window_max = 32 \* MSECS_PER_SEC,'; do
           if grep -q "$pattern" "$POWER_FILE"; then
             echo "✅ Found expected setting: $pattern"
           else
