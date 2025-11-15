@@ -11,7 +11,7 @@ on:
       description:
         description: 'Release description'
         required: false
-        default: '定制功耗墙配置：提高性能效率（PL1: 20W/60s, PL2: 50W/15s）'
+        default: '定制功耗墙配置：提高性能效率（PL1: 25W/64s, PL2: 50W/32s）'
         type: string
 
 jobs:
@@ -305,6 +305,7 @@ jobs:
         
         cd coreboot
         POWER_FILE="src/mainboard/google/puff/variants/kaisa/overridetree.cb"
+        SYSTEMAGENT_FILE="src/soc/intel/cannonlake/systemagent.c"
         
         if [ ! -f "$POWER_FILE" ]; then
           echo "❌ Power configuration file not found: $POWER_FILE"
@@ -313,23 +314,34 @@ jobs:
         
         # Modify power limits using sed
         echo "📝 Updating TDP power limits..."
-        sed -i 's/\.tdp_pl1_override = 15,/.tdp_pl1_override = 20,/' "$POWER_FILE"
+        sed -i 's/\.tdp_pl1_override = 15,/.tdp_pl1_override = 25,/' "$POWER_FILE"
         sed -i 's/\.tdp_pl2_override = 51,/.tdp_pl2_override = 50,/' "$POWER_FILE"
         
-        echo "📝 Updating PL1 power limits (20W, 60s window)..."
-        sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.min_power = 15000,/.min_power = 20000,/' "$POWER_FILE"
-        sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.max_power = 15000,/.max_power = 20000,/' "$POWER_FILE"
-        sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.time_window_min = 28 \* MSECS_PER_SEC,/.time_window_min = 60 * MSECS_PER_SEC,/' "$POWER_FILE"
-        sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.time_window_max = 32 \* MSECS_PER_SEC,/.time_window_max = 60 * MSECS_PER_SEC,/' "$POWER_FILE"
+        echo "📝 Updating PL1 power limits (25W, 64s window)..."
+        sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.min_power = 15000,/.min_power = 25000,/' "$POWER_FILE"
+        sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.max_power = 15000,/.max_power = 25000,/' "$POWER_FILE"
+        sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.time_window_min = 28 \* MSECS_PER_SEC,/.time_window_min = 64 * MSECS_PER_SEC,/' "$POWER_FILE"
+        sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.time_window_max = 32 \* MSECS_PER_SEC,/.time_window_max = 64 * MSECS_PER_SEC,/' "$POWER_FILE"
         
-        echo "📝 Updating PL2 power limits (50W, 15s window)..."
+        echo "📝 Updating PL2 power limits (50W, 32s window - half of PL1)..."
         sed -i '/register "controls\.power_limits\.pl2"/,/granularity = 1000,}/ s/\.max_power = 51000,/.max_power = 50000,/' "$POWER_FILE"
-        sed -i '/register "controls\.power_limits\.pl2"/,/granularity = 1000,}/ s/\.time_window_min = 28 \* MSECS_PER_SEC,/.time_window_min = 15 * MSECS_PER_SEC,/' "$POWER_FILE"
-        sed -i '/register "controls\.power_limits\.pl2"/,/granularity = 1000,}/ s/\.time_window_max = 32 \* MSECS_PER_SEC,/.time_window_max = 15 * MSECS_PER_SEC,/' "$POWER_FILE"
+        sed -i '/register "controls\.power_limits\.pl2"/,/granularity = 1000,}/ s/\.time_window_min = 28 \* MSECS_PER_SEC,/.time_window_min = 32 * MSECS_PER_SEC,/' "$POWER_FILE"
+        sed -i '/register "controls\.power_limits\.pl2"/,/granularity = 1000,}/ s/\.time_window_max = 32 \* MSECS_PER_SEC,/.time_window_max = 32 * MSECS_PER_SEC,/' "$POWER_FILE"
         
         # Update comments
-        sed -i 's/# PL1 is fixed at 15W, avg over 28-32s interval/# PL1 is fixed at 20W, avg over 60s interval/' "$POWER_FILE"
-        sed -i 's/# 15-51W PL2 in 1000mW increments, avg over 28-32s interval/# 20-50W PL2 in 1000mW increments, avg over 15s interval/' "$POWER_FILE"
+        sed -i 's/# PL1 is fixed at 15W, avg over 28-32s interval/# PL1 is fixed at 25W, avg over 64s interval/' "$POWER_FILE"
+        sed -i 's/# 15-51W PL2 in 1000mW increments, avg over 28-32s interval/# 25-50W PL2 in 1000mW increments, avg over 32s interval/' "$POWER_FILE"
+        
+        # Modify systemagent.c to use 64 seconds (closest to 60s) for PL1 time window
+        # Note: power_limit_time_sec_to_msr array doesn't have 60s, closest is 64s (0x10)
+        echo "📝 Updating systemagent.c to use 64 seconds for PL1 time window..."
+        if [ -f "$SYSTEMAGENT_FILE" ]; then
+          # Change MOBILE_SKU_PL1_TIME_SEC from 28 to 64
+          sed -i 's/set_power_limits(MOBILE_SKU_PL1_TIME_SEC, soc_config);/set_power_limits(64, soc_config); \/\/ Changed from MOBILE_SKU_PL1_TIME_SEC (28s) to 64s for high performance/' "$SYSTEMAGENT_FILE"
+          echo "✅ systemagent.c updated to use 64 seconds for PL1 time window"
+        else
+          echo "⚠️  systemagent.c not found, PL1 time window will remain at 28 seconds"
+        fi
         
         echo "✅ High performance power profile applied"
     
@@ -501,6 +513,7 @@ jobs:
         echo "🔍 Step Verify 7: Validating high performance power settings..."
         cd coreboot
         POWER_FILE="src/mainboard/google/puff/variants/kaisa/overridetree.cb"
+        SYSTEMAGENT_FILE="src/soc/intel/cannonlake/systemagent.c"
         
         if [ ! -f "$POWER_FILE" ]; then
           echo "❌ Power configuration file not found: $POWER_FILE"
@@ -508,15 +521,15 @@ jobs:
         fi
         
         for pattern in \
-          'tdp_pl1_override = 20' \
+          'tdp_pl1_override = 25' \
           'tdp_pl2_override = 50' \
-          'min_power = 20000' \
-          'max_power = 20000' \
-          'time_window_min = 60 \* MSECS_PER_SEC' \
-          'time_window_max = 60 \* MSECS_PER_SEC' \
+          'min_power = 25000' \
+          'max_power = 25000' \
+          'time_window_min = 64 \* MSECS_PER_SEC' \
+          'time_window_max = 64 \* MSECS_PER_SEC' \
           'max_power = 50000' \
-          'time_window_min = 15 \* MSECS_PER_SEC' \
-          'time_window_max = 15 \* MSECS_PER_SEC'; do
+          'time_window_min = 32 \* MSECS_PER_SEC' \
+          'time_window_max = 32 \* MSECS_PER_SEC'; do
           if grep -q "$pattern" "$POWER_FILE"; then
             echo "✅ Found expected setting: $pattern"
           else
@@ -524,6 +537,17 @@ jobs:
             exit 1
           fi
         done
+        
+        # Verify systemagent.c uses 64 seconds
+        if [ -f "$SYSTEMAGENT_FILE" ]; then
+          if grep -q "set_power_limits(64, soc_config)" "$SYSTEMAGENT_FILE"; then
+            echo "✅ systemagent.c uses 64 seconds for PL1 time window"
+          else
+            echo "⚠️  systemagent.c may not use 64 seconds for PL1 time window"
+            echo "   Current value:"
+            grep "set_power_limits" "$SYSTEMAGENT_FILE"
+          fi
+        fi
         
         echo "✅ Step Verify 7 completed: High performance power profile verified"
     
@@ -633,7 +657,7 @@ jobs:
           - **主板型号**: Google Kaisa (Puff)
           - **构建时间**: ${{ github.event.repository.updated_at }}
           - **构建编号**: #${{ github.run_number }}
-          - **功耗配置**: PL1: 20W/60s, PL2: 50W/15s
+          - **功耗配置**: PL1: 25W/64s, PL2: 50W/32s
           
           ## 📦 包含文件
           - `coreboot.rom` - 主固件文件
