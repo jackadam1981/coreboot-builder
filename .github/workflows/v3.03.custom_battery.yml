@@ -301,76 +301,25 @@ jobs:
     - name: "Step 8: Remove battery device from ACPI"
       run: |
         echo "🔧 Step 8: Removing battery device from ACPI tables..."
-        echo "📝 Making battery device inclusion conditional for Chromebox"
+        echo "📝 Overwriting ec.asl with fixed version..."
         
         cd coreboot
         EC_ASL="src/ec/google/chromeec/acpi/ec.asl"
+        FIXED_EC_ASL="../fixed-files/ec.asl"
         
-        if [ ! -f "$EC_ASL" ]; then
-          echo "❌ EC ASL file not found: $EC_ASL"
+        # 检查修复后的文件是否存在
+        if [ -f "$FIXED_EC_ASL" ]; then
+          echo "✅ Fixed EC ASL file found: $FIXED_EC_ASL"
+          
+          # 覆盖原始文件
+          echo "📝 Overwriting ec.asl with fixed version..."
+          cp "$FIXED_EC_ASL" "$EC_ASL"
+          echo "✅ EC ASL file updated with battery device removal"
+        else
+          echo "❌ Fixed EC ASL file not found: $FIXED_EC_ASL"
+          echo "⚠️  Skipping EC ASL fixes (using original version)"
           exit 1
         fi
-        
-        # 检查是否已经添加了条件编译
-        if grep -q "#ifdef EC_ENABLE_BATTERY_DEVICE" "$EC_ASL" && \
-           grep -A 2 "#ifdef EC_ENABLE_BATTERY_DEVICE" "$EC_ASL" | grep -q "battery.asl"; then
-          echo "✅ Battery device already conditionally included"
-        else
-          echo "📝 Adding conditional compilation for battery device..."
-          # 将无条件的 #include "battery.asl" 改为条件编译
-          sed -i 's|^[[:space:]]*#include "battery.asl"|#ifdef EC_ENABLE_BATTERY_DEVICE\n\t#include "battery.asl"\n#endif|' "$EC_ASL"
-          echo "✅ Battery device inclusion made conditional"
-        fi
-        
-        # 保护所有对 BAT0 的引用
-        echo "📝 Protecting BAT0 references with conditional compilation..."
-        
-        # 使用简单的 sed 替换：在每个 Notify (BAT0, ...) 行前后添加条件编译
-        # 先备份原文件
-        cp "$EC_ASL" "${EC_ASL}.bak"
-        
-        # 使用 perl 一行命令处理（更可靠）
-        perl -i -pe '
-          if (/^(\s*)Notify \(BAT0,/) {
-            $indent = $1;
-            $line = $_;
-            unless ($prev =~ /#ifdef EC_ENABLE_BATTERY_DEVICE/) {
-              $_ = "${indent}#ifdef EC_ENABLE_BATTERY_DEVICE\n${indent}\t$line${indent}#endif\n";
-            } else {
-              $_ = $line;
-            }
-          }
-          $prev = $_;
-        ' "$EC_ASL"
-        
-        # 如果 perl 不可用，使用 awk 作为备选
-        if [ $? -ne 0 ]; then
-          echo "⚠️  Perl not available, using awk instead..."
-          awk '
-          /^[[:space:]]*Notify \(BAT0,/ {
-            indent = match($0, /[^[:space:]]/) - 1
-            if (prev !~ /#ifdef EC_ENABLE_BATTERY_DEVICE/) {
-              printf "%*s#ifdef EC_ENABLE_BATTERY_DEVICE\n", indent, ""
-            }
-            printf "%*s\t", indent, ""
-            print substr($0, indent + 1)
-            if (getline next_line > 0 && next_line !~ /#endif/) {
-              printf "%*s#endif\n", indent, ""
-              print next_line
-              next
-            } else {
-              printf "%*s#endif\n", indent, ""
-              if (next_line) print next_line
-              next
-            }
-          }
-          { prev = $0; print }
-          ' "${EC_ASL}.bak" > "$EC_ASL"
-        fi
-        
-        rm -f "${EC_ASL}.bak"
-        
-        echo "✅ BAT0 references protected with conditional compilation"
         
         # 验证 puff/ec.h 不定义 EC_ENABLE_BATTERY_DEVICE
         echo "📝 Verifying puff/ec.h does not enable battery device..."
@@ -400,6 +349,33 @@ jobs:
           fi
         else
           echo "❌ kaisa variant EC header not found: $KAISA_EC_H"
+          exit 1
+        fi
+        
+        # 确保 config.kaisa.uefi 中不包含电池设备相关配置
+        echo "📝 Ensuring battery device is disabled in config.kaisa.uefi..."
+        CONFIG_FILE="configs/cml/config.kaisa.uefi"
+        if [ -f "$CONFIG_FILE" ]; then
+          # 移除任何可能存在的电池设备启用配置
+          if grep -q "CONFIG.*BATTERY.*=y" "$CONFIG_FILE" || \
+             grep -q "EC_ENABLE_BATTERY_DEVICE" "$CONFIG_FILE"; then
+            echo "⚠️  Found battery device config, removing it..."
+            sed -i '/CONFIG.*BATTERY.*=y/d' "$CONFIG_FILE"
+            sed -i '/EC_ENABLE_BATTERY_DEVICE/d' "$CONFIG_FILE"
+            echo "✅ Battery device config removed from config.kaisa.uefi"
+          else
+            echo "✅ No battery device config found in config.kaisa.uefi (correct for Chromebox)"
+          fi
+          
+          # 确保明确禁用电池设备（如果存在 CONFIG 选项）
+          if ! grep -q "# Disable battery device for Chromebox" "$CONFIG_FILE"; then
+            echo "" >> "$CONFIG_FILE"
+            echo "# Disable battery device for Chromebox" >> "$CONFIG_FILE"
+            echo "# CONFIG_EC_GOOGLE_CHROMEEC_BATTERY is not set" >> "$CONFIG_FILE"
+            echo "✅ Battery device disabled in config.kaisa.uefi"
+          fi
+        else
+          echo "❌ Config file not found: $CONFIG_FILE"
           exit 1
         fi
         
@@ -711,12 +687,27 @@ jobs:
         
         # 验证所有 BAT0 引用都被条件编译保护
         echo "📝 Checking BAT0 references are protected..."
-        if grep -q "Notify (BAT0," "$EC_ASL"; then
-          # 检查是否有未保护的 BAT0 引用
-          unprotected=$(grep -B 1 "Notify (BAT0," "$EC_ASL" | grep -v "#ifdef EC_ENABLE_BATTERY_DEVICE" | grep -v "#endif" | grep "Notify (BAT0," || true)
-          if [ -n "$unprotected" ]; then
-            echo "❌ Found unprotected BAT0 references:"
-            echo "$unprotected"
+        BAT0_COUNT=$(grep -c "Notify (BAT0," "$EC_ASL" || echo "0")
+        if [ "$BAT0_COUNT" -gt 0 ]; then
+          # 检查每个 Notify (BAT0, ...) 行前后是否有条件编译保护
+          unprotected_count=0
+          while IFS= read -r line; do
+            line_num=$(echo "$line" | cut -d: -f1)
+            line_content=$(echo "$line" | cut -d: -f2-)
+            # 检查前一行
+            prev_line=$(sed -n "$((line_num-1))p" "$EC_ASL")
+            # 检查后一行
+            next_line=$(sed -n "$((line_num+1))p" "$EC_ASL")
+            # 如果前一行不是 #ifdef 或后一行不是 #endif，则未保护
+            if [[ "$prev_line" != *"#ifdef EC_ENABLE_BATTERY_DEVICE"* ]] && \
+               [[ "$next_line" != *"#endif"* ]]; then
+              echo "❌ Unprotected BAT0 reference at line $line_num: $line_content"
+              unprotected_count=$((unprotected_count + 1))
+            fi
+          done < <(grep -n "Notify (BAT0," "$EC_ASL")
+          
+          if [ $unprotected_count -gt 0 ]; then
+            echo "❌ Found $unprotected_count unprotected BAT0 reference(s)"
             exit 1
           else
             echo "✅ All BAT0 references are protected with conditional compilation"
@@ -759,6 +750,28 @@ jobs:
           exit 1
         else
           echo "✅ No lid events in puff/ec.h"
+        fi
+        
+        # 验证 config.kaisa.uefi 中电池设备被禁用
+        echo "📝 Checking config.kaisa.uefi has battery device disabled..."
+        CONFIG_FILE="configs/cml/config.kaisa.uefi"
+        if [ -f "$CONFIG_FILE" ]; then
+          if grep -q "CONFIG.*BATTERY.*=y" "$CONFIG_FILE"; then
+            echo "❌ Battery device is still enabled in config.kaisa.uefi"
+            exit 1
+          else
+            echo "✅ Battery device is disabled in config.kaisa.uefi"
+          fi
+          
+          if grep -q "EC_ENABLE_BATTERY_DEVICE" "$CONFIG_FILE"; then
+            echo "❌ EC_ENABLE_BATTERY_DEVICE is still present in config.kaisa.uefi"
+            exit 1
+          else
+            echo "✅ EC_ENABLE_BATTERY_DEVICE not present in config.kaisa.uefi"
+          fi
+        else
+          echo "❌ Config file not found: $CONFIG_FILE"
+          exit 1
         fi
         
         echo "✅ Step Verify 8 completed: Battery device removal verified"
