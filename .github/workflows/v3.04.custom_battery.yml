@@ -1,0 +1,539 @@
+name: 3.04.custom_battery.yml - Build Kaisa ROM without Battery Device
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 3.4)'
+        required: false
+        default: '3.4'
+        type: string
+      description:
+        description: 'Release description'
+        required: false
+        default: '移除电池设备配置：Chromebox 专用固件（无电池管理）'
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      actions: write
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Pull Docker image
+      run: |
+        echo "🐳 Pulling coreboot/coreboot-sdk Docker image..."
+        docker pull coreboot/coreboot-sdk:latest
+        echo "✅ Docker image ready"
+    
+    - name: Clone MrChromebox coreboot
+      run: |
+        echo "📥 Cloning MrChromebox coreboot repository..."
+        if [ ! -d "coreboot" ]; then
+          echo "📥 Cache miss, cloning repository..."
+          git clone https://github.com/mrchromebox/coreboot.git
+        else
+          echo "✅ Cache hit, using cached repository"
+        fi
+        
+        cd coreboot
+        echo "📦 Updating submodules..."
+        git submodule update --init --checkout --recursive
+        echo "🔧 Setting proper permissions..."
+        chmod -R 755 .
+        echo "✅ Source code ready"
+    
+    - name: "Step 1: Set ROM version string"
+      run: |
+        echo "🔧 Step 1: Setting custom ROM version string..."
+        
+        cd coreboot
+        CONFIG_FILE="configs/cml/config.kaisa.uefi"
+        VERSION="${{ github.event.inputs.version || '3.4' }}"
+        VERSION_SUFFIX="$(date +%Y%m%d)-${VERSION}"
+        
+        if [ -f "$CONFIG_FILE" ]; then
+          echo "📝 Updating CONFIG_LOCALVERSION in $CONFIG_FILE"
+          sed -i '/^CONFIG_LOCALVERSION/d' "$CONFIG_FILE"
+          printf '\nCONFIG_LOCALVERSION="%s"\n' "$VERSION_SUFFIX" >> "$CONFIG_FILE"
+          echo "✅ CONFIG_LOCALVERSION set to $VERSION_SUFFIX"
+        else
+          echo "❌ Config file not found: $CONFIG_FILE"
+          exit 1
+        fi
+    
+    - name: "Step 2: Configure Kconfig for RTL8168 dependencies"
+      run: |
+        echo "🔧 Step 2: Configuring Kconfig for RTL8168 dependencies..."
+        echo "📝 Adding missing dependencies for RTL8168 ERI programming"
+        
+        cd coreboot
+        PUFF_KCONFIG="src/mainboard/google/puff/Kconfig"
+        
+        if [ ! -f "$PUFF_KCONFIG" ]; then
+          echo "❌ Kconfig file not found: $PUFF_KCONFIG"
+          exit 1
+        fi
+        
+        # 检查并添加 REALTEK_8168_RESET 依赖
+        if ! grep -q "select REALTEK_8168_RESET" "$PUFF_KCONFIG"; then
+          echo "📝 Adding REALTEK_8168_RESET dependency..."
+          sed -i '/select RT8168_GEN_ACPI_POWER_RESOURCE/a\\tselect REALTEK_8168_RESET' "$PUFF_KCONFIG"
+          echo "✅ REALTEK_8168_RESET dependency added"
+        else
+          echo "✅ REALTEK_8168_RESET already present"
+        fi
+        
+        # 检查并添加 RT8168_SUPPORT_LEGACY_VPD_MAC 支持
+        if ! grep -q "select RT8168_SUPPORT_LEGACY_VPD_MAC" "$PUFF_KCONFIG"; then
+          echo "📝 Adding RT8168_SUPPORT_LEGACY_VPD_MAC support..."
+          sed -i '/select RT8168_SET_LED_MODE/a\\tselect RT8168_SUPPORT_LEGACY_VPD_MAC' "$PUFF_KCONFIG"
+          echo "✅ RT8168_SUPPORT_LEGACY_VPD_MAC support added"
+        else
+          echo "✅ RT8168_SUPPORT_LEGACY_VPD_MAC already present"
+        fi
+        
+        # 检查并添加 RT8168_GET_MAC_FROM_VPD 支持
+        if ! grep -q "select RT8168_GET_MAC_FROM_VPD" "$PUFF_KCONFIG"; then
+          echo "📝 Adding RT8168_GET_MAC_FROM_VPD support..."
+          sed -i '/select RT8168_SUPPORT_LEGACY_VPD_MAC/a\\tselect RT8168_GET_MAC_FROM_VPD' "$PUFF_KCONFIG"
+          echo "✅ RT8168_GET_MAC_FROM_VPD support added"
+        else
+          echo "✅ RT8168_GET_MAC_FROM_VPD already present"
+        fi
+        
+        # 检查并添加 RT8168_PUT_MAC_TO_ERI 支持
+        if ! grep -q "select RT8168_PUT_MAC_TO_ERI" "$PUFF_KCONFIG"; then
+          echo "📝 Adding RT8168_PUT_MAC_TO_ERI support..."
+          sed -i '/select RT8168_GET_MAC_FROM_VPD/a\\tselect RT8168_PUT_MAC_TO_ERI' "$PUFF_KCONFIG"
+          echo "✅ RT8168_PUT_MAC_TO_ERI support added"
+        else
+          echo "✅ RT8168_PUT_MAC_TO_ERI already present"
+        fi
+        
+        echo "✅ Step 2 completed: RTL8168 Kconfig dependencies configured"
+    
+    - name: "Step 3: Configure EDK2 in config.kaisa.uefi"
+      run: |
+        echo "🔧 Step 3: Configuring EDK2 custom build parameters..."
+        echo "📝 Adding optimized EDK2 network configuration for PXE boot"
+        
+        cd coreboot
+        CONFIG_FILE="configs/cml/config.kaisa.uefi"
+        
+        if [ ! -f "$CONFIG_FILE" ]; then
+          echo "❌ Kaisa UEFI config not found: $CONFIG_FILE"
+          exit 1
+        fi
+        
+        # 检查是否已经存在 EDK2 自定义构建参数
+        if grep -q "CONFIG_EDK2_CUSTOM_BUILD_PARAMS" "$CONFIG_FILE"; then
+          echo "📝 Updating existing CONFIG_EDK2_CUSTOM_BUILD_PARAMS..."
+          sed -i '/CONFIG_EDK2_CUSTOM_BUILD_PARAMS/d' "$CONFIG_FILE"
+        else
+          echo "📝 Adding new CONFIG_EDK2_CUSTOM_BUILD_PARAMS..."
+        fi
+        
+        # 添加优化的 EDK2 自定义构建参数
+        echo "" >> "$CONFIG_FILE"
+        echo "# EDK2 custom build parameters for PXE network boot" >> "$CONFIG_FILE"
+        echo 'CONFIG_EDK2_CUSTOM_BUILD_PARAMS="-D NETWORK_DRIVER_ENABLE=TRUE -D NETWORK_ENABLE=TRUE -D NETWORK_IP4_ENABLE=TRUE -D NETWORK_IP6_ENABLE=FALSE -D NETWORK_PXE_BOOT_ENABLE=TRUE -D NETWORK_HTTP_BOOT_ENABLE=FALSE -D NETWORK_HTTP_ENABLE=FALSE -D NETWORK_ALLOW_HTTP_CONNECTIONS=FALSE -D NETWORK_SNP_ENABLE=TRUE -D NETWORK_VLAN_ENABLE=FALSE -D NETWORK_RTEK_PCI=TRUE -D NETWORK_TLS_ENABLE=FALSE -D NETWORK_ISCSI_ENABLE=FALSE -D NETWORK_RTEK_USB=FALSE -D NETWORK_ASIX_USB3=FALSE -D NETWORK_ASIX_USB2=FALSE"' >> "$CONFIG_FILE"
+        
+        echo "✅ Step 3 completed: EDK2 custom build parameters configured"
+    
+    - name: "Step 4: Configure PXE in config.kaisa.uefi"
+      run: |
+        echo "🔧 Step 4: Configuring PXE support in config.kaisa.uefi..."
+        
+        cd coreboot
+        CONFIG_FILE="configs/cml/config.kaisa.uefi"
+        
+        if [ ! -f "$CONFIG_FILE" ]; then
+          echo "❌ Kaisa UEFI config not found: $CONFIG_FILE"
+          exit 1
+        fi
+        
+        echo "📝 Adding EDK2 Network PXE Support..."
+        if ! grep -q "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" "$CONFIG_FILE"; then
+          echo "" >> "$CONFIG_FILE"
+          echo "# EDK2 Network PXE Support" >> "$CONFIG_FILE"
+          echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> "$CONFIG_FILE"
+          echo "CONFIG_EDK2_LOAD_OPTION_ROMS=y" >> "$CONFIG_FILE"
+          echo "" >> "$CONFIG_FILE"
+          echo "# EDK2 Boot Manager Settings" >> "$CONFIG_FILE"
+          echo "CONFIG_EDK2_BOOT_TIMEOUT=10" >> "$CONFIG_FILE"
+          echo "CONFIG_EDK2_BOOT_MANAGER_ESCAPE=y" >> "$CONFIG_FILE"
+          echo "✅ PXE support added"
+        else
+          echo "✅ PXE support already present"
+        fi
+        
+        echo "✅ Step 4 completed: PXE support configured"
+    
+    - name: "Step 5: Configure RTL8168 in config.kaisa.uefi"
+      run: |
+        echo "🔧 Step 5: Configuring RTL8168 in config.kaisa.uefi..."
+        echo "📝 Note: CONFIG_RT8168_PUT_MAC_TO_ERI will be auto-configured via Kconfig select in Step 2"
+        
+        cd coreboot
+        CONFIG_FILE="configs/cml/config.kaisa.uefi"
+        
+        if [ ! -f "$CONFIG_FILE" ]; then
+          echo "❌ Kaisa UEFI config not found: $CONFIG_FILE"
+          exit 1
+        fi
+        
+        echo "✅ Step 5 completed: RTL8168 configuration (will be auto-configured by make olddefconfig)"
+    
+    - name: "Step 6: Replace RTL8168 driver file"
+      run: |
+        echo "🔧 Step 6: Replacing RTL8168 driver file..."
+        
+        cd coreboot
+        R8168_DRIVER="src/drivers/net/r8168.c"
+        FIXED_DRIVER="../fixed-files/r8168.c"
+        
+        # 检查目标文件是否存在
+        if [ ! -f "$R8168_DRIVER" ]; then
+          echo "❌ Target file not found: $R8168_DRIVER"
+          echo "⚠️  Source file should exist after git submodule update"
+          exit 1
+        fi
+        
+        # 检查修复后的文件是否存在
+        if [ ! -f "$FIXED_DRIVER" ]; then
+          echo "❌ Fixed RTL8168 driver not found: $FIXED_DRIVER"
+          exit 1
+        fi
+        
+        echo "✅ Target file exists: $R8168_DRIVER"
+        echo "✅ Fixed driver file exists: $FIXED_DRIVER"
+        
+        # 覆盖原始文件
+        echo "📝 Overwriting r8168.c with fixed version..."
+        cp "$FIXED_DRIVER" "$R8168_DRIVER"
+        echo "✅ RTL8168 driver file replaced"
+        
+        echo "✅ Step 6 completed: RTL8168 driver file replaced"
+    
+    - name: "Step 7: Replace UEFI UNDI driver"
+      run: |
+        echo "🔧 Step 7: Replacing UEFI UNDI driver with Realtek official driver..."
+        
+        cd coreboot
+        
+        # 检查预下载的 RTL 驱动
+        if [ -f "../RtkUndiDxe.efi" ]; then
+          echo "✅ Found Realtek UNDI driver: ../RtkUndiDxe.efi"
+          
+          # 验证驱动文件
+          echo "📊 Driver file info:"
+          file "../RtkUndiDxe.efi"
+          size=$(stat -c%s "../RtkUndiDxe.efi")
+          echo "📏 File size: $size bytes"
+          
+          # 复制到构建目录
+          echo "💾 Copying RTL driver to build directory..."
+          cp "../RtkUndiDxe.efi" "rtl_undi_driver_updated.efi"
+          echo "✅ RTL UNDI driver prepared"
+          echo "📝 This driver will be integrated into the firmware during EDK2 build"
+        else
+          echo "⚠️  Realtek UNDI driver not found: ../RtkUndiDxe.efi"
+          echo "📝 Will use default driver from MrChromebox EDK2"
+        fi
+        
+        echo "✅ Step 7 completed: UEFI UNDI driver replacement prepared"
+    
+    - name: "Step 8: Disable battery device in config.kaisa.uefi"
+      run: |
+        echo "🔧 Step 8: Disabling battery device configuration in config.kaisa.uefi..."
+        
+        cd coreboot
+        CONFIG_FILE="configs/cml/config.kaisa.uefi"
+        
+        if [ ! -f "$CONFIG_FILE" ]; then
+          echo "❌ Config file not found: $CONFIG_FILE"
+          exit 1
+        fi
+        
+        # 移除任何可能存在的电池设备启用配置
+        if grep -q "CONFIG.*BATTERY.*=y" "$CONFIG_FILE" || \
+           grep -q "EC_ENABLE_BATTERY_DEVICE" "$CONFIG_FILE"; then
+          echo "⚠️  Found battery device config, removing it..."
+          sed -i '/CONFIG.*BATTERY.*=y/d' "$CONFIG_FILE"
+          sed -i '/EC_ENABLE_BATTERY_DEVICE/d' "$CONFIG_FILE"
+          echo "✅ Battery device config removed from config.kaisa.uefi"
+        else
+          echo "✅ No battery device config found in config.kaisa.uefi (correct for Chromebox)"
+        fi
+        
+        # 确保明确禁用电池设备（如果存在 CONFIG 选项）
+        if ! grep -q "# Disable battery device for Chromebox" "$CONFIG_FILE"; then
+          echo "" >> "$CONFIG_FILE"
+          echo "# Disable battery device for Chromebox" >> "$CONFIG_FILE"
+          echo "# CONFIG_EC_GOOGLE_CHROMEEC_BATTERY is not set" >> "$CONFIG_FILE"
+          echo "✅ Battery device disabled in config.kaisa.uefi"
+        fi
+        
+        echo "✅ Step 8 completed: Battery device disabled in config.kaisa.uefi"
+    
+    - name: "Step 9: Replace EC header file (remove battery device)"
+      run: |
+        echo "🔧 Step 9: Replacing EC header file to remove battery device..."
+        
+        cd coreboot
+        EC_H_TARGET="src/mainboard/google/puff/variants/baseboard/include/puff/ec.h"
+        EC_H_SOURCE="../fixed-files/ec.h"
+        
+        # 检查目标文件是否存在
+        if [ ! -f "$EC_H_TARGET" ]; then
+          echo "❌ Target file not found: $EC_H_TARGET"
+          echo "⚠️  Source file should exist after git submodule update"
+          exit 1
+        fi
+        
+        # 检查源文件是否存在
+        if [ ! -f "$EC_H_SOURCE" ]; then
+          echo "❌ Fixed EC header file not found: $EC_H_SOURCE"
+          exit 1
+        fi
+        
+        echo "✅ Target file exists: $EC_H_TARGET"
+        echo "✅ Source file exists: $EC_H_SOURCE"
+        
+        # 覆盖原始文件
+        echo "📝 Overwriting ec.h with fixed version..."
+        cp "$EC_H_SOURCE" "$EC_H_TARGET"
+        echo "✅ EC header file replaced"
+        
+        echo "✅ Step 9 completed: EC header file replaced (battery device removed)"
+    
+    - name: "Step 10: Replace ACPI EC file (remove battery device)"
+      run: |
+        echo "🔧 Step 10: Replacing ACPI EC file to remove battery device..."
+        
+        cd coreboot
+        EC_ASL_TARGET="src/ec/google/chromeec/acpi/ec.asl"
+        EC_ASL_SOURCE="../fixed-files/ec.asl"
+        
+        # 检查目标文件是否存在
+        if [ ! -f "$EC_ASL_TARGET" ]; then
+          echo "❌ Target file not found: $EC_ASL_TARGET"
+          echo "⚠️  Source file should exist after git submodule update"
+          exit 1
+        fi
+        
+        # 检查源文件是否存在
+        if [ ! -f "$EC_ASL_SOURCE" ]; then
+          echo "❌ Fixed EC ASL file not found: $EC_ASL_SOURCE"
+          exit 1
+        fi
+        
+        echo "✅ Target file exists: $EC_ASL_TARGET"
+        echo "✅ Source file exists: $EC_ASL_SOURCE"
+        
+        # 覆盖原始文件
+        echo "📝 Overwriting ec.asl with fixed version..."
+        cp "$EC_ASL_SOURCE" "$EC_ASL_TARGET"
+        echo "✅ EC ASL file replaced"
+        
+        echo "✅ Step 10 completed: ACPI EC file replaced (battery device removed)"
+    
+    - name: "Step 11: Run make olddefconfig"
+      run: |
+        echo "🔧 Step 11: Running make olddefconfig to generate final .config..."
+        echo "📝 This will auto-configure all options based on Kconfig selects"
+        
+        cd coreboot
+        
+        # 复制配置文件到根目录（参考 build-uefi.sh 第31行）
+        cfg_file="configs/cml/config.kaisa.uefi"
+        echo "📋 Copying $cfg_file to .config"
+        cp "$cfg_file" .config
+        
+        # 执行 make clean 和 make olddefconfig（参考 build-uefi.sh 第33-34行）
+        echo "🧹 Running make clean..."
+        make clean
+        
+        echo "⚙️ Running make olddefconfig (will auto-configure based on Kconfig selects)..."
+        make olddefconfig
+        
+        # 验证 RT8168_PUT_MAC_TO_ERI 是否被自动配置
+        echo "🔍 Verifying RT8168_PUT_MAC_TO_ERI is auto-configured..."
+        if grep -q "^CONFIG_RT8168_PUT_MAC_TO_ERI=y" .config; then
+          echo "✅ CONFIG_RT8168_PUT_MAC_TO_ERI is auto-configured by make olddefconfig"
+        else
+          echo "⚠️  CONFIG_RT8168_PUT_MAC_TO_ERI not found in .config"
+          echo "📝 Checking Kconfig select..."
+          if grep -q "select RT8168_PUT_MAC_TO_ERI" src/mainboard/google/puff/Kconfig; then
+            echo "✅ Kconfig select is present, but make olddefconfig didn't add it"
+            echo "📝 Manually adding CONFIG_RT8168_PUT_MAC_TO_ERI=y..."
+            echo "" >> .config
+            echo "# RTL8168 MAC Address ERI Programming (auto-configured via Kconfig)" >> .config
+            echo "CONFIG_RT8168_PUT_MAC_TO_ERI=y" >> .config
+          else
+            echo "❌ Kconfig select is missing! This should have been added in Step 2"
+            exit 1
+          fi
+        fi
+        
+        echo "✅ Step 11 completed: make olddefconfig completed, final .config generated"
+    
+    - name: Build Kaisa ROM with Docker
+      run: |
+          echo "🚀 Building Kaisa ROM: kaisa-v${{ github.event.inputs.version || '3.4' }},${{ github.event.inputs.description || 'Coreboot Kaisa ROM' }}"
+          echo "🐳 Using coreboot/coreboot-sdk Docker image..."
+          
+          cd coreboot
+          
+          # Create output directory
+          mkdir -p ../roms
+          
+          # Prepare version string
+          VERSION="${{ github.event.inputs.version || '3.4' }}"
+          VERSION_SUFFIX="$(date +%Y%m%d)-${VERSION}"
+          
+          # Build using Docker
+          echo "🔧 Starting Docker build with version: ${VERSION_SUFFIX}..."
+          docker run --rm --user root -v "$(pwd)":/home/coreboot/coreboot -v "$(pwd)/../roms":/home/coreboot/roms -w /home/coreboot/coreboot -e VERSION_SUFFIX="${VERSION_SUFFIX}" coreboot/coreboot-sdk:latest bash -c "
+            echo '🔧 Building Kaisa ROM with version: '\${VERSION_SUFFIX}'...'
+            git config --global --add safe.directory /home/coreboot/coreboot
+            # Override build-uefi.sh to use our version instead of git rev
+            sed -i \"s|\\\${rev}|\${VERSION_SUFFIX}|\" build-uefi.sh
+            ./build-uefi.sh kaisa
+          "
+          
+          # Check generated files
+          echo "📋 Checking generated files in roms directory:"
+          ls -la roms/ || echo "roms directory not found"
+          echo "📋 Looking for .sha1 files:"
+          find roms/ -name "*.sha1" -type f || echo "No .sha1 files found"
+          
+          echo "✅ ROM build completed"
+    
+    - name: Prepare additional files for release
+      run: |
+        echo "📋 Preparing additional files for release..."
+        
+        # Create a directory for additional files in roms
+        mkdir -p roms
+        
+        # 1. Copy .config as default.config (from coreboot directory)
+        if [ -f "coreboot/.config" ]; then
+          cp coreboot/.config roms/default.config
+          echo "✅ Copied .config to default.config"
+        else
+          echo "⚠️ .config file not found in coreboot directory"
+        fi
+        
+        # 2. Copy fixed r8168.c driver
+        if [ -f "fixed-files/r8168.c" ]; then
+          cp fixed-files/r8168.c roms/r8168.c
+          echo "✅ Copied fixed r8168.c driver"
+        else
+          echo "⚠️ fixed-files/r8168.c not found"
+        fi
+        
+        # 3. Copy EC configuration files
+        EC_KAISA="coreboot/src/mainboard/google/puff/variants/kaisa/include/variant/ec.h"
+        EC_BASEBOARD="coreboot/src/mainboard/google/puff/variants/baseboard/include/puff/ec.h"
+        
+        if [ -f "$EC_KAISA" ]; then
+          cp "$EC_KAISA" roms/kaisa-ec.h
+          echo "✅ Copied Kaisa EC configuration"
+        else
+          echo "⚠️ Kaisa EC configuration not found: $EC_KAISA"
+        fi
+        
+        if [ -f "$EC_BASEBOARD" ]; then
+          cp "$EC_BASEBOARD" roms/baseboard-ec.h
+          echo "✅ Copied baseboard EC configuration"
+        else
+          echo "⚠️ Baseboard EC configuration not found: $EC_BASEBOARD"
+        fi
+        
+        echo "📋 Additional files prepared in roms directory:"
+        ls -la roms/
+    
+    - name: Check ROM files
+      run: |
+        echo "📋 Generated ROM files:"
+        echo "ROM files:"
+        ls -la roms/*.rom || echo "No ROM files found"
+        echo "SHA1 files:"
+        ls -la roms/*.sha1 || echo "No SHA1 files found"
+        echo "Additional files:"
+        ls -la roms/default.config roms/r8168.c roms/kaisa-ec.h roms/baseboard-ec.h 2>/dev/null || echo "Some additional files may be missing"
+        echo "All files in roms directory:"
+        ls -la roms/
+    
+    - name: Upload ROM Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: kaisa-rom
+        path: |
+          roms/*.rom
+          roms/*.sha1
+          roms/default.config
+          roms/r8168.c
+          roms/kaisa-ec.h
+          roms/baseboard-ec.h
+        compression-level: 0
+    
+    - name: Create Release
+      if: ${{ github.event_name != 'workflow_dispatch' || (github.event.inputs.version || github.event.inputs.description) }}
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: kaisa-v${{ github.event.inputs.version || '3.4' }}
+        name: "kaisa-v${{ github.event.inputs.version || '3.4' }},${{ github.event.inputs.description || '移除电池设备配置：Chromebox 专用固件（无电池管理）' }} #${{ github.run_number }}"
+        body: |
+          # 🎯 Kaisa ROM Chromebox 专用构建成功
+          
+          ## 🔧 构建信息
+          - **主板型号**: Google Kaisa (Puff) - Chromebox
+          - **构建时间**: ${{ github.event.repository.updated_at }}
+          - **构建编号**: #${{ github.run_number }}
+          - **特殊配置**: 已移除电池设备（Chromebox 专用）
+          - **功耗配置**: PL1: 25W/64s, PL2: 50W/32s
+          
+          ## 📦 包含文件
+          - `coreboot.rom` - 主固件文件
+          - `coreboot.rom.sha1` - SHA1 校验文件
+          - `default.config` - 构建配置文件
+          - `r8168.c` - 修复后的 RTL8168 网络驱动源文件
+          - `kaisa-ec.h` - Kaisa 主板 EC 配置文件
+          - `baseboard-ec.h` - Baseboard EC 配置文件
+          
+          ## 🚀 使用方法
+          1. 下载 `coreboot.rom` 文件
+          2. 使用刷写工具刷入主板
+          3. 重启后即可使用
+          
+          ## ⚠️ 注意事项
+          - 刷写前请备份原始固件
+          - 确保主板型号为 Google Kaisa
+          - 刷写失败可能导致主板无法启动
+          - 此版本配置了高性能功耗墙，可能增加功耗和发热
+          - 此版本已移除电池设备，适合 Chromebox 使用
+          - Windows 设备管理器中不会显示电池设备
+        files: |
+          roms/*.rom
+          roms/*.sha1
+          roms/default.config
+          roms/r8168.c
+          roms/kaisa-ec.h
+          roms/baseboard-ec.h
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
