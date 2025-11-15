@@ -318,10 +318,29 @@ jobs:
         sed -i 's/\.tdp_pl2_override = 51,/.tdp_pl2_override = 50,/' "$POWER_FILE"
         
         echo "📝 Updating PL1 power limits (25W, 64s window)..."
+        # Debug: Show current PL1 values before modification
+        echo "   Current PL1 values:"
+        grep -A 5 'register "controls\.power_limits\.pl1"' "$POWER_FILE" | head -6 || true
+        
+        # Update PL1 min_power from 15000 to 25000
         sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.min_power = 15000,/.min_power = 25000,/' "$POWER_FILE"
+        echo "   ✅ Updated PL1 min_power to 25000"
+        
+        # Update PL1 max_power from 15000 to 25000
         sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.max_power = 15000,/.max_power = 25000,/' "$POWER_FILE"
+        echo "   ✅ Updated PL1 max_power to 25000"
+        
+        # Update PL1 time_window_min from 28 to 64 seconds
         sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.time_window_min = 28 \* MSECS_PER_SEC,/.time_window_min = 64 * MSECS_PER_SEC,/' "$POWER_FILE"
-        sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.time_window_max = 32 \* MSECS_PER_SEC,/.time_window_max = 64 * MSECS_PER_SEC,/' "$POWER_FILE"
+        echo "   ✅ Updated PL1 time_window_min to 64 seconds"
+        
+        # Update PL1 time_window_max to 64 seconds (handle any value, ensure it's 64)
+        sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.time_window_max = [0-9][0-9]* \* MSECS_PER_SEC,/.time_window_max = 64 * MSECS_PER_SEC,/' "$POWER_FILE"
+        echo "   ✅ Updated PL1 time_window_max to 64 seconds"
+        
+        # Debug: Show PL1 values after modification
+        echo "   PL1 values after modification:"
+        grep -A 5 'register "controls\.power_limits\.pl1"' "$POWER_FILE" | head -6 || true
         
         echo "📝 Updating PL2 power limits (50W, 32s window - half of PL1)..."
         # Debug: Show current PL2 values before modification
