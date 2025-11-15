@@ -230,25 +230,27 @@ jobs:
         
         cd coreboot
         
-        # 检查预下载的 RTL 驱动
-        if [ -f "../RtkUndiDxe.efi" ]; then
-          echo "✅ Found Realtek UNDI driver: ../RtkUndiDxe.efi"
-          
-          # 验证驱动文件
-          echo "📊 Driver file info:"
-          file "../RtkUndiDxe.efi"
-          size=$(stat -c%s "../RtkUndiDxe.efi")
-          echo "📏 File size: $size bytes"
-          
-          # 复制到构建目录
-          echo "💾 Copying RTL driver to build directory..."
-          cp "../RtkUndiDxe.efi" "rtl_undi_driver_updated.efi"
-          echo "✅ RTL UNDI driver prepared"
-          echo "📝 This driver will be integrated into the firmware during EDK2 build"
-        else
-          echo "⚠️  Realtek UNDI driver not found: ../RtkUndiDxe.efi"
-          echo "📝 Will use default driver from MrChromebox EDK2"
+        UNDI_DRIVER_SOURCE="../fixed-files/RtkUndiDxe.efi"
+        
+        # 检查源文件是否存在
+        if [ ! -f "$UNDI_DRIVER_SOURCE" ]; then
+          echo "❌ Realtek UNDI driver not found: $UNDI_DRIVER_SOURCE"
+          exit 1
         fi
+        
+        echo "✅ Found Realtek UNDI driver: $UNDI_DRIVER_SOURCE"
+        
+        # 验证驱动文件
+        echo "📊 Driver file info:"
+        file "$UNDI_DRIVER_SOURCE"
+        size=$(stat -c%s "$UNDI_DRIVER_SOURCE")
+        echo "📏 File size: $size bytes"
+        
+        # 复制到构建目录
+        echo "💾 Copying RTL driver to build directory..."
+        cp "$UNDI_DRIVER_SOURCE" "rtl_undi_driver_updated.efi"
+        echo "✅ RTL UNDI driver prepared"
+        echo "📝 This driver will be integrated into the firmware during EDK2 build"
         
         echo "✅ Step 7 completed: UEFI UNDI driver replacement prepared"
     
