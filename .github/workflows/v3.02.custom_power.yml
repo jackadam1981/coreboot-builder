@@ -324,9 +324,26 @@ jobs:
         sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.time_window_max = 32 \* MSECS_PER_SEC,/.time_window_max = 64 * MSECS_PER_SEC,/' "$POWER_FILE"
         
         echo "📝 Updating PL2 power limits (50W, 32s window - half of PL1)..."
+        # Debug: Show current PL2 values before modification
+        echo "   Current PL2 values:"
+        grep -A 5 'register "controls\.power_limits\.pl2"' "$POWER_FILE" | head -6 || true
+        
+        # Update PL2 max_power from 51000 to 50000
         sed -i '/register "controls\.power_limits\.pl2"/,/granularity = 1000,}/ s/\.max_power = 51000,/.max_power = 50000,/' "$POWER_FILE"
+        echo "   ✅ Updated PL2 max_power to 50000"
+        
+        # Update PL2 time_window_min from 28 to 32 seconds
         sed -i '/register "controls\.power_limits\.pl2"/,/granularity = 1000,}/ s/\.time_window_min = 28 \* MSECS_PER_SEC,/.time_window_min = 32 * MSECS_PER_SEC,/' "$POWER_FILE"
-        sed -i '/register "controls\.power_limits\.pl2"/,/granularity = 1000,}/ s/\.time_window_max = 32 \* MSECS_PER_SEC,/.time_window_max = 32 * MSECS_PER_SEC,/' "$POWER_FILE"
+        echo "   ✅ Updated PL2 time_window_min to 32 seconds"
+        
+        # Update PL2 time_window_max to 32 seconds (handle any value, ensure it's 32)
+        # Use [0-9]\+ to match one or more digits (basic regex, works with sed -i)
+        sed -i '/register "controls\.power_limits\.pl2"/,/granularity = 1000,}/ s/\.time_window_max = [0-9][0-9]* \* MSECS_PER_SEC,/.time_window_max = 32 * MSECS_PER_SEC,/' "$POWER_FILE"
+        echo "   ✅ Updated PL2 time_window_max to 32 seconds"
+        
+        # Debug: Show PL2 values after modification
+        echo "   PL2 values after modification:"
+        grep -A 5 'register "controls\.power_limits\.pl2"' "$POWER_FILE" | head -6 || true
         
         # Update comments
         sed -i 's/# PL1 is fixed at 15W, avg over 28-32s interval/# PL1 is fixed at 25W, avg over 64s interval/' "$POWER_FILE"
