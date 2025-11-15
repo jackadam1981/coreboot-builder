@@ -909,6 +909,50 @@ jobs:
           
           echo "✅ ROM build completed"
     
+    - name: Prepare additional files for release
+      run: |
+        echo "📋 Preparing additional files for release..."
+        
+        # Create a directory for additional files in roms
+        mkdir -p roms
+        
+        # 1. Copy .config as default.config (from coreboot directory)
+        if [ -f "coreboot/.config" ]; then
+          cp coreboot/.config roms/default.config
+          echo "✅ Copied .config to default.config"
+        else
+          echo "⚠️ .config file not found in coreboot directory"
+        fi
+        
+        # 2. Copy fixed r8168.c driver
+        if [ -f "fixed-files/r8168.c" ]; then
+          cp fixed-files/r8168.c roms/r8168.c
+          echo "✅ Copied fixed r8168.c driver"
+        else
+          echo "⚠️ fixed-files/r8168.c not found"
+        fi
+        
+        # 3. Copy EC configuration files
+        EC_KAISA="coreboot/src/mainboard/google/puff/variants/kaisa/include/variant/ec.h"
+        EC_BASEBOARD="coreboot/src/mainboard/google/puff/variants/baseboard/include/puff/ec.h"
+        
+        if [ -f "$EC_KAISA" ]; then
+          cp "$EC_KAISA" roms/kaisa-ec.h
+          echo "✅ Copied Kaisa EC configuration"
+        else
+          echo "⚠️ Kaisa EC configuration not found: $EC_KAISA"
+        fi
+        
+        if [ -f "$EC_BASEBOARD" ]; then
+          cp "$EC_BASEBOARD" roms/baseboard-ec.h
+          echo "✅ Copied baseboard EC configuration"
+        else
+          echo "⚠️ Baseboard EC configuration not found: $EC_BASEBOARD"
+        fi
+        
+        echo "📋 Additional files prepared in roms directory:"
+        ls -la roms/
+    
     - name: Check ROM files
       run: |
         echo "📋 Generated ROM files:"
@@ -916,6 +960,8 @@ jobs:
         ls -la roms/*.rom || echo "No ROM files found"
         echo "SHA1 files:"
         ls -la roms/*.sha1 || echo "No SHA1 files found"
+        echo "Additional files:"
+        ls -la roms/default.config roms/r8168.c roms/kaisa-ec.h roms/baseboard-ec.h 2>/dev/null || echo "Some additional files may be missing"
         echo "All files in roms directory:"
         ls -la roms/
     
@@ -926,6 +972,10 @@ jobs:
         path: |
           roms/*.rom
           roms/*.sha1
+          roms/default.config
+          roms/r8168.c
+          roms/kaisa-ec.h
+          roms/baseboard-ec.h
         compression-level: 0
     
     - name: Create Release
@@ -947,6 +997,10 @@ jobs:
           ## 📦 包含文件
           - `coreboot.rom` - 主固件文件
           - `coreboot.rom.sha1` - SHA1 校验文件
+          - `default.config` - 构建配置文件
+          - `r8168.c` - 修复后的 RTL8168 网络驱动源文件
+          - `kaisa-ec.h` - Kaisa 主板 EC 配置文件
+          - `baseboard-ec.h` - Baseboard EC 配置文件
           
           ## 🚀 使用方法
           1. 下载 `coreboot.rom` 文件
@@ -963,6 +1017,10 @@ jobs:
         files: |
           roms/*.rom
           roms/*.sha1
+          roms/default.config
+          roms/r8168.c
+          roms/kaisa-ec.h
+          roms/baseboard-ec.h
         draft: false
         prerelease: false
         generate_release_notes: true
