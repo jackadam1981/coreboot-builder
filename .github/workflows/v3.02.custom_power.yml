@@ -314,23 +314,23 @@ jobs:
         
         # Modify power limits using sed
         echo "📝 Updating TDP power limits..."
-        sed -i 's/\.tdp_pl1_override = 15,/.tdp_pl1_override = 25,/' "$POWER_FILE"
-        sed -i 's/\.tdp_pl2_override = 51,/.tdp_pl2_override = 50,/' "$POWER_FILE"
+        sed -i 's/\.tdp_pl1_override = 20,/.tdp_pl1_override = 25,/' "$POWER_FILE"
+        # PL2 override is already 50, no change needed
         
         echo "📝 Updating PL1 power limits (25W, 64s window)..."
-        sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.min_power = 15000,/.min_power = 25000,/' "$POWER_FILE"
-        sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.max_power = 15000,/.max_power = 25000,/' "$POWER_FILE"
-        sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.time_window_min = 28 \* MSECS_PER_SEC,/.time_window_min = 64 * MSECS_PER_SEC,/' "$POWER_FILE"
-        sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.time_window_max = 32 \* MSECS_PER_SEC,/.time_window_max = 64 * MSECS_PER_SEC,/' "$POWER_FILE"
+        sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.min_power = 20000,/.min_power = 25000,/' "$POWER_FILE"
+        sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.max_power = 20000,/.max_power = 25000,/' "$POWER_FILE"
+        sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.time_window_min = 60 \* MSECS_PER_SEC,/.time_window_min = 64 * MSECS_PER_SEC,/' "$POWER_FILE"
+        sed -i '/register "controls\.power_limits\.pl1"/,/granularity = 200,}/ s/\.time_window_max = 60 \* MSECS_PER_SEC,/.time_window_max = 64 * MSECS_PER_SEC,/' "$POWER_FILE"
         
         echo "📝 Updating PL2 power limits (50W, 32s window - half of PL1)..."
-        sed -i '/register "controls\.power_limits\.pl2"/,/granularity = 1000,}/ s/\.max_power = 51000,/.max_power = 50000,/' "$POWER_FILE"
-        sed -i '/register "controls\.power_limits\.pl2"/,/granularity = 1000,}/ s/\.time_window_min = 28 \* MSECS_PER_SEC,/.time_window_min = 32 * MSECS_PER_SEC,/' "$POWER_FILE"
-        sed -i '/register "controls\.power_limits\.pl2"/,/granularity = 1000,}/ s/\.time_window_max = 32 \* MSECS_PER_SEC,/.time_window_max = 32 * MSECS_PER_SEC,/' "$POWER_FILE"
+        # PL2 max_power is already 50000, no change needed
+        sed -i '/register "controls\.power_limits\.pl2"/,/granularity = 1000,}/ s/\.time_window_min = 15 \* MSECS_PER_SEC,/.time_window_min = 32 * MSECS_PER_SEC,/' "$POWER_FILE"
+        sed -i '/register "controls\.power_limits\.pl2"/,/granularity = 1000,}/ s/\.time_window_max = 15 \* MSECS_PER_SEC,/.time_window_max = 32 * MSECS_PER_SEC,/' "$POWER_FILE"
         
         # Update comments
-        sed -i 's/# PL1 is fixed at 15W, avg over 28-32s interval/# PL1 is fixed at 25W, avg over 64s interval/' "$POWER_FILE"
-        sed -i 's/# 15-51W PL2 in 1000mW increments, avg over 28-32s interval/# 25-50W PL2 in 1000mW increments, avg over 32s interval/' "$POWER_FILE"
+        sed -i 's/# PL1 is fixed at 20W, avg over 60s interval/# PL1 is fixed at 25W, avg over 64s interval/' "$POWER_FILE"
+        sed -i 's/# 20-50W PL2 in 1000mW increments, avg over 15s interval/# 25-50W PL2 in 1000mW increments, avg over 32s interval/' "$POWER_FILE"
         
         # Modify systemagent.c to use 64 seconds (closest to 60s) for PL1 time window
         # Note: power_limit_time_sec_to_msr array doesn't have 60s, closest is 64s (0x10)
