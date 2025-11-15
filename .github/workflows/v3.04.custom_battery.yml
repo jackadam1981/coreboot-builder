@@ -249,6 +249,49 @@ jobs:
         
         echo "✅ Step 7 completed: UEFI UNDI driver replacement prepared"
     
+    - name: "Step 7.5: Add battery device config option to Kconfig"
+      run: |
+        echo "🔧 Step 7.5: Adding battery device config option to Kconfig..."
+        
+        cd coreboot
+        CHROMEEC_KCONFIG="src/ec/google/chromeec/Kconfig"
+        
+        if [ ! -f "$CHROMEEC_KCONFIG" ]; then
+          echo "❌ Chrome EC Kconfig file not found: $CHROMEEC_KCONFIG"
+          exit 1
+        fi
+        
+        # 检查是否已经存在电池配置项
+        if grep -q "config EC_GOOGLE_CHROMEEC_BATTERY" "$CHROMEEC_KCONFIG"; then
+          echo "✅ EC_GOOGLE_CHROMEEC_BATTERY config already exists in Kconfig"
+        else
+          echo "📝 Adding EC_GOOGLE_CHROMEEC_BATTERY config option..."
+          # 使用 awk 在 EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL 配置块后添加电池配置项
+          awk '/^config EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL$/,/^$/ {
+            print
+            if (/^$/) {
+              print ""
+              print "config EC_GOOGLE_CHROMEEC_BATTERY"
+              print "\tbool \"Enable battery device support\""
+              print "\tdefault n"
+              print "\thelp"
+              print "\t  Enable battery device support in ACPI tables."
+              print "\t  Set to n for Chromebox devices that do not have batteries."
+              next
+            }
+          } !/^config EC_GOOGLE_CHROMEEC_AUTO_FAN_CTRL$/,/^$/ { print }' "$CHROMEEC_KCONFIG" > "$CHROMEEC_KCONFIG.tmp" && mv "$CHROMEEC_KCONFIG.tmp" "$CHROMEEC_KCONFIG"
+          
+          # 验证是否添加成功
+          if grep -q "config EC_GOOGLE_CHROMEEC_BATTERY" "$CHROMEEC_KCONFIG"; then
+            echo "✅ EC_GOOGLE_CHROMEEC_BATTERY config added to Kconfig"
+          else
+            echo "❌ Failed to add EC_GOOGLE_CHROMEEC_BATTERY config"
+            exit 1
+          fi
+        fi
+        
+        echo "✅ Step 7.5 completed: Battery device config option added to Kconfig"
+    
     - name: "Step 8: Disable battery device in config.kaisa.uefi"
       run: |
         echo "🔧 Step 8: Disabling battery device configuration in config.kaisa.uefi..."
@@ -272,7 +315,7 @@ jobs:
           echo "✅ No battery device config found in config.kaisa.uefi (correct for Chromebox)"
         fi
         
-        # 确保明确禁用电池设备（如果存在 CONFIG 选项）
+        # 确保明确禁用电池设备（现在 Kconfig 中已存在该配置项）
         if ! grep -q "# Disable battery device for Chromebox" "$CONFIG_FILE"; then
           echo "" >> "$CONFIG_FILE"
           echo "# Disable battery device for Chromebox" >> "$CONFIG_FILE"
