@@ -144,6 +144,39 @@ jobs:
         
         echo "✅ Step 3 completed: EDK2 custom build parameters configured"
     
+    - name: "Step 3.5: Lower console log level for debugging"
+      run: |
+        echo "🔧 Step 3.5: Lowering console log level for MAC address debugging..."
+        
+        cd coreboot
+        CONFIG_FILE="configs/cml/config.kaisa.uefi"
+        
+        if [ ! -f "$CONFIG_FILE" ]; then
+          echo "❌ Kaisa UEFI config not found: $CONFIG_FILE"
+          exit 1
+        fi
+        
+        # 移除现有的日志级别配置
+        sed -i '/^CONFIG_DEFAULT_CONSOLE_LOGLEVEL/d' "$CONFIG_FILE"
+        sed -i '/^# CONFIG_DEFAULT_CONSOLE_LOGLEVEL_/d' "$CONFIG_FILE"
+        sed -i '/^CONFIG_DEFAULT_CONSOLE_LOGLEVEL_/d' "$CONFIG_FILE"
+        
+        # 添加低日志级别配置（DEBUG级别）
+        echo "" >> "$CONFIG_FILE"
+        echo "# Lower log level for debugging MAC address issues" >> "$CONFIG_FILE"
+        echo "# CONFIG_DEFAULT_CONSOLE_LOGLEVEL_8 is not set" >> "$CONFIG_FILE"
+        echo "# CONFIG_DEFAULT_CONSOLE_LOGLEVEL_7 is not set" >> "$CONFIG_FILE"
+        echo "# CONFIG_DEFAULT_CONSOLE_LOGLEVEL_6 is not set" >> "$CONFIG_FILE"
+        echo "# CONFIG_DEFAULT_CONSOLE_LOGLEVEL_5 is not set" >> "$CONFIG_FILE"
+        echo "# CONFIG_DEFAULT_CONSOLE_LOGLEVEL_4 is not set" >> "$CONFIG_FILE"
+        echo "# CONFIG_DEFAULT_CONSOLE_LOGLEVEL_3 is not set" >> "$CONFIG_FILE"
+        echo "# CONFIG_DEFAULT_CONSOLE_LOGLEVEL_2 is not set" >> "$CONFIG_FILE"
+        echo "# CONFIG_DEFAULT_CONSOLE_LOGLEVEL_1 is not set" >> "$CONFIG_FILE"
+        echo "CONFIG_DEFAULT_CONSOLE_LOGLEVEL_0=y" >> "$CONFIG_FILE"
+        echo "CONFIG_DEFAULT_CONSOLE_LOGLEVEL=0" >> "$CONFIG_FILE"
+        
+        echo "✅ Step 3.5 completed: Console log level set to 0 (DEBUG) for MAC address debugging"
+    
     - name: "Step 4: Configure PXE in config.kaisa.uefi"
       run: |
         echo "🔧 Step 4: Configuring PXE support in config.kaisa.uefi..."

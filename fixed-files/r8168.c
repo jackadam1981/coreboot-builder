@@ -103,10 +103,25 @@ static enum cb_err fetch_mac_vpd_key(u8 *macstrbuf, const char *vpd_key)
 	vpd_value = vpd_find(vpd_key, &vpd_size, VPD_RO);
 	if (vpd_value && vpd_size > 0) {
 		/* Copy the value to macstrbuf, ensuring null termination */
+		/* MAC address should be exactly 17 characters (XX:XX:XX:XX:XX:XX) */
+		/* But VPD might store it without null terminator or with extra bytes */
 		int copy_size = MIN(vpd_size, MACLEN - 1);
 		memcpy(macstrbuf, vpd_value, copy_size);
 		macstrbuf[copy_size] = '\0';
-		printk(BIOS_DEBUG, "r8168: Found MAC in VPD using vpd_find: %s\n", macstrbuf);
+		
+		/* Validate MAC address length */
+		size_t mac_len = strlen((const char *)macstrbuf);
+		if (mac_len < 17) {
+			printk(BIOS_WARNING, "r8168: MAC address from VPD is too short (%zu chars): %s\n", 
+			       mac_len, macstrbuf);
+			/* Try to find null terminator in original data */
+			if (vpd_size > copy_size && ((const char *)vpd_value)[copy_size] != '\0') {
+				printk(BIOS_DEBUG, "r8168: VPD value size: %d, copied: %d\n", vpd_size, copy_size);
+			}
+		}
+		
+		printk(BIOS_DEBUG, "r8168: Found MAC in VPD using vpd_find: %s (length: %zu, vpd_size: %d)\n", 
+		       macstrbuf, mac_len, vpd_size);
 		return CB_SUCCESS;
 	}
 	printk(BIOS_DEBUG, "r8168: vpd_find failed, trying legacy method\n");
@@ -199,10 +214,17 @@ static void get_mac_address(u8 *macaddr, const u8 *strbuf)
 	size_t offset = 0;
 	int i;
 
+	/* Check if strbuf is empty or null */
+	if (!strbuf || strbuf[0] == '\0') {
+		printk(BIOS_DEBUG, "r8168: MAC address string is empty, keeping default MAC\n");
+		return;
+	}
+
+	/* Validate MAC address format: XX:XX:XX:XX:XX:XX */
 	if ((strbuf[2] != ':') || (strbuf[5] != ':') ||
 	    (strbuf[8] != ':') || (strbuf[11] != ':') ||
 	    (strbuf[14] != ':')) {
-		printk(BIOS_ERR, "r8168: ignore invalid MAC address in cbfs\n");
+		printk(BIOS_ERR, "r8168: ignore invalid MAC address format (expected XX:XX:XX:XX:XX:XX)\n");
 		return;
 	}
 
@@ -213,7 +235,8 @@ static void get_mac_address(u8 *macaddr, const u8 *strbuf)
 
 		/* Check if both hex digits are valid */
 		if (hex1 > 0x0f || hex2 > 0x0f) {
-			printk(BIOS_ERR, "r8168: Invalid hex digit in MAC address at position %d\n", i);
+			printk(BIOS_ERR, "r8168: Invalid hex digit in MAC address at position %d (char: '%c'/'%c')\n", 
+			       i, strbuf[offset], strbuf[offset + 1]);
 			return;
 		}
 
@@ -233,15 +256,32 @@ static void program_mac_address(struct device *dev, u16 io_base)
 	u8 mac[6] = { 0x00, 0xe0, 0x4c, 0x00, 0xc0, 0xb0 };
 	struct drivers_net_config *config = dev->chip_info;
 
+	printk(BIOS_DEBUG, "r8168: Starting MAC address programming, config=%p\n", config);
+
 	/* check the VPD for the mac address */
 	if (CONFIG(RT8168_GET_MAC_FROM_VPD)) {
+		printk(BIOS_DEBUG, "r8168: Attempting to fetch MAC from VPD\n");
 		fetch_mac_string_vpd(config, macstrbuf);
+		if (macstrbuf[0] != '\0') {
+			printk(BIOS_DEBUG, "r8168: MAC string from VPD: %s\n", macstrbuf);
+		} else {
+			printk(BIOS_DEBUG, "r8168: No MAC found in VPD, macstrbuf is empty\n");
+		}
 	} else {
-		if (fetch_mac_string_cbfs(macstrbuf) != CB_SUCCESS)
+		printk(BIOS_DEBUG, "r8168: Attempting to fetch MAC from CBFS\n");
+		if (fetch_mac_string_cbfs(macstrbuf) != CB_SUCCESS) {
 			printk(BIOS_ERR, "r8168: Error reading MAC from CBFS,"
 							" using default 00:e0:4c:00:c0:b0\n");
+		} else {
+			printk(BIOS_DEBUG, "r8168: MAC string from CBFS: %s\n", macstrbuf);
+		}
 	}
+	
+	printk(BIOS_DEBUG, "r8168: Before get_mac_address, default MAC: %02x:%02x:%02x:%02x:%02x:%02x\n",
+	       mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 	get_mac_address(mac, macstrbuf);
+	printk(BIOS_DEBUG, "r8168: After get_mac_address, final MAC: %02x:%02x:%02x:%02x:%02x:%02x\n",
+	       mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
 	/* Reset NIC */
 	printk(BIOS_DEBUG, "r8168: Resetting NIC...");
