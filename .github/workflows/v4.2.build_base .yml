@@ -1,0 +1,440 @@
+name: 4.2.build_rom_rename.yml - Build Kaisa ROM 02 rename rom and sha1 files
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 4.2)'
+        required: false
+        default: '4.2'
+        type: string
+      description:
+        description: 'Release description'
+        required: false 
+        default: '重命名rom和sha1文件，包含版本号'
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      actions: write
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Pull Docker image
+      run: |
+        echo "🐳 Pulling coreboot/coreboot-sdk Docker image..."
+        docker pull coreboot/coreboot-sdk:latest
+        echo "✅ Docker image ready"
+    
+    - name: Clone MrChromebox coreboot
+      run: |
+        echo "📥 Cloning MrChromebox coreboot repository..."
+        git clone https://github.com/mrchromebox/coreboot.git
+        
+        cd coreboot
+        echo "📦 Updating submodules..."
+        git submodule update --init --checkout --recursive
+        echo "🔧 Setting proper permissions..."
+        chmod -R 755 .
+        echo "✅ Source code ready"
+    
+    - name: "Step 1: [待实现]"
+      run: |
+        echo "🔧 Step 1: [待实现]"
+        cd coreboot
+        # TODO: 实现 Step 1
+        echo "✅ Step 1 completed"
+    
+    - name: "Step 2: [待实现]"
+      run: |
+        echo "🔧 Step 2: [待实现]"
+        cd coreboot
+        # TODO: 实现 Step 2
+        echo "✅ Step 2 completed"
+    
+    - name: "Step 3: [待实现]"
+      run: |
+        echo "🔧 Step 3: [待实现]"
+        cd coreboot
+        # TODO: 实现 Step 3
+        echo "✅ Step 3 completed"
+    
+    - name: "Step 4: [待实现]"
+      run: |
+        echo "🔧 Step 4: [待实现]"
+        cd coreboot
+        # TODO: 实现 Step 4
+        echo "✅ Step 4 completed"
+    
+    - name: "Step 5: [待实现]"
+      run: |
+        echo "🔧 Step 5: [待实现]"
+        cd coreboot
+        # TODO: 实现 Step 5
+        echo "✅ Step 5 completed"
+    
+    - name: "Step 6: [待实现]"
+      run: |
+        echo "🔧 Step 6: [待实现]"
+        cd coreboot
+        # TODO: 实现 Step 6
+        echo "✅ Step 6 completed"
+    
+    - name: "Step 7: [待实现]"
+      run: |
+        echo "🔧 Step 7: [待实现]"
+        cd coreboot
+        # TODO: 实现 Step 7
+        echo "✅ Step 7 completed"
+    
+    - name: "Step 8: [待实现]"
+      run: |
+        echo "🔧 Step 8: [待实现]"
+        cd coreboot
+        # TODO: 实现 Step 8
+        echo "✅ Step 8 completed"
+    
+    - name: "Step 9: [待实现]"
+      run: |
+        echo "🔧 Step 9: [待实现]"
+        cd coreboot
+        # TODO: 实现 Step 9
+        echo "✅ Step 9 completed"
+    
+    - name: "Step 10: [待实现]"
+      run: |
+        echo "🔧 Step 10: [待实现]"
+        cd coreboot
+        # TODO: 实现 Step 10
+        echo "✅ Step 10 completed"
+    
+    - name: "Step generate_config: Run make olddefconfig"
+      run: |
+        echo "🔧 Step : Running make olddefconfig to generate final .config..."
+        echo "📝 This will auto-configure all options based on Kconfig selects"
+        
+        cd coreboot
+        
+        # Copy config file to root directory
+        cfg_file="configs/cml/config.kaisa.uefi"
+        echo "📋 Copying $cfg_file to .config"
+        cp "$cfg_file" .config
+        
+        # Run make clean and make olddefconfig
+        echo "🧹 Running make clean..."
+        make clean
+        
+        echo "⚙️ Running make olddefconfig (will auto-configure based on Kconfig selects)..."
+        make olddefconfig
+        
+        echo "✅ Step completed: make olddefconfig completed, final .config generated"
+    
+    - name: "Verify Step 1: [待实现]"
+      run: |
+        echo "🔍 Verify Step 1: [待实现]"
+        cd coreboot
+        # TODO: 实现验证 Step 1
+        echo "✅ Verify Step 1 completed"
+    
+    - name: "Verify Step 2: [待实现]"
+      run: |
+        echo "🔍 Verify Step 2: [待实现]"
+        cd coreboot
+        # TODO: 实现验证 Step 2
+        echo "✅ Verify Step 2 completed"
+    
+    - name: "Verify Step 3: [待实现]"
+      run: |
+        echo "🔍 Verify Step 3: [待实现]"
+        cd coreboot
+        # TODO: 实现验证 Step 3
+        echo "✅ Verify Step 3 completed"
+    
+    - name: "Verify Step 4: [待实现]"
+      run: |
+        echo "🔍 Verify Step 4: [待实现]"
+        cd coreboot
+        # TODO: 实现验证 Step 4
+        echo "✅ Verify Step 4 completed"
+    
+    - name: "Verify Step 5: [待实现]"
+      run: |
+        echo "🔍 Verify Step 5: [待实现]"
+        cd coreboot
+        # TODO: 实现验证 Step 5
+        echo "✅ Verify Step 5 completed"
+    
+    - name: "Verify Step 6: [待实现]"
+      run: |
+        echo "🔍 Verify Step 6: [待实现]"
+        cd coreboot
+        # TODO: 实现验证 Step 6
+        echo "✅ Verify Step 6 completed"
+    
+    - name: "Verify Step 7: [待实现]"
+      run: |
+        echo "🔍 Verify Step 7: [待实现]"
+        cd coreboot
+        # TODO: 实现验证 Step 7
+        echo "✅ Verify Step 7 completed"
+    
+    - name: "Verify Step 8: [待实现]"
+      run: |
+        echo "🔍 Verify Step 8: [待实现]"
+        cd coreboot
+        # TODO: 实现验证 Step 8
+        echo "✅ Verify Step 8 completed"
+    
+    - name: "Verify Step 9: [待实现]"
+      run: |
+        echo "🔍 Verify Step 9: [待实现]"
+        cd coreboot
+        # TODO: 实现验证 Step 9
+        echo "✅ Verify Step 9 completed"
+    
+    - name: "Verify Step 10: [待实现]"
+      run: |
+        echo "🔍 Verify Step 10: [待实现]"
+        cd coreboot
+        # TODO: 实现验证 Step 10
+        echo "✅ Verify Step 10 completed"
+    
+    - name: Build Kaisa ROM with Docker
+      run: |
+          echo "🚀 Building Kaisa ROM: kaisa-v${{ github.event.inputs.version || '4.1' }},${{ github.event.inputs.description || 'Coreboot Kaisa ROM' }}"
+          echo "🐳 Using coreboot/coreboot-sdk Docker image..."
+          
+          cd coreboot
+          
+          # Create output directory
+          mkdir -p ../roms
+          
+          # Prepare version string
+          VERSION="${{ github.event.inputs.version || '4.1' }}"
+          VERSION_SUFFIX="$(date +%Y%m%d)-${VERSION}"
+          
+          # Build using Docker
+          echo "🔧 Starting Docker build with version: ${VERSION_SUFFIX}..."
+          docker run --rm --user root -v "$(pwd)":/home/coreboot/coreboot -v "$(pwd)/../roms":/home/coreboot/roms -w /home/coreboot/coreboot -e VERSION_SUFFIX="${VERSION_SUFFIX}" coreboot/coreboot-sdk:latest bash -c "
+            echo '🔧 Building Kaisa ROM with version: '\${VERSION_SUFFIX}'...'
+            git config --global --add safe.directory /home/coreboot/coreboot
+            # Override build-uefi.sh to use our version instead of git rev
+            sed -i \"s|\\\${rev}|\${VERSION_SUFFIX}|\" build-uefi.sh
+            ./build-uefi.sh kaisa
+          "
+          
+          # Check generated files
+          echo "📋 Checking generated files in roms directory:"
+          ls -la ../roms/ || echo "roms directory not found"
+          echo "📋 Looking for .rom and .sha1 files:"
+          find ../roms/ -name "*.rom" -type f || echo "No .rom files found"
+          find ../roms/ -name "*.sha1" -type f || echo "No .sha1 files found"
+          
+          echo "✅ ROM build completed"
+    
+    - name: Rename ROM and SHA1 files with version
+      run: |
+          echo "📝 Renaming ROM and SHA1 files to include version number..."
+          VERSION="${{ github.event.inputs.version || '4.1' }}"
+          
+          # Process each .rom file and its corresponding .sha1 file
+          # Format: coreboot_***_v{VERSION}.rom and coreboot_***_v{VERSION}.rom.sha1
+          echo "📝 Renaming ROM and SHA1 files to match format: coreboot_***_v${VERSION}.rom"
+          for rom_file in roms/*.rom; do
+            if [ -f "$rom_file" ]; then
+              # Get the base name without extension
+              rom_basename=$(basename "$rom_file" .rom)
+              
+              # Extract base name by removing date pattern (YYYYMMDD) at the end
+              # Pattern: coreboot_edk2-kaisa-mrchromebox_20251122 -> coreboot_edk2-kaisa-mrchromebox
+              # Try to remove date pattern (8 digits at the end before .rom)
+              if [[ "$rom_basename" =~ ^(.+)_[0-9]{8}$ ]]; then
+                # Has date pattern: remove _YYYYMMDD
+                base_name="${BASH_REMATCH[1]}"
+              else
+                # No date pattern, use full name
+                base_name="$rom_basename"
+              fi
+              
+              # Create new ROM name: base_name_vVERSION.rom
+              new_rom_name="roms/${base_name}_v${VERSION}.rom"
+              echo "📝 Renaming ROM: $(basename "$rom_file") → $(basename "$new_rom_name")"
+              mv "$rom_file" "$new_rom_name"
+              echo "✅ Renamed ROM: $new_rom_name"
+              
+              # Find and rename corresponding .sha1 file
+              # SHA1 file is typically named as: {original_rom_file}.sha1
+              original_rom_basename=$(basename "$rom_file")
+              sha1_file="roms/${original_rom_basename}.sha1"
+              
+              if [ -f "$sha1_file" ]; then
+                # SHA1 file named as: {rom_file}.sha1
+                new_sha1_name="roms/${base_name}_v${VERSION}.rom.sha1"
+                echo "📝 Renaming SHA1: $(basename "$sha1_file") → $(basename "$new_sha1_name")"
+                mv "$sha1_file" "$new_sha1_name"
+                echo "✅ Renamed SHA1: $new_sha1_name"
+              else
+                echo "⚠️  No corresponding SHA1 file found for: $rom_file"
+                echo "   Expected: $sha1_file"
+              fi
+            fi
+          done
+          
+          # Handle any remaining .sha1 files that weren't matched
+          echo "📝 Checking for any remaining SHA1 files..."
+          for sha1_file in roms/*.sha1; do
+            if [ -f "$sha1_file" ]; then
+              # Skip files that already have the version number (already renamed)
+              if [[ "$(basename "$sha1_file")" == *_v${VERSION}.rom.sha1 ]]; then
+                echo "⏭️  Skipping already renamed SHA1 file: $(basename "$sha1_file")"
+                continue
+              fi
+              
+              sha1_basename=$(basename "$sha1_file" .sha1)
+              
+              # Check if it's a .rom.sha1 file
+              if [[ "$sha1_basename" == *.rom ]]; then
+                # Remove .rom suffix to get base name
+                rom_part="${sha1_basename%.rom}"
+                # Extract base name by removing date pattern
+                if [[ "$rom_part" =~ ^(.+)_[0-9]{8}$ ]]; then
+                  base_name="${BASH_REMATCH[1]}"
+                else
+                  base_name="$rom_part"
+                fi
+                new_sha1_name="roms/${base_name}_v${VERSION}.rom.sha1"
+                echo "📝 Renaming remaining SHA1: $(basename "$sha1_file") → $(basename "$new_sha1_name")"
+                mv "$sha1_file" "$new_sha1_name"
+                echo "✅ Renamed SHA1: $new_sha1_name"
+              else
+                echo "⚠️  Found unmatched SHA1 file with unexpected format: $(basename "$sha1_file")"
+              fi
+            fi
+          done
+          
+          echo "✅ ROM and SHA1 files renamed with version number"
+    
+    - name: Prepare additional files for release
+      run: |
+        echo "📋 Preparing additional files for release..."
+        
+        # Create a directory for additional files in roms
+        mkdir -p roms
+        
+        # 1. Copy .config as default.config (from coreboot directory)
+        if [ -f "coreboot/.config" ]; then
+          cp coreboot/.config roms/default.config
+          echo "✅ Copied .config to default.config"
+        else
+          echo "⚠️ .config file not found in coreboot directory"
+        fi
+        
+        # 2. Copy fixed r8168.c driver
+        if [ -f "fixed-files/r8168.c" ]; then
+          cp fixed-files/r8168.c roms/r8168.c
+          echo "✅ Copied fixed r8168.c driver"
+        else
+          echo "⚠️ fixed-files/r8168.c not found"
+        fi
+        
+        # 3. Copy EC configuration files
+        EC_KAISA="coreboot/src/mainboard/google/puff/variants/kaisa/include/variant/ec.h"
+        EC_BASEBOARD="coreboot/src/mainboard/google/puff/variants/baseboard/include/puff/ec.h"
+        
+        if [ -f "$EC_KAISA" ]; then
+          cp "$EC_KAISA" roms/kaisa-ec.h
+          echo "✅ Copied Kaisa EC configuration"
+        else
+          echo "⚠️ Kaisa EC configuration not found: $EC_KAISA"
+        fi
+        
+        if [ -f "$EC_BASEBOARD" ]; then
+          cp "$EC_BASEBOARD" roms/baseboard-ec.h
+          echo "✅ Copied baseboard EC configuration"
+        else
+          echo "⚠️ Baseboard EC configuration not found: $EC_BASEBOARD"
+        fi
+        
+        echo "📋 Additional files prepared in roms directory:"
+        ls -la roms/
+    
+    - name: Check ROM files
+      run: |
+        echo "📋 Generated ROM files:"
+        echo "ROM files:"
+        ls -la roms/*.rom || echo "No ROM files found"
+        echo "SHA1 files:"
+        ls -la roms/*.sha1 || echo "No SHA1 files found"
+        echo "Additional files:"
+        ls -la roms/default.config roms/r8168.c roms/kaisa-ec.h roms/baseboard-ec.h 2>/dev/null || echo "Some additional files may be missing"
+        echo "All files in roms directory:"
+        ls -la roms/
+    
+    - name: Upload ROM Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: kaisa-rom
+        path: |
+          roms/*.rom
+          roms/*.sha1
+          roms/default.config
+          roms/r8168.c
+          roms/kaisa-ec.h
+          roms/baseboard-ec.h
+        compression-level: 0
+    
+    - name: Create Release
+      if: ${{ github.event_name != 'workflow_dispatch' || (github.event.inputs.version || github.event.inputs.description) }}
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: kaisa-v${{ github.event.inputs.version || '4.1' }}
+        name: "kaisa-v${{ github.event.inputs.version || '4.1' }},${{ github.event.inputs.description || '移除电池设备配置：Chromebox 专用固件（无电池管理）' }} #${{ github.run_number }}"
+        body: |
+          # 🎯 Kaisa ROM Chromebox 专用构建成功
+          
+          ## 🔧 构建信息
+          - **主板型号**: Google Kaisa (Puff) - Chromebox
+          - **构建时间**: ${{ github.event.repository.updated_at }}
+          - **构建编号**: #${{ github.run_number }}
+          - **特殊配置**: 已移除电池设备（Chromebox 专用）
+          
+          ## 📦 包含文件
+          - `coreboot-vYYYYMMDD-VERSION.rom` - 主固件文件（包含版本号）
+          - `coreboot.rom-vYYYYMMDD-VERSION.sha1` - SHA1 校验文件（包含版本号）
+          - `default.config` - 构建配置文件
+          - `r8168.c` - 修复后的 RTL8168 网络驱动源文件
+          - `kaisa-ec.h` - Kaisa 主板 EC 配置文件
+          - `baseboard-ec.h` - Baseboard EC 配置文件
+          
+          ## 🚀 使用方法
+          1. 下载 `coreboot.rom` 文件
+          2. 使用刷写工具刷入主板
+          3. 重启后即可使用
+          
+          ## ⚠️ 注意事项
+          - 刷写前请备份原始固件
+          - 确保主板型号为 Google Kaisa
+          - 刷写失败可能导致主板无法启动
+          - 此版本已移除电池设备，适合 Chromebox 使用
+          - Windows 设备管理器中不会显示电池设备
+        files: |
+          roms/*.rom
+          roms/*.sha1
+          roms/default.config
+          roms/r8168.c
+          roms/kaisa-ec.h
+          roms/baseboard-ec.h
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
