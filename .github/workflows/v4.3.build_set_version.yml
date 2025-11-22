@@ -49,10 +49,13 @@ jobs:
     - name: "Step 1: Create git tag for version"
       run: |
         echo "🔧 Step 1: Creating git tag for version..."
-        cd coreboot
         
+        # Calculate VERSION_SUFFIX once and set it as environment variable for all subsequent steps
         VERSION="${{ github.event.inputs.version || '4.3' }}"
         VERSION_SUFFIX="${VERSION}-$(date +%Y%m%d)"
+        echo "VERSION_SUFFIX=${VERSION_SUFFIX}" >> $GITHUB_ENV
+        
+        cd coreboot
         
         # Create a lightweight git tag for the version
         # This tag will be used by build-uefi.sh's git describe --tags --dirty
@@ -157,8 +160,8 @@ jobs:
         echo "🔍 Verify Step 1: Verifying git tag..."
         cd coreboot
         
-        VERSION="${{ github.event.inputs.version || '4.3' }}"
-        VERSION_SUFFIX="${VERSION}-$(date +%Y%m%d)"
+        # Use VERSION_SUFFIX from environment variable (set in Step 1)
+        VERSION_SUFFIX="${VERSION_SUFFIX}"
         
         # Check if git tag exists
         if git tag -l | grep -q "^${VERSION_SUFFIX}$"; then
@@ -280,7 +283,15 @@ jobs:
     - name: Rename ROM and SHA1 files with version
       run: |
           echo "📝 Renaming ROM and SHA1 files to include version number..."
-          VERSION="${{ github.event.inputs.version || '4.3' }}"
+          
+          # Use VERSION_SUFFIX from environment variable (set in Step 1)
+          # Format: 4.3-20251122
+          VERSION_SUFFIX="${VERSION_SUFFIX}"
+          
+          if [ -z "$VERSION_SUFFIX" ]; then
+            echo "❌ VERSION_SUFFIX not set in environment"
+            exit 1
+          fi
           
           # Find the ROM file (should be only one)
           rom_file=$(ls roms/*.rom 2>/dev/null | head -1)
@@ -294,15 +305,15 @@ jobs:
           original_rom_name=$(basename "$rom_file")
           base_name=$(basename "$rom_file" .rom | sed -E 's/_[0-9]{8}$//')
           
-          # Rename ROM file
-          new_rom_name="roms/${base_name}_v${VERSION}.rom"
+          # Rename ROM file with VERSION_SUFFIX format: base_name_v4.3-20251122.rom
+          new_rom_name="roms/${base_name}_v${VERSION_SUFFIX}.rom"
           echo "📝 Renaming ROM: $original_rom_name → $(basename "$new_rom_name")"
           mv "$rom_file" "$new_rom_name"
           echo "✅ Renamed ROM: $new_rom_name"
           
           # Rename corresponding SHA1 file
           sha1_file="roms/${original_rom_name}.sha1"
-          new_sha1_name="roms/${base_name}_v${VERSION}.rom.sha1"
+          new_sha1_name="roms/${base_name}_v${VERSION_SUFFIX}.rom.sha1"
           echo "📝 Renaming SHA1: $(basename "$sha1_file") → $(basename "$new_sha1_name")"
           mv "$sha1_file" "$new_sha1_name"
           echo "✅ Renamed SHA1: $new_sha1_name"
