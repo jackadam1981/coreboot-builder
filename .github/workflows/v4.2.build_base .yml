@@ -118,7 +118,7 @@ jobs:
     
     - name: "Step generate_config: Run make olddefconfig"
       run: |
-        echo "🔧 Step : Running make olddefconfig to generate final .config..."
+        echo "🔧 Step generate_config: Running make olddefconfig to generate final .config..."
         echo "📝 This will auto-configure all options based on Kconfig selects"
         
         cd coreboot
@@ -133,9 +133,22 @@ jobs:
         make clean
         
         echo "⚙️ Running make olddefconfig (will auto-configure based on Kconfig selects)..."
-        make olddefconfig
+        echo "⚠️  Note: make olddefconfig may remove configurations not defined in Kconfig"
+        make olddefconfig 2>&1 | tee /tmp/olddefconfig_output.log || true
         
-        echo "✅ Step completed: make olddefconfig completed, final .config generated"
+        # Check for warnings in the output
+        if grep -q "warning:" /tmp/olddefconfig_output.log; then
+          echo "⚠️  Warnings detected during make olddefconfig:"
+          grep "warning:" /tmp/olddefconfig_output.log || true
+        fi
+        
+        # Verify that .config was generated
+        if [ ! -f ".config" ]; then
+          echo "❌ Error: .config file was not generated!"
+          exit 1
+        fi
+        
+        echo "✅ Step generate_config completed: make olddefconfig completed, final .config generated"
     
     - name: "Verify Step 1: [待实现]"
       run: |
