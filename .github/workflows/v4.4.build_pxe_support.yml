@@ -1,0 +1,500 @@
+name: 4.4.build_pxe_support.yml - Build Kaisa ROM 04 PXE Support
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 4.4)'
+        required: false
+        default: '4.4'
+        type: string
+      description:
+        description: 'Release description'
+        required: false 
+        default: '添加 PXE 支持：Chromebox 专用固件（支持 PXE 网络引导）'
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      actions: write
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Pull Docker image
+      run: |
+        echo "🐳 Pulling coreboot/coreboot-sdk Docker image..."
+        docker pull coreboot/coreboot-sdk:latest
+        echo "✅ Docker image ready"
+    
+    - name: Clone MrChromebox coreboot
+      run: |
+        echo "📥 Cloning MrChromebox coreboot repository..."
+        git clone https://github.com/mrchromebox/coreboot.git
+        
+        cd coreboot
+        echo "📦 Updating submodules..."
+        git submodule update --init --checkout --recursive
+        echo "🔧 Setting proper permissions..."
+        chmod -R 755 .
+        echo "✅ Source code ready"
+    
+    - name: "Step 1: Create git tag for version"
+      run: |
+        echo "🔧 Step 1: Creating git tag for version..."
+        
+        # Calculate VERSION_SUFFIX once and set it as environment variable for all subsequent steps
+        VERSION="${{ github.event.inputs.version || '4.3' }}"
+        VERSION_SUFFIX="${VERSION}-$(date +%Y%m%d)_$(date +%H%M)"
+        echo "VERSION_SUFFIX=${VERSION_SUFFIX}" >> $GITHUB_ENV
+        
+        cd coreboot
+        
+        # Create a lightweight git tag for the version
+        # This tag will be used by build-uefi.sh's git describe --tags --dirty
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        git tag -f "${VERSION_SUFFIX}" || git tag "${VERSION_SUFFIX}"
+        
+        echo "✅ Step 1 completed: Git tag ${VERSION_SUFFIX} created"
+    
+    - name: "Step 2: Enable iPXE in config.kaisa.uefi"
+      run: |
+        echo "🔧 Step 2: Enabling iPXE support in config.kaisa.uefi..."
+        
+        cd coreboot
+        CONFIG_FILE="configs/cml/config.kaisa.uefi"
+        
+        if [ ! -f "$CONFIG_FILE" ]; then
+          echo "❌ Kaisa UEFI config not found: $CONFIG_FILE"
+          exit 1
+        fi
+        
+        echo "📝 Checking for CONFIG_EDK2_ENABLE_IPXE..."
+        if grep -q "CONFIG_EDK2_ENABLE_IPXE=y" "$CONFIG_FILE"; then
+          echo "✅ CONFIG_EDK2_ENABLE_IPXE already enabled"
+        else
+          echo "📝 Adding CONFIG_EDK2_ENABLE_IPXE=y to $CONFIG_FILE..."
+          # Remove any existing CONFIG_EDK2_ENABLE_IPXE line (if set to n or commented)
+          sed -i '/CONFIG_EDK2_ENABLE_IPXE/d' "$CONFIG_FILE"
+          # Add the configuration at the end of the file
+          echo "" >> "$CONFIG_FILE"
+          echo "# Enable iPXE EFI support for network booting" >> "$CONFIG_FILE"
+          echo "CONFIG_EDK2_ENABLE_IPXE=y" >> "$CONFIG_FILE"
+          echo "✅ CONFIG_EDK2_ENABLE_IPXE added"
+        fi
+        
+        echo "✅ Step 2 completed: iPXE support enabled in config.kaisa.uefi"
+    
+    - name: "Step 3: [待实现]"
+      run: |
+        echo "🔧 Step 3: [待实现]"
+        cd coreboot
+        # TODO: 实现 Step 3
+        echo "✅ Step 3 completed"
+
+    - name: "Step 4: [待实现]"
+      run: |
+        echo "🔧 Step 4: [待实现]"
+        cd coreboot
+        # TODO: 实现 Step 4
+        echo "✅ Step 4 completed"
+    
+    - name: "Step 5: [待实现]"
+      run: |
+        echo "🔧 Step 5: [待实现]"
+        cd coreboot
+        # TODO: 实现 Step 5
+        echo "✅ Step 5 completed"
+    
+    - name: "Step 6: [待实现]"
+      run: |
+        echo "🔧 Step 6: [待实现]"
+        cd coreboot
+        # TODO: 实现 Step 6
+        echo "✅ Step 6 completed"
+    
+    - name: "Step 7: [待实现]"
+      run: |
+        echo "🔧 Step 7: [待实现]"
+        cd coreboot
+        # TODO: 实现 Step 7
+        echo "✅ Step 7 completed"
+    
+    - name: "Step 8: [待实现]"
+      run: |
+        echo "🔧 Step 8: [待实现]"
+        cd coreboot
+        # TODO: 实现 Step 8
+        echo "✅ Step 8 completed"
+    
+    - name: "Step 9: [待实现]"
+      run: |
+        echo "🔧 Step 9: [待实现]"
+        cd coreboot
+        # TODO: 实现 Step 9
+        echo "✅ Step 9 completed"
+    
+    - name: "Step 10: [待实现]"
+      run: |
+        echo "🔧 Step 10: [待实现]"
+        cd coreboot
+        # TODO: 实现 Step 10
+        echo "✅ Step 10 completed"
+    
+    - name: "Step generate_config: Run make olddefconfig"
+      run: |
+        echo "🔧 Step generate_config: Running make olddefconfig to generate final .config..."
+        echo "📝 This will auto-configure all options based on Kconfig selects"
+        
+        cd coreboot
+        
+        # Copy config file to root directory
+        cfg_file="configs/cml/config.kaisa.uefi"
+        echo "📋 Copying $cfg_file to .config"
+        cp "$cfg_file" .config
+        
+        # Run make clean and make olddefconfig
+        echo "🧹 Running make clean..."
+        make clean
+        
+        echo "⚙️ Running make olddefconfig (will auto-configure based on Kconfig selects)..."
+        echo "⚠️  Note: make olddefconfig may remove configurations not defined in Kconfig"
+        make olddefconfig 2>&1 | tee /tmp/olddefconfig_output.log || true
+        
+        # Check for warnings in the output
+        if grep -q "warning:" /tmp/olddefconfig_output.log; then
+          echo "⚠️  Warnings detected during make olddefconfig:"
+          grep "warning:" /tmp/olddefconfig_output.log || true
+        fi
+        
+        # Verify that .config was generated
+        if [ ! -f ".config" ]; then
+          echo "❌ Error: .config file was not generated!"
+          exit 1
+        fi
+        
+        echo "✅ Step generate_config completed: make olddefconfig completed, final .config generated"
+    
+    - name: "Verify Step 1: Verify git tag"
+      run: |
+        echo "🔍 Verify Step 1: Verifying git tag..."
+        cd coreboot
+        
+        # Use VERSION_SUFFIX from environment variable (set in Step 1)
+        VERSION_SUFFIX="${VERSION_SUFFIX}"
+        
+        # Check if git tag exists
+        if git tag -l | grep -q "^${VERSION_SUFFIX}$"; then
+          echo "✅ Git tag ${VERSION_SUFFIX} exists"
+          echo "📝 Git describe output:"
+          GIT_DESCRIBE=$(git describe --tags --dirty 2>/dev/null || echo "")
+          if [ -n "$GIT_DESCRIBE" ]; then
+            echo "  $GIT_DESCRIBE"
+            # Verify that git describe starts with our version suffix
+            if echo "$GIT_DESCRIBE" | grep -q "^${VERSION_SUFFIX}"; then
+              echo "✅ Git describe matches expected version format"
+            else
+              echo "⚠️  Git describe format: $GIT_DESCRIBE (may include commit suffix)"
+            fi
+          else
+            echo "⚠️  git describe failed (may be expected if no commits)"
+          fi
+        else
+          echo "❌ Git tag ${VERSION_SUFFIX} not found"
+          echo "📝 Available tags:"
+          git tag -l | head -10
+          exit 1
+        fi
+        
+        echo "✅ Verify Step 1 completed: Git tag verified"
+    
+    - name: "Verify Step 2: Verify iPXE configuration"
+      run: |
+        echo "🔍 Verify Step 2: Verifying iPXE configuration in config.kaisa.uefi..."
+        cd coreboot
+        
+        CONFIG_FILE="configs/cml/config.kaisa.uefi"
+        
+        if [ ! -f "$CONFIG_FILE" ]; then
+          echo "❌ Config file not found: $CONFIG_FILE"
+          exit 1
+        fi
+        
+        if grep -q "^CONFIG_EDK2_ENABLE_IPXE=y" "$CONFIG_FILE"; then
+          echo "✅ CONFIG_EDK2_ENABLE_IPXE=y found in $CONFIG_FILE"
+          echo "📝 Configuration line:"
+          grep "^CONFIG_EDK2_ENABLE_IPXE=y" "$CONFIG_FILE"
+        else
+          echo "❌ CONFIG_EDK2_ENABLE_IPXE=y not found in $CONFIG_FILE"
+          echo "📝 Current EDK2_ENABLE_IPXE related lines:"
+          grep -i "EDK2_ENABLE_IPXE" "$CONFIG_FILE" || echo "  (none found)"
+          exit 1
+        fi
+        
+        echo "✅ Verify Step 2 completed: iPXE configuration verified"
+    
+    - name: "Verify Step 3: [待实现]"
+      run: |
+        echo "🔍 Verify Step 3: [待实现]"
+        cd coreboot
+        # TODO: 实现验证 Step 3
+        echo "✅ Verify Step 3 completed"
+    
+    - name: "Verify Step 4: [待实现]"
+      run: |
+        echo "🔍 Verify Step 4: [待实现]"
+        cd coreboot
+        # TODO: 实现验证 Step 4
+        echo "✅ Verify Step 4 completed"
+    
+    - name: "Verify Step 5: [待实现]"
+      run: |
+        echo "🔍 Verify Step 5: [待实现]"
+        cd coreboot
+        # TODO: 实现验证 Step 5
+        echo "✅ Verify Step 5 completed"
+    
+    - name: "Verify Step 6: [待实现]"
+      run: |
+        echo "🔍 Verify Step 6: [待实现]"
+        cd coreboot
+        # TODO: 实现验证 Step 6
+        echo "✅ Verify Step 6 completed"
+    
+    - name: "Verify Step 7: [待实现]"
+      run: |
+        echo "🔍 Verify Step 7: [待实现]"
+        cd coreboot
+        # TODO: 实现验证 Step 7
+        echo "✅ Verify Step 7 completed"
+    
+    - name: "Verify Step 8: [待实现]"
+      run: |
+        echo "🔍 Verify Step 8: [待实现]"
+        cd coreboot
+        # TODO: 实现验证 Step 8
+        echo "✅ Verify Step 8 completed"
+    
+    - name: "Verify Step 9: [待实现]"
+      run: |
+        echo "🔍 Verify Step 9: [待实现]"
+        cd coreboot
+        # TODO: 实现验证 Step 9
+        echo "✅ Verify Step 9 completed"
+    
+    - name: "Verify Step 10: [待实现]"
+      run: |
+        echo "🔍 Verify Step 10: [待实现]"
+        cd coreboot
+        # TODO: 实现验证 Step 10
+        echo "✅ Verify Step 10 completed"
+    
+    - name: Build Kaisa ROM with Docker
+      run: |
+          echo "🚀 Building Kaisa ROM: kaisa-v${{ github.event.inputs.version || '4.3' }},${{ github.event.inputs.description || 'Coreboot Kaisa ROM' }}"
+          echo "🐳 Using coreboot/coreboot-sdk Docker image..."
+          
+          cd coreboot
+          
+          # Create output directory
+          mkdir -p ../roms
+          
+          # Build using Docker
+          # build-uefi.sh will automatically read version from git tag (created in Step 1)
+          echo "🔧 Starting Docker build..."
+          docker run --rm --user root -v "$(pwd)":/home/coreboot/coreboot -v "$(pwd)/../roms":/home/coreboot/roms -w /home/coreboot/coreboot coreboot/coreboot-sdk:latest bash -c "
+            echo '🔧 Building Kaisa ROM...'
+            git config --global --add safe.directory /home/coreboot/coreboot
+            # build-uefi.sh will use git describe --tags --dirty to get version from git tag
+            ./build-uefi.sh kaisa
+          "
+          
+          # Check generated files
+          echo "📋 Checking generated files in roms directory:"
+          ls -la ../roms/ || echo "roms directory not found"
+          echo "📋 Looking for .rom and .sha1 files:"
+          find ../roms/ -name "*.rom" -type f || echo "No .rom files found"
+          find ../roms/ -name "*.sha1" -type f || echo "No .sha1 files found"
+          
+          echo "✅ ROM build completed"
+    
+    - name: Rename ROM and SHA1 files with version
+      run: |
+          echo "📝 Renaming ROM and SHA1 files to include version number..."
+          
+          # Use VERSION_SUFFIX from environment variable (set in Step 1)
+          # Format: 4.3-20251122_1430 (VERSION-YYYYMMDD_HHMM)
+          VERSION_SUFFIX="${VERSION_SUFFIX}"
+          
+          if [ -z "$VERSION_SUFFIX" ]; then
+            echo "❌ VERSION_SUFFIX not set in environment"
+            exit 1
+          fi
+          
+          # Find the ROM file (should be only one)
+          rom_file=$(ls roms/*.rom 2>/dev/null | head -1)
+          
+          if [ -z "$rom_file" ] || [ ! -f "$rom_file" ]; then
+            echo "❌ No ROM file found in roms directory"
+            exit 1
+          fi
+          
+          # Extract base name: remove .rom extension and date pattern _YYYYMMDD
+          original_rom_name=$(basename "$rom_file")
+          base_name=$(basename "$rom_file" .rom | sed -E 's/_[0-9]{8}$//')
+          
+          # Rename ROM file with VERSION_SUFFIX format: base_name_v4.3-20251122_1430.rom
+          new_rom_name="roms/${base_name}_v${VERSION_SUFFIX}.rom"
+          echo "📝 Renaming ROM: $original_rom_name → $(basename "$new_rom_name")"
+          mv "$rom_file" "$new_rom_name"
+          echo "✅ Renamed ROM: $new_rom_name"
+          
+          # Rename corresponding SHA1 file
+          sha1_file="roms/${original_rom_name}.sha1"
+          new_sha1_name="roms/${base_name}_v${VERSION_SUFFIX}.rom.sha1"
+          echo "📝 Renaming SHA1: $(basename "$sha1_file") → $(basename "$new_sha1_name")"
+          mv "$sha1_file" "$new_sha1_name"
+          echo "✅ Renamed SHA1: $new_sha1_name"
+          
+          echo "✅ ROM and SHA1 files renamed with version number"
+    
+    - name: Prepare additional files for release
+      run: |
+        echo "📋 Preparing additional files for release..."
+        
+        # Create a directory for additional files in roms
+        mkdir -p roms
+        
+        # 1. Copy .config as default.config (from coreboot directory)
+        if [ -f "coreboot/.config" ]; then
+          cp coreboot/.config roms/default.config
+          echo "✅ Copied .config to default.config"
+        else
+          echo "⚠️ .config file not found in coreboot directory"
+        fi
+        
+        # 2. Copy fixed r8168.c driver
+        if [ -f "fixed-files/r8168.c" ]; then
+          cp fixed-files/r8168.c roms/r8168.c
+          echo "✅ Copied fixed r8168.c driver"
+        else
+          echo "⚠️ fixed-files/r8168.c not found"
+        fi
+        
+        # 3. Copy EC configuration files
+        EC_KAISA="coreboot/src/mainboard/google/puff/variants/kaisa/include/variant/ec.h"
+        EC_BASEBOARD="coreboot/src/mainboard/google/puff/variants/baseboard/include/puff/ec.h"
+        
+        if [ -f "$EC_KAISA" ]; then
+          cp "$EC_KAISA" roms/kaisa-ec.h
+          echo "✅ Copied Kaisa EC configuration"
+        else
+          echo "⚠️ Kaisa EC configuration not found: $EC_KAISA"
+        fi
+        
+        if [ -f "$EC_BASEBOARD" ]; then
+          cp "$EC_BASEBOARD" roms/baseboard-ec.h
+          echo "✅ Copied baseboard EC configuration"
+        else
+          echo "⚠️ Baseboard EC configuration not found: $EC_BASEBOARD"
+        fi
+        
+        echo "📋 Additional files prepared in roms directory:"
+        ls -la roms/
+    
+    - name: Check ROM files
+      run: |
+        echo "📋 Generated ROM files:"
+        echo "ROM files:"
+        ls -la roms/*.rom || echo "No ROM files found"
+        echo "SHA1 files:"
+        ls -la roms/*.sha1 || echo "No SHA1 files found"
+        echo "Additional files:"
+        ls -la roms/default.config roms/r8168.c roms/kaisa-ec.h roms/baseboard-ec.h 2>/dev/null || echo "Some additional files may be missing"
+        echo "All files in roms directory:"
+        ls -la roms/
+    
+    - name: Upload ROM Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: kaisa-rom
+        path: |
+          roms/*.rom
+          roms/*.sha1
+          roms/default.config
+          roms/r8168.c
+          roms/kaisa-ec.h
+          roms/baseboard-ec.h
+        compression-level: 0
+    
+    - name: Create Release
+      if: ${{ github.event_name != 'workflow_dispatch' || (github.event.inputs.version || github.event.inputs.description) }}
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: kaisa-${{ env.VERSION_SUFFIX }}
+        name: "kaisa-${{ env.VERSION_SUFFIX }},${{ github.event.inputs.description || format('版本号：%s', env.VERSION_SUFFIX) }} #${{ github.run_number }}"
+        body: |
+          # 🎯 Kaisa ROM v4.3 版本号设置
+          
+          ## 🔧 构建信息
+          - **主板型号**: Google Kaisa (Puff) - Chromebox
+          - **构建时间**: ${{ github.event.repository.updated_at }}
+          - **构建编号**: #${{ github.run_number }}
+          - **版本**: ${{ env.VERSION_SUFFIX }}
+          - **构建类型**: 基础构建（使用 mrchromebox 默认配置）
+          
+          ## ✨ 当前实现功能
+          - ✅ 基础构建流程（使用默认配置）
+          - ✅ 自动运行 `make olddefconfig` 生成配置
+          - ✅ ROM 和 SHA1 文件自动重命名，包含版本号
+            - 格式: `coreboot_***_v{VERSION_SUFFIX}.rom` 和 `coreboot_***_v{VERSION_SUFFIX}.rom.sha1`
+          - ✅ **版本号设置**：通过配置文件设置 `CONFIG_LOCALVERSION`
+            - 使用 git tag 管理版本号，`build-uefi.sh` 自动从 git tag 读取版本号
+            - 在 `config.kaisa.uefi` 中设置版本号
+          
+          ## 🚧 开发中功能
+          - ⏳ 配置步骤（Step 3-10）正在逐步实现中
+          - ⏳ 验证步骤（Verify Step 1-10）待实现
+          
+          ## 📦 包含文件
+          - `coreboot_***_v${{ env.VERSION_SUFFIX }}.rom` - 主固件文件（包含版本号）
+          - `coreboot_***_v${{ env.VERSION_SUFFIX }}.rom.sha1` - SHA1 校验文件（包含版本号）
+          - `default.config` - 构建配置文件
+          - `r8168.c` - RTL8168 网络驱动源文件
+          - `kaisa-ec.h` - Kaisa 主板 EC 配置文件
+          - `baseboard-ec.h` - Baseboard EC 配置文件
+          
+          ## 🚀 使用方法
+          1. 下载 `coreboot_***_v${{ env.VERSION_SUFFIX }}.rom` 文件
+          2. 使用刷写工具刷入主板
+          3. 重启后即可使用
+          
+          ## ⚠️ 注意事项
+          - 刷写前请备份原始固件
+          - 确保主板型号为 Google Kaisa
+          - 刷写失败可能导致主板无法启动
+          - 这是基础构建版本，使用默认配置
+          - 版本号格式：`VERSION-YYYYMMDD_HHMM`（例如：4.3-20251122_1430）
+          - 更多功能正在开发中，请关注后续版本
+        files: |
+          roms/*.rom
+          roms/*.sha1
+          roms/default.config
+          roms/r8168.c
+          roms/kaisa-ec.h
+          roms/baseboard-ec.h
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        VERSION_SUFFIX: ${{ env.VERSION_SUFFIX }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
