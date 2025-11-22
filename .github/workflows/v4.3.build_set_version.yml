@@ -52,7 +52,7 @@ jobs:
         
         # Calculate VERSION_SUFFIX once and set it as environment variable for all subsequent steps
         VERSION="${{ github.event.inputs.version || '4.3' }}"
-        VERSION_SUFFIX="${VERSION}-$(date +%Y%m%d)"
+        VERSION_SUFFIX="${VERSION}-$(date +%Y%m%d)_$(date +%H%M)"
         echo "VERSION_SUFFIX=${VERSION_SUFFIX}" >> $GITHUB_ENV
         
         cd coreboot
@@ -393,8 +393,8 @@ jobs:
       if: ${{ github.event_name != 'workflow_dispatch' || (github.event.inputs.version || github.event.inputs.description) }}
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: kaisa-v${{ github.event.inputs.version || '4.3' }}
-        name: "kaisa-v${{ github.event.inputs.version || '4.3' }},${{ github.event.inputs.description || '设置版本号：VERSION-YYYYMMDD' }} #${{ github.run_number }}"
+        tag_name: kaisa-${{ env.VERSION_SUFFIX }}
+        name: "kaisa-${{ env.VERSION_SUFFIX }},${{ github.event.inputs.description || '设置版本号：VERSION-YYYYMMDD' }} #${{ github.run_number }}"
         body: |
           # 🎯 Kaisa ROM v4.3 版本号设置
           
@@ -402,14 +402,14 @@ jobs:
           - **主板型号**: Google Kaisa (Puff) - Chromebox
           - **构建时间**: ${{ github.event.repository.updated_at }}
           - **构建编号**: #${{ github.run_number }}
-          - **版本**: v${{ github.event.inputs.version || '4.3' }}
+          - **版本**: ${{ env.VERSION_SUFFIX }}
           - **构建类型**: 基础构建（使用 mrchromebox 默认配置）
           
           ## ✨ 当前实现功能
           - ✅ 基础构建流程（使用默认配置）
           - ✅ 自动运行 `make olddefconfig` 生成配置
           - ✅ ROM 和 SHA1 文件自动重命名，包含版本号
-            - 格式: `coreboot_***_v{VERSION}.rom` 和 `coreboot_***_v{VERSION}.rom.sha1`
+            - 格式: `coreboot_***_v{VERSION_SUFFIX}.rom` 和 `coreboot_***_v{VERSION_SUFFIX}.rom.sha1`
           - ✅ **版本号设置**：通过配置文件设置 `CONFIG_LOCALVERSION`
             - 使用 git tag 管理版本号，`build-uefi.sh` 自动从 git tag 读取版本号
             - 在 `config.kaisa.uefi` 中设置版本号
@@ -419,15 +419,15 @@ jobs:
           - ⏳ 验证步骤（Verify Step 1-10）待实现
           
           ## 📦 包含文件
-          - `coreboot_***_v${{ github.event.inputs.version || '4.3' }}.rom` - 主固件文件（包含版本号）
-          - `coreboot_***_v${{ github.event.inputs.version || '4.3' }}.rom.sha1` - SHA1 校验文件（包含版本号）
+          - `coreboot_***_v${{ env.VERSION_SUFFIX }}.rom` - 主固件文件（包含版本号）
+          - `coreboot_***_v${{ env.VERSION_SUFFIX }}.rom.sha1` - SHA1 校验文件（包含版本号）
           - `default.config` - 构建配置文件
           - `r8168.c` - RTL8168 网络驱动源文件
           - `kaisa-ec.h` - Kaisa 主板 EC 配置文件
           - `baseboard-ec.h` - Baseboard EC 配置文件
           
           ## 🚀 使用方法
-          1. 下载 `coreboot_***_v${{ github.event.inputs.version || '4.3' }}.rom` 文件
+          1. 下载 `coreboot_***_v${{ env.VERSION_SUFFIX }}.rom` 文件
           2. 使用刷写工具刷入主板
           3. 重启后即可使用
           
@@ -436,7 +436,7 @@ jobs:
           - 确保主板型号为 Google Kaisa
           - 刷写失败可能导致主板无法启动
           - 这是基础构建版本，使用默认配置
-          - 版本号格式：`YYYYMMDD-VERSION`（例如：20251122-4.3）
+          - 版本号格式：`VERSION-YYYYMMDD_HHMM`（例如：4.3-20251122_1430）
           - 更多功能正在开发中，请关注后续版本
         files: |
           roms/*.rom
@@ -449,5 +449,6 @@ jobs:
         prerelease: false
         generate_release_notes: true
       env:
+        VERSION_SUFFIX: ${{ env.VERSION_SUFFIX }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
