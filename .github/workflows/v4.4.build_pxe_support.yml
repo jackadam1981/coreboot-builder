@@ -142,12 +142,44 @@ jobs:
         # TODO: 实现 Step 9
         echo "✅ Step 9 completed"
     
-    - name: "Step 10: [待实现]"
+    - name: "Step 10: Commit all configuration changes"
       run: |
-        echo "🔧 Step 10: [待实现]"
+        echo "🔧 Step 10: Committing all configuration changes to avoid dirty status..."
+        
         cd coreboot
-        # TODO: 实现 Step 10
-        echo "✅ Step 10 completed"
+        
+        # Configure git user (if not already configured)
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        
+        # Check if there are any changes to commit
+        if git diff --quiet; then
+          echo "✅ No changes to commit (all configurations already up to date)"
+        else
+          echo "📝 Staging all modified files..."
+          git add -A
+          
+          echo "📝 Committing configuration changes..."
+          git commit -m "workflow: Apply configuration changes for PXE support build" || {
+            echo "⚠️  Commit failed, checking status..."
+            git status
+            exit 1
+          }
+          
+          echo "✅ All configuration changes committed"
+          echo "📝 Commit details:"
+          git log -1 --stat
+        fi
+        
+        # Verify that working directory is clean
+        if git diff --quiet && git diff --cached --quiet; then
+          echo "✅ Working directory is clean (no dirty status)"
+        else
+          echo "⚠️  Warning: Working directory still has uncommitted changes"
+          git status
+        fi
+        
+        echo "✅ Step 10 completed: All configuration changes committed"
     
     - name: "Step generate_config: Run make olddefconfig"
       run: |
