@@ -285,7 +285,7 @@ jobs:
           echo "📝 Renaming ROM and SHA1 files to include version number..."
           
           # Use VERSION_SUFFIX from environment variable (set in Step 1)
-          # Format: 4.3-20251122
+          # Format: 4.3-20251122_1430 (VERSION-YYYYMMDD_HHMM)
           VERSION_SUFFIX="${VERSION_SUFFIX}"
           
           if [ -z "$VERSION_SUFFIX" ]; then
@@ -305,7 +305,7 @@ jobs:
           original_rom_name=$(basename "$rom_file")
           base_name=$(basename "$rom_file" .rom | sed -E 's/_[0-9]{8}$//')
           
-          # Rename ROM file with VERSION_SUFFIX format: base_name_v4.3-20251122.rom
+          # Rename ROM file with VERSION_SUFFIX format: base_name_v4.3-20251122_1430.rom
           new_rom_name="roms/${base_name}_v${VERSION_SUFFIX}.rom"
           echo "📝 Renaming ROM: $original_rom_name → $(basename "$new_rom_name")"
           mv "$rom_file" "$new_rom_name"
@@ -394,7 +394,7 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         tag_name: kaisa-${{ env.VERSION_SUFFIX }}
-        name: "kaisa-${{ env.VERSION_SUFFIX }},${{ github.event.inputs.description || '设置版本号：VERSION-YYYYMMDD' }} #${{ github.run_number }}"
+        name: "kaisa-${{ env.VERSION_SUFFIX }},${{ github.event.inputs.description || format('版本号：%s', env.VERSION_SUFFIX) }} #${{ github.run_number }}"
         body: |
           # 🎯 Kaisa ROM v4.3 版本号设置
           
