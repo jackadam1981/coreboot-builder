@@ -58,9 +58,9 @@ jobs:
       run: |
         echo "🔧 Step 1: Calculating release version and modifying build-uefi.sh..."
         
-        VERSION="${{ github.event.inputs.version || '4.7' }}"
+        VERSION="${{ github.event.inputs.version || '5.1' }}"
         
-        # Calculate RELEASE_VERSION with date and time: v5.0-YYYYMMDD_HHMM
+        # Calculate RELEASE_VERSION with date and time: v5.1-YYYYMMDD_HHMM
         RELEASE_VERSION="v${VERSION}-$(date +%Y%m%d)_$(date +%H%M)"
         echo "RELEASE_VERSION=${RELEASE_VERSION}" >> $GITHUB_ENV
         echo "✅ Release version calculated: ${RELEASE_VERSION}"
@@ -753,7 +753,7 @@ jobs:
     
     - name: Build Kaisa ROM with Docker
       run: |
-          echo "🚀 Building Kaisa ROM: kaisa-v${{ github.event.inputs.version || '5.0' }},${{ github.event.inputs.description || 'Coreboot Kaisa ROM' }}"
+          echo "🚀 Building Kaisa ROM: kaisa-v${{ github.event.inputs.version || '5.1' }},${{ github.event.inputs.description || 'Coreboot Kaisa ROM' }}"
           echo "🐳 Using coreboot/coreboot-sdk Docker image..."
           
           cd coreboot
@@ -771,7 +771,7 @@ jobs:
           # Build using Docker
           # Pass VERSION as environment variable to Docker container
           # build-uefi.sh will use VERSION if set, otherwise fall back to git describe --tags
-          VERSION="${{ github.event.inputs.version || '5.0' }}"
+          VERSION="${{ github.event.inputs.version || '5.1' }}"
           echo "🔧 Starting Docker build with VERSION=${VERSION}..."
           docker run --rm --user root -v "$(pwd)":/home/coreboot/coreboot -v "$(pwd)/../roms":/home/coreboot/roms -w /home/coreboot/coreboot -e VERSION="${VERSION}" coreboot/coreboot-sdk:latest bash -c "
             echo '🔧 Building Kaisa ROM with VERSION='\${VERSION}'...'
@@ -936,29 +936,34 @@ jobs:
         tag_name: kaisa-${{ env.RELEASE_VERSION }}
         name: "kaisa-${{ env.RELEASE_VERSION }},${{ github.event.inputs.description || format('版本号：%s', env.RELEASE_VERSION) }} #${{ github.run_number }}"
         body: |
-          # 🎯 Kaisa ROM v5.0 EDK2 PXE Base版本
+          # 🎯 Kaisa ROM v5.1 EDK2 PXE 版本
           
           ## 🔧 构建信息
           - **主板型号**: Google Kaisa (Puff) - Chromebox
           - **构建时间**: ${{ github.event.repository.updated_at }}
           - **构建编号**: #${{ github.run_number }}
           - **版本**: ${{ env.RELEASE_VERSION }}
-          - **构建类型**: Chromebox 专用固件（EDK2 PXE Base：基础EDK2固件 + EC优化 + 高性能功耗墙配置）
+          - **构建类型**: Chromebox 专用固件（EDK2 PXE：基础EDK2固件 + EC优化 + 高性能功耗墙配置 + EDK2内置PXE支持）
           
           ## ✨ 当前实现功能
           - ✅ 基础构建流程（使用默认配置）
           - ✅ 自动运行 `make olddefconfig` 生成配置
           - ✅ ROM 和 SHA1 文件自动重命名，包含版本号
             - 格式: `coreboot_***_{RELEASE_VERSION}.rom` 和 `coreboot_***_{RELEASE_VERSION}.rom.sha1`
-            - 版本号格式：`v{VERSION}-YYYYMMDD_HHMM`（例如：v5.0-20251123_1430）
+            - 版本号格式：`v{VERSION}-YYYYMMDD_HHMM`（例如：v5.1-20251123_1430）
           - ✅ **版本号设置**：使用 inputs.version 设置版本号
             - `build-uefi.sh` 通过 sed 修改，使用 VERSION 环境变量（值为 inputs.version）
-            - `CONFIG_LOCALVERSION` 只使用版本号（如 "4.7"），不包含日期时间
-          - ✅ **PXE 网络引导支持**（Step 5）：
-            - 启用 `CONFIG_EDK2_ENABLE_IPXE=y` 集成 iPXE 到 EDK2 payload
-            - iPXE 将出现在 UEFI 启动菜单中，支持网络引导
-            - 使用官方 iPXE 集成方式，功能更强大
-            - 注意：iPXE 配置步骤已移至 Step 5（在 EC 和功率配置之后）
+            - `CONFIG_LOCALVERSION` 只使用版本号（如 "5.1"），不包含日期时间
+          - ✅ **PXE 网络引导支持**：
+            - **EDK2 内置 PXE**（默认，Step 6）：
+              - 禁用 iPXE，使用 EDK2 内置 PXE 支持
+              - 通过 `CONFIG_EDK2_CUSTOM_BUILD_PARAMS` 启用网络驱动和 PXE 功能
+              - 精简参数配置（6个必需参数）
+            - **iPXE**（可选，Step 5）：
+              - 启用 `CONFIG_EDK2_ENABLE_IPXE=y` 集成 iPXE 到 EDK2 payload
+              - iPXE 将出现在 UEFI 启动菜单中，支持网络引导
+              - 使用官方 iPXE 集成方式，功能更强大
+              - 注意：iPXE 配置步骤仅在 `pxe_type == 'ipxe'` 时执行
           - ✅ **EC优化**（Chromebox 专用）：
             - **移除电池设备支持**：
               - 在 `config.kaisa.uefi` 中禁用电池和盖子开关配置
@@ -1003,8 +1008,9 @@ jobs:
           - 刷写前请备份原始固件
           - 确保主板型号为 Google Kaisa (Chromebox)
           - 刷写失败可能导致主板无法启动
-          - 版本号格式：`v{VERSION}-YYYYMMDD_HHMM`（例如：v5.0-20251123_1430）
-          - 本版本包含 PXE 网络引导支持，可在 UEFI 启动菜单中选择 "iPXE Network Boot"
+          - 版本号格式：`v{VERSION}-YYYYMMDD_HHMM`（例如：v5.1-20251123_1430）
+          - **本版本包含 EDK2 内置 PXE 支持**（默认）：通过 `CONFIG_EDK2_CUSTOM_BUILD_PARAMS` 启用
+          - **可选 iPXE 支持**：通过 `pxe_type` 输入选择 `ipxe` 时启用
           - **本版本已移除电池和AC适配器设备支持**：适用于 Chromebox（桌面设备），不会在操作系统中显示电池和AC适配器设备
           - **本版本配置了高性能功耗墙**：PL1 25W/64s, PL2 50W/32s，可能增加功耗和发热
           - 更多功能正在开发中，请关注后续版本
