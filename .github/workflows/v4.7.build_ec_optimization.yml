@@ -141,12 +141,13 @@ jobs:
           echo "✅ No lid switch config found (correct for Chromebox)"
         fi
         
-        # 添加注释说明（确保这些宏未定义）
+        # 添加注释说明（确保这些宏未定义或已定义）
         if ! grep -q "# Disable battery and lid switch for Chromebox" "$CONFIG_FILE"; then
           echo "" >> "$CONFIG_FILE"
           echo "# Disable battery and lid switch for Chromebox" >> "$CONFIG_FILE"
           echo "# Note: EC_ENABLE_BATTERY_DEVICE is NOT defined (Chromebox does not have battery)" >> "$CONFIG_FILE"
           echo "# Note: EC_ENABLE_LID_SWITCH is NOT defined (Chromebox does not have lid switch)" >> "$CONFIG_FILE"
+          echo "# Note: EC_DISABLE_AC_ADAPTER is defined in ec.h via patch (Chromebox is desktop/mini PC, no AC adapter device)" >> "$CONFIG_FILE"
           echo "✅ Added documentation comments"
         fi
         
