@@ -711,6 +711,24 @@ jobs:
           echo "⚠️ EC ASL file not found: $EC_ASL"
         fi
         
+        # 5. Copy modified overridetree.cb (with high performance power profile patch applied)
+        POWER_FILE="coreboot/src/mainboard/google/puff/variants/kaisa/overridetree.cb"
+        if [ -f "$POWER_FILE" ]; then
+          cp "$POWER_FILE" roms/overridetree.cb
+          echo "✅ Copied modified overridetree.cb (with high performance power profile patch)"
+        else
+          echo "⚠️ Power configuration file not found: $POWER_FILE"
+        fi
+        
+        # 6. Copy modified systemagent.c (with high performance power profile patch applied)
+        SYSTEMAGENT_FILE="coreboot/src/soc/intel/cannonlake/systemagent.c"
+        if [ -f "$SYSTEMAGENT_FILE" ]; then
+          cp "$SYSTEMAGENT_FILE" roms/systemagent.c
+          echo "✅ Copied modified systemagent.c (with high performance power profile patch)"
+        else
+          echo "⚠️ System agent file not found: $SYSTEMAGENT_FILE"
+        fi
+        
         echo "📋 Additional files prepared in roms directory:"
         ls -la roms/
     
@@ -722,7 +740,7 @@ jobs:
         echo "SHA1 files:"
         ls -la roms/*.sha1 || echo "No SHA1 files found"
         echo "Additional files:"
-        ls -la roms/default.config roms/r8168.c roms/kaisa-ec.h roms/baseboard-ec.h roms/ec.asl 2>/dev/null || echo "Some additional files may be missing"
+        ls -la roms/default.config roms/r8168.c roms/kaisa-ec.h roms/baseboard-ec.h roms/ec.asl roms/overridetree.cb roms/systemagent.c 2>/dev/null || echo "Some additional files may be missing"
         echo "All files in roms directory:"
         ls -la roms/
     
@@ -738,6 +756,8 @@ jobs:
           roms/kaisa-ec.h
           roms/baseboard-ec.h
           roms/ec.asl
+          roms/overridetree.cb
+          roms/systemagent.c
         compression-level: 0
     
     - name: Create Release
@@ -789,6 +809,8 @@ jobs:
           - `kaisa-ec.h` - Kaisa 主板 EC 配置文件
           - `baseboard-ec.h` - Baseboard EC 配置文件
           - `ec.asl` - 修改后的 ACPI EC 源文件（已应用电池移除 patch）
+          - `overridetree.cb` - 修改后的功率配置（已应用高性能功率 patch）
+          - `systemagent.c` - 修改后的系统代理功率设置（已应用高性能功率 patch）
           
           ## 🚀 使用方法
           1. 下载 `coreboot_***_${{ env.RELEASE_VERSION }}.rom` 文件
@@ -812,6 +834,8 @@ jobs:
           roms/kaisa-ec.h
           roms/baseboard-ec.h
           roms/ec.asl
+          roms/overridetree.cb
+          roms/systemagent.c
         draft: false
         prerelease: false
         generate_release_notes: true
