@@ -145,15 +145,68 @@ jobs:
         
         echo "✅ Step 3 completed: Kconfig options configured"
     
-    - name: "Step 4: Apply EC optimization patch (ec.asl only)"
+    - name: "Step 4: Apply Kconfig-based modifications and EC optimization patch"
       run: |
-        echo "🔧 Step 4: Applying EC optimization patch (ec.asl only)..."
-        echo "📋 Note: ec.h and systemagent.c now use Kconfig-based configuration"
-        echo "   - ec.h: Uses #if CONFIG(...) for conditional compilation"
-        echo "   - systemagent.c: Uses CONFIG(KAISA_PL1_TIME_SEC) for power limit"
-        echo "   - ec.asl: Still uses patch (ACPI file, uses macros from ec.h)"
+        echo "🔧 Step 4: Applying Kconfig-based modifications and EC optimization patch..."
+        echo "📋 This step includes:"
+        echo "   - Apply Kconfig patches to ec.h and systemagent.c"
+        echo "   - Apply ec.asl patch (ACPI file, uses macros from ec.h)"
         
         cd coreboot
+        
+        # Apply ec.h Kconfig patch
+        PATCH_FILE_EC_H="../patches/ec-h-kconfig.patch"
+        if [ ! -f "$PATCH_FILE_EC_H" ]; then
+          echo "❌ Patch file not found: $PATCH_FILE_EC_H"
+          exit 1
+        fi
+        
+        echo "📝 Applying ec.h Kconfig patch: $PATCH_FILE_EC_H"
+        if patch -p1 --dry-run < "$PATCH_FILE_EC_H" > /dev/null 2>&1; then
+          echo "✅ Patch can be applied (dry-run successful)"
+          patch -p1 < "$PATCH_FILE_EC_H"
+          echo "✅ ec.h Kconfig patch applied successfully"
+        else
+          if patch -p1 --reverse --dry-run < "$PATCH_FILE_EC_H" > /dev/null 2>&1; then
+            echo "⚠️  Patch appears to be already applied"
+            echo "✅ Skipping patch application"
+          else
+            echo "❌ Patch cannot be applied (file may have changed)"
+            echo "📝 Attempting to apply anyway..."
+            patch -p1 < "$PATCH_FILE_EC_H" || {
+              echo "❌ Patch application failed"
+              exit 1
+            }
+            echo "✅ Patch applied (with possible conflicts resolved)"
+          fi
+        fi
+        
+        # Apply systemagent.c Kconfig patch
+        PATCH_FILE_SYSTEMAGENT="../patches/systemagent-kconfig.patch"
+        if [ ! -f "$PATCH_FILE_SYSTEMAGENT" ]; then
+          echo "❌ Patch file not found: $PATCH_FILE_SYSTEMAGENT"
+          exit 1
+        fi
+        
+        echo "📝 Applying systemagent.c Kconfig patch: $PATCH_FILE_SYSTEMAGENT"
+        if patch -p1 --dry-run < "$PATCH_FILE_SYSTEMAGENT" > /dev/null 2>&1; then
+          echo "✅ Patch can be applied (dry-run successful)"
+          patch -p1 < "$PATCH_FILE_SYSTEMAGENT"
+          echo "✅ systemagent.c Kconfig patch applied successfully"
+        else
+          if patch -p1 --reverse --dry-run < "$PATCH_FILE_SYSTEMAGENT" > /dev/null 2>&1; then
+            echo "⚠️  Patch appears to be already applied"
+            echo "✅ Skipping patch application"
+          else
+            echo "❌ Patch cannot be applied (file may have changed)"
+            echo "📝 Attempting to apply anyway..."
+            patch -p1 < "$PATCH_FILE_SYSTEMAGENT" || {
+              echo "❌ Patch application failed"
+              exit 1
+            }
+            echo "✅ Patch applied (with possible conflicts resolved)"
+          fi
+        fi
         
         # Apply ec.asl patch (contains both battery and AC adapter removal)
         # Note: ec.asl uses macros defined in ec.h, which are now controlled by Kconfig
@@ -183,7 +236,7 @@ jobs:
           fi
         fi
         
-        echo "✅ Step 4 completed: EC optimization patch applied (ec.asl only)"
+        echo "✅ Step 4 completed: Kconfig modifications and EC optimization patch applied"
     
     - name: "Step 5: Apply high performance power profile patch (overridetree.cb only)"
       run: |

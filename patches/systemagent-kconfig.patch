@@ -1,0 +1,16 @@
+diff --git a/src/soc/intel/cannonlake/systemagent.c b/src/soc/intel/cannonlake/systemagent.c
+index 5cb3418ed6..a63ea1ac3e 100644
+--- a/src/soc/intel/cannonlake/systemagent.c
++++ b/src/soc/intel/cannonlake/systemagent.c
+@@ -61,7 +61,11 @@ void soc_systemagent_init(struct device *dev)
+ 	mdelay(1);
+ 	config = config_of_soc();
+ 	soc_config = &config->power_limits_config;
++#if CONFIG(KAISA_PL1_TIME_SEC)
++	set_power_limits(CONFIG(KAISA_PL1_TIME_SEC), soc_config);
++#else
+ 	set_power_limits(MOBILE_SKU_PL1_TIME_SEC, soc_config);
++#endif
+ }
+ 
+ uint32_t soc_systemagent_max_chan_capacity_mib(u8 capid0_a_ddrsz)
