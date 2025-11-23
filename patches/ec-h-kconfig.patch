@@ -1,33 +1,38 @@
 diff --git a/src/mainboard/google/puff/variants/baseboard/include/puff/ec.h b/src/mainboard/google/puff/variants/baseboard/include/puff/ec.h
-diff --git a/src/mainboard/google/puff/variants/baseboard/include/puff/ec.h b/src/mainboard/google/puff/variants/baseboard/include/puff/ec.h
 index 986cf61c05..2aa99bf223 100644
 --- a/src/mainboard/google/puff/variants/baseboard/include/puff/ec.h
 +++ b/src/mainboard/google/puff/variants/baseboard/include/puff/ec.h
+@@ -5,7 +5,8 @@
  
  #include <ec/google/chromeec/ec_commands.h>
  #include <variant/gpio.h>
 +#include <config.h>
  
 +#if CONFIG(EC_DISABLE_AC_ADAPTER)
-+#define MAINBOARD_EC_SCI_EVENTS \
+ #define MAINBOARD_EC_SCI_EVENTS \
+-	(EC_HOST_EVENT_MASK(EC_HOST_EVENT_AC_CONNECTED)      |\
+-	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_AC_DISCONNECTED)   |\
+-	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_THERMAL_THRESHOLD) |\
 +	(EC_HOST_EVENT_MASK(EC_HOST_EVENT_THERMAL_THRESHOLD) |\
+ 	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_THROTTLE_START)    |\
+ 	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_THROTTLE_STOP)     |\
+ 	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_PD_MCU)            |\
+-	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_MKBP))
++	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_MKBP))
++#else
++#define MAINBOARD_EC_SCI_EVENTS \
++	(EC_HOST_EVENT_MASK(EC_HOST_EVENT_AC_CONNECTED)      |\
++	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_AC_DISCONNECTED)   |\
++	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_THERMAL_THRESHOLD) |\
 +	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_THROTTLE_START)    |\
 +	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_THROTTLE_STOP)     |\
 +	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_PD_MCU)            |\
 +	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_MKBP))
-+#else
- #define MAINBOARD_EC_SCI_EVENTS \
- 	(EC_HOST_EVENT_MASK(EC_HOST_EVENT_AC_CONNECTED)      |\
- 	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_AC_DISCONNECTED)   |\
-@@ -14,6 +23,7 @@
- 	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_THROTTLE_STOP)     |\
- 	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_PD_MCU)            |\
- 	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_MKBP))
 +#endif
  
  #define MAINBOARD_EC_SMI_EVENTS 0
  
-@@ -56,4 +66,13 @@
+@@ -56,4 +57,13 @@
  /* Enable EC sync interrupt, EC_SYNC_IRQ is defined in baseboard/gpio.h */
  #define EC_ENABLE_SYNC_IRQ
  
