@@ -1,0 +1,117 @@
+diff --git a/src/ec/google/chromeec/acpi/ec.asl b/src/ec/google/chromeec/acpi/ec.asl
+index eba2b61bb1..4c3d48981a 100644
+--- a/src/ec/google/chromeec/acpi/ec.asl
++++ b/src/ec/google/chromeec/acpi/ec.asl
+@@ -42,8 +42,10 @@ Device (EC0)
+ 	Name (TNOP, EC_TEMP_SENSOR_NOT_POWERED)
+ 	Name (TBAD, EC_TEMP_SENSOR_ERROR)
+ 	Name (TNPR, EC_TEMP_SENSOR_NOT_PRESENT)
++#ifdef EC_ENABLE_BATTERY_DEVICE
+ 	Name (DWRN, 15)		// Battery capacity warning at 15%
+ 	Name (DLOW, 10)		// Battery capacity low at 10%
++#endif
+ 
+ 	OperationRegion (ERAM, EmbeddedControl, 0x00, EC_ACPI_MEM_MAPPED_BEGIN)
+ 	Field (ERAM, ByteAcc, Lock, Preserve)
+@@ -79,8 +81,10 @@ Device (EC0)
+ 		GPIO, 1,	// EC provides GPIO commands
+ 		I2CB, 1,	// EC provides I2C controller access
+ 		CHRG, 1,	// EC provides commands for charger control
++#ifdef EC_ENABLE_BATTERY_DEVICE
+ 		BATT, 1,	// Simply Battery support
+ 		SBAT, 1,	// Smart Battery support
++#endif
+ 		HANG, 1,	// EC can detect host hang
+ 		PMUI, 1,	// Power Information
+ 		DSEC, 1,	// another EC exists downstream
+@@ -97,11 +101,16 @@ Device (EC0)
+ 		// make sure we're within our space envelope
+ 		Offset (0x0e),
+ 		Offset (0x12),
++#ifdef EC_ENABLE_BATTERY_DEVICE
+ 		BTID, 8,	// Battery index that host wants to read
++#endif
++		Offset (0x13),
+ 		USPP, 8,	// USB Port Power
+ 		RFWU, 8,	// Retimer Firmware Update
+ 		PBOK, 8,	// Power source change count from dptf
++#ifdef EC_ENABLE_BATTERY_DEVICE
+ 		BSRF, 8,	// Battery string readout FIFO
++#endif
+ 	}
+ 
+ #if CONFIG(EC_GOOGLE_CHROMEEC_ACPI_MEMMAP)
+@@ -325,20 +334,25 @@ Device (EC0)
+ 	}
+ 
+ 	// Battery Low Event
++#ifdef EC_ENABLE_BATTERY_DEVICE
+ 	Method (_Q06, 0, NotSerialized)
+ 	{
+ 		Printf ("EC: BATTERY LOW")
+ 		Notify (BAT0, 0x80)
+ 	}
++#endif
+ 
+ 	// Battery Critical Event
++#ifdef EC_ENABLE_BATTERY_DEVICE
+ 	Method (_Q07, 0, NotSerialized)
+ 	{
+ 		Printf ("EC: BATTERY CRITICAL")
+ 		Notify (BAT0, 0x80)
+ 	}
++#endif
+ 
+ 	// Battery Info Event
++#ifdef EC_ENABLE_BATTERY_DEVICE
+ 	Method (_Q08, 0, NotSerialized)
+ 	{
+ 		Printf ("EC: BATTERY INFO")
+@@ -349,6 +363,7 @@ Device (EC0)
+ 		}
+ #endif
+ 	}
++#endif
+ 
+ 	// Thermal Overload Event
+ 	Method (_Q0A, 0, NotSerialized)
+@@ -379,11 +394,13 @@ Device (EC0)
+ 	}
+ 
+ 	// Battery Shutdown Imminent
++#ifdef EC_ENABLE_BATTERY_DEVICE
+ 	Method (_Q11, 0, NotSerialized)
+ 	{
+ 		Printf ("EC: BATTERY SHUTDOWN")
+ 		Notify (BAT0, 0x80)
+ 	}
++#endif
+ 
+ 	// Throttle Start
+ 	Method (_Q12, 0, NotSerialized)
+@@ -416,6 +433,7 @@ Device (EC0)
+ #endif
+ 
+ 	// Battery Status
++#ifdef EC_ENABLE_BATTERY_DEVICE
+ 	Method (_Q17, 0, NotSerialized)
+ 	{
+ 		Printf ("EC: BATTERY STATUS")
+@@ -434,6 +452,7 @@ Device (EC0)
+ 		 */
+ 		\PNOT ()
+ 	}
++#endif
+ 
+ 	// EC Panic
+ 	Method (_Q18, 0, NotSerialized)
+@@ -675,7 +694,9 @@ Device (EC0)
+ #endif
+ 
+ 	#include "ac.asl"
++#ifdef EC_ENABLE_BATTERY_DEVICE
+ 	#include "battery.asl"
++#endif
+ 	#include "cros_ec.asl"
+ 
+ #ifdef EC_ENABLE_ALS_DEVICE
