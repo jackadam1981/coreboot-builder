@@ -3,6 +3,8 @@ diff --git a/src/mainboard/google/puff/variants/baseboard/include/puff/ec.h b/sr
 index 986cf61c05..2aa99bf223 100644
 --- a/src/mainboard/google/puff/variants/baseboard/include/puff/ec.h
 +++ b/src/mainboard/google/puff/variants/baseboard/include/puff/ec.h
+ 
+ #include <ec/google/chromeec/ec_commands.h>
  #include <variant/gpio.h>
 +#include <config.h>
  
