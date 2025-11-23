@@ -147,7 +147,8 @@ jobs:
           echo "# Disable battery and lid switch for Chromebox" >> "$CONFIG_FILE"
           echo "# Note: EC_ENABLE_BATTERY_DEVICE is NOT defined (Chromebox does not have battery)" >> "$CONFIG_FILE"
           echo "# Note: EC_ENABLE_LID_SWITCH is NOT defined (Chromebox does not have lid switch)" >> "$CONFIG_FILE"
-          echo "# Note: EC_DISABLE_AC_ADAPTER is defined in ec.h via patch (Chromebox is desktop/mini PC, no AC adapter device)" >> "$CONFIG_FILE"
+          echo "# Note: EC_DISABLE_AC_ADAPTER will be defined in ec.h via patch (Step 4)" >> "$CONFIG_FILE"
+          echo "#       This disables AC adapter device for Chromebox (desktop/mini PC)" >> "$CONFIG_FILE"
           echo "✅ Added documentation comments"
         fi
         
