@@ -1,0 +1,89 @@
+diff --git a/src/ec/google/chromeec/acpi/ec.asl b/src/ec/google/chromeec/acpi/ec.asl
+index eba2b61bb1..3cc7b2948b 100644
+--- a/src/ec/google/chromeec/acpi/ec.asl
++++ b/src/ec/google/chromeec/acpi/ec.asl
+@@ -171,6 +171,7 @@ Device (EC0)
+ 
+ 	Method (_REG, 2, NotSerialized)
+ 	{
++#ifndef EC_DISABLE_AC_ADAPTER
+ 		// Initialize AC power state
+ 		\PWRS = ACEX
+ 		/*
+@@ -181,6 +182,7 @@ Device (EC0)
+ 		 * PWRS isn't valid before this point.
+ 		 */
+ 		\PNOT ()
++#endif
+ 
+ #ifndef EC_ENABLE_LID_SWITCH
+ 		// Initialize LID switch state
+@@ -284,6 +286,7 @@ Device (EC0)
+ 		Printf ("EC: POWER BUTTON")
+ 	}
+ 
++#ifndef EC_DISABLE_AC_ADAPTER
+ 	// AC Connected
+ 	Method (_Q04, 0, NotSerialized)
+ 	{
+@@ -324,7 +327,9 @@ Device (EC0)
+ 		\PNOT ()
+ 	}
+ 
++#endif
+ 	// Battery Low Event
++#ifdef EC_ENABLE_BATTERY_DEVICE
+ 	Method (_Q06, 0, NotSerialized)
+ 	{
+ 		Printf ("EC: BATTERY LOW")
+@@ -349,6 +354,7 @@ Device (EC0)
+ 		}
+ #endif
+ 	}
++#endif
+ 
+ 	// Thermal Overload Event
+ 	Method (_Q0A, 0, NotSerialized)
+@@ -379,11 +385,13 @@ Device (EC0)
+ 	}
+ 
+ 	// Battery Shutdown Imminent
++#ifdef EC_ENABLE_BATTERY_DEVICE
+ 	Method (_Q11, 0, NotSerialized)
+ 	{
+ 		Printf ("EC: BATTERY SHUTDOWN")
+ 		Notify (BAT0, 0x80)
+ 	}
++#endif
+ 
+ 	// Throttle Start
+ 	Method (_Q12, 0, NotSerialized)
+@@ -416,6 +424,7 @@ Device (EC0)
+ #endif
+ 
+ 	// Battery Status
++#ifdef EC_ENABLE_BATTERY_DEVICE
+ 	Method (_Q17, 0, NotSerialized)
+ 	{
+ 		Printf ("EC: BATTERY STATUS")
+@@ -434,6 +443,7 @@ Device (EC0)
+ 		 */
+ 		\PNOT ()
+ 	}
++#endif
+ 
+ 	// EC Panic
+ 	Method (_Q18, 0, NotSerialized)
+@@ -674,8 +684,12 @@ Device (EC0)
+ 	}
+ #endif
+ 
++#ifndef EC_DISABLE_AC_ADAPTER
+ 	#include "ac.asl"
++#endif
++#ifdef EC_ENABLE_BATTERY_DEVICE
+ 	#include "battery.asl"
++#endif
+ 	#include "cros_ec.asl"
+ 
+ #ifdef EC_ENABLE_ALS_DEVICE
