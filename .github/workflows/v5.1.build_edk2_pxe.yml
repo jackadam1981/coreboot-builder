@@ -129,10 +129,38 @@ jobs:
       run: |
         echo "🔧 Step 3: Applying Kconfig-based modifications and EC optimization patch..."
         echo "📋 This step includes:"
+        echo "   - Apply EDK2 Kconfig patch (add CONFIG_EDK2_NETWORK_PXE_SUPPORT with mutual exclusion)"
         echo "   - Apply Kconfig patches to ec.h and systemagent.c"
         echo "   - Apply ec.asl patch (ACPI file, uses macros from ec.h)"
         
         cd coreboot
+        
+        # Apply EDK2 Kconfig patch (add CONFIG_EDK2_NETWORK_PXE_SUPPORT)
+        PATCH_FILE_EDK2_KCONFIG="../patches/edk2-kconfig-pxe.patch"
+        if [ ! -f "$PATCH_FILE_EDK2_KCONFIG" ]; then
+          echo "❌ Patch file not found: $PATCH_FILE_EDK2_KCONFIG"
+          exit 1
+        fi
+        
+        echo "📝 Applying EDK2 Kconfig patch: $PATCH_FILE_EDK2_KCONFIG"
+        if patch -p1 --dry-run < "$PATCH_FILE_EDK2_KCONFIG" > /dev/null 2>&1; then
+          echo "✅ Patch can be applied (dry-run successful)"
+          patch -p1 < "$PATCH_FILE_EDK2_KCONFIG"
+          echo "✅ EDK2 Kconfig patch applied successfully"
+        else
+          if patch -p1 --reverse --dry-run < "$PATCH_FILE_EDK2_KCONFIG" > /dev/null 2>&1; then
+            echo "⚠️  Patch appears to be already applied"
+            echo "✅ Skipping patch application"
+          else
+            echo "❌ Patch cannot be applied (file may have changed)"
+            echo "📝 Attempting to apply anyway..."
+            patch -p1 < "$PATCH_FILE_EDK2_KCONFIG" || {
+              echo "❌ Patch application failed"
+              exit 1
+            }
+            echo "✅ Patch applied (with possible conflicts resolved)"
+          fi
+        fi
         
         # Apply ec.h Kconfig patch
         PATCH_FILE_EC_H="../patches/ec-h-kconfig.patch"
@@ -316,18 +344,15 @@ jobs:
           exit 1
         fi
         
-        echo "📝 Step 6.1: Disabling iPXE (CONFIG_EDK2_ENABLE_IPXE)..."
-        # Remove any existing CONFIG_EDK2_ENABLE_IPXE line
-        sed -i '/CONFIG_EDK2_ENABLE_IPXE/d' "$CONFIG_FILE"
-        # Explicitly disable iPXE
-        if ! grep -q "^# CONFIG_EDK2_ENABLE_IPXE is not set" "$CONFIG_FILE"; then
-          echo "" >> "$CONFIG_FILE"
-          echo "# Disable iPXE (using EDK2 built-in PXE instead)" >> "$CONFIG_FILE"
-          echo "# CONFIG_EDK2_ENABLE_IPXE is not set" >> "$CONFIG_FILE"
-          echo "✅ CONFIG_EDK2_ENABLE_IPXE disabled"
-        else
-          echo "✅ CONFIG_EDK2_ENABLE_IPXE already disabled"
-        fi
+        echo "📝 Step 6.1: Enabling EDK2 Network PXE Support (CONFIG_EDK2_NETWORK_PXE_SUPPORT)..."
+        # Remove any existing CONFIG_EDK2_NETWORK_PXE_SUPPORT line
+        sed -i '/CONFIG_EDK2_NETWORK_PXE_SUPPORT/d' "$CONFIG_FILE"
+        # Enable EDK2 Network PXE Support
+        # Note: Kconfig will automatically disable CONFIG_EDK2_ENABLE_IPXE due to mutual exclusion
+        echo "" >> "$CONFIG_FILE"
+        echo "# Enable EDK2 built-in PXE support (mutually exclusive with iPXE, handled by Kconfig)" >> "$CONFIG_FILE"
+        echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> "$CONFIG_FILE"
+        echo "✅ CONFIG_EDK2_NETWORK_PXE_SUPPORT enabled"
         
         echo "📝 Step 6.2: Configuring EDK2 Custom Build Parameters for built-in PXE..."
         # Remove any existing CONFIG_EDK2_CUSTOM_BUILD_PARAMS line
@@ -347,19 +372,16 @@ jobs:
         echo 'CONFIG_EDK2_CUSTOM_BUILD_PARAMS="-D NETWORK_DRIVER_ENABLE=TRUE -D NETWORK_ENABLE=TRUE -D NETWORK_IP4_ENABLE=TRUE -D NETWORK_PXE_BOOT_ENABLE=TRUE -D NETWORK_SNP_ENABLE=TRUE -D NETWORK_RTEK_PCI=TRUE"' >> "$CONFIG_FILE"
         echo "✅ CONFIG_EDK2_CUSTOM_BUILD_PARAMS configured for EDK2 built-in PXE (精简版: 6个必需参数)"
         
-        echo "📝 Step 6.3: Enabling EDK2 Network PXE Support and Load Option ROMs..."
-        # Remove any existing lines
-        sed -i '/CONFIG_EDK2_NETWORK_PXE_SUPPORT/d' "$CONFIG_FILE"
+        echo "📝 Step 6.3: Enabling EDK2 Load Option ROMs..."
+        # Remove any existing CONFIG_EDK2_LOAD_OPTION_ROMS line
         sed -i '/CONFIG_EDK2_LOAD_OPTION_ROMS/d' "$CONFIG_FILE"
-        
-        # Add required EDK2 PXE configuration options
+        # Add EDK2 Load Option ROMs (required for loading network boot options)
         echo "" >> "$CONFIG_FILE"
-        echo "# EDK2 Network PXE Support (required for PXE boot menu entry)" >> "$CONFIG_FILE"
-        echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> "$CONFIG_FILE"
+        echo "# EDK2 Load Option ROMs (required for loading network boot options)" >> "$CONFIG_FILE"
         echo "CONFIG_EDK2_LOAD_OPTION_ROMS=y" >> "$CONFIG_FILE"
-        echo "✅ CONFIG_EDK2_NETWORK_PXE_SUPPORT and CONFIG_EDK2_LOAD_OPTION_ROMS enabled"
+        echo "✅ CONFIG_EDK2_LOAD_OPTION_ROMS enabled"
         
-        echo "✅ Step 6 completed: EDK2 Network PXE Support configured (iPXE disabled, EDK2 built-in PXE enabled)"
+        echo "✅ Step 6 completed: EDK2 Network PXE Support configured (Kconfig will handle mutual exclusion with iPXE)"
     
     - name: "Step 7: [待实现]"
       run: |
@@ -432,38 +454,7 @@ jobs:
         fi
         
         echo "✅ Step generate_config completed: make olddefconfig completed, final .config generated"
-    
-    - name: "Step post_olddefconfig: Re-apply EDK2 PXE configuration after make olddefconfig"
-      if: ${{ github.event.inputs.pxe_type == 'edk2_pxe' || github.event.inputs.pxe_type == '' }}
-      run: |
-        echo "🔧 Step post_olddefconfig: Re-applying EDK2 PXE configuration after make olddefconfig..."
-        echo "📋 This ensures configurations are not removed by make olddefconfig"
-        
-        cd coreboot
-        
-        # Re-apply EDK2 PXE configuration to .config (after make olddefconfig)
-        echo "📝 Re-applying EDK2 PXE configuration to .config..."
-        
-        # Disable iPXE
-        sed -i '/CONFIG_EDK2_ENABLE_IPXE/d' .config
-        if ! grep -q "^# CONFIG_EDK2_ENABLE_IPXE is not set" .config; then
-          echo "# Disable iPXE (using EDK2 built-in PXE instead)" >> .config
-          echo "# CONFIG_EDK2_ENABLE_IPXE is not set" >> .config
-        fi
-        
-        # Add EDK2 Custom Build Parameters
-        sed -i '/CONFIG_EDK2_CUSTOM_BUILD_PARAMS/d' .config
-        echo 'CONFIG_EDK2_CUSTOM_BUILD_PARAMS="-D NETWORK_DRIVER_ENABLE=TRUE -D NETWORK_ENABLE=TRUE -D NETWORK_IP4_ENABLE=TRUE -D NETWORK_PXE_BOOT_ENABLE=TRUE -D NETWORK_SNP_ENABLE=TRUE -D NETWORK_RTEK_PCI=TRUE"' >> .config
-        
-        # Add EDK2 Network PXE Support
-        sed -i '/CONFIG_EDK2_NETWORK_PXE_SUPPORT/d' .config
-        echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> .config
-        
-        # Add EDK2 Load Option ROMs
-        sed -i '/CONFIG_EDK2_LOAD_OPTION_ROMS/d' .config
-        echo "CONFIG_EDK2_LOAD_OPTION_ROMS=y" >> .config
-        
-        echo "✅ Step post_olddefconfig completed: EDK2 PXE configuration re-applied to .config"
+        echo "📝 Note: Kconfig mutual exclusion will be handled automatically by make olddefconfig"
     
     - name: "Verify Step 1: Verify RELEASE_VERSION and build-uefi.sh modification"
       run: |
@@ -729,14 +720,22 @@ jobs:
           exit 1
         fi
         
-        echo "📝 Verifying iPXE is disabled..."
+        echo "📝 Verifying EDK2 Network PXE Support is enabled..."
+        if grep -q "^CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" "$CONFIG_FILE"; then
+          echo "✅ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y found (correct for EDK2 built-in PXE)"
+        else
+          echo "❌ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y not found (required for EDK2 built-in PXE)"
+          exit 1
+        fi
+        
+        echo "📝 Verifying iPXE is disabled (mutual exclusion)..."
         if grep -q "^# CONFIG_EDK2_ENABLE_IPXE is not set" "$CONFIG_FILE"; then
-          echo "✅ CONFIG_EDK2_ENABLE_IPXE is disabled (correct for EDK2 built-in PXE)"
+          echo "✅ CONFIG_EDK2_ENABLE_IPXE is disabled (correct, mutually exclusive with EDK2_NETWORK_PXE_SUPPORT)"
         elif grep -q "^CONFIG_EDK2_ENABLE_IPXE=y" "$CONFIG_FILE"; then
-          echo "❌ CONFIG_EDK2_ENABLE_IPXE=y is still enabled (should be disabled for EDK2 built-in PXE)"
+          echo "❌ CONFIG_EDK2_ENABLE_IPXE=y is still enabled (should be disabled due to mutual exclusion)"
           exit 1
         else
-          echo "⚠️  CONFIG_EDK2_ENABLE_IPXE not explicitly set (may be disabled by default)"
+          echo "⚠️  CONFIG_EDK2_ENABLE_IPXE not explicitly set (Kconfig will handle mutual exclusion)"
         fi
         
         echo "📝 Verifying EDK2 Custom Build Parameters for PXE..."
