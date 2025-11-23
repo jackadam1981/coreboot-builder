@@ -1,42 +1,33 @@
 diff --git a/src/mainboard/google/puff/variants/baseboard/include/puff/ec.h b/src/mainboard/google/puff/variants/baseboard/include/puff/ec.h
-index 986cf61c05..027e55b3f5 100644
+index 027e55b3f5..2aa99bf223 100644
 --- a/src/mainboard/google/puff/variants/baseboard/include/puff/ec.h
 +++ b/src/mainboard/google/puff/variants/baseboard/include/puff/ec.h
-@@ -5,15 +5,19 @@
- 
- #include <ec/google/chromeec/ec_commands.h>
+@@ -7,17 +7,23 @@
  #include <variant/gpio.h>
-+#include <config.h>
+ #include <config.h>
  
++#if CONFIG(EC_DISABLE_AC_ADAPTER)
  #define MAINBOARD_EC_SCI_EVENTS \
--	(EC_HOST_EVENT_MASK(EC_HOST_EVENT_AC_CONNECTED)      |\
--	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_AC_DISCONNECTED)   |\
--	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_THERMAL_THRESHOLD) |\
-+	(EC_HOST_EVENT_MASK(EC_HOST_EVENT_THERMAL_THRESHOLD) |\
+ 	(EC_HOST_EVENT_MASK(EC_HOST_EVENT_THERMAL_THRESHOLD) |\
  	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_THROTTLE_START)    |\
  	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_THROTTLE_STOP)     |\
  	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_PD_MCU)            |\
--	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_MKBP))
-+	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_MKBP)\
-+#if !CONFIG(EC_DISABLE_AC_ADAPTER)
-+	 | EC_HOST_EVENT_MASK(EC_HOST_EVENT_AC_CONNECTED)      |\
-+	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_AC_DISCONNECTED)
-+#endif
-+	)
+-	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_MKBP)\
+-#if !CONFIG(EC_DISABLE_AC_ADAPTER)
+-	 | EC_HOST_EVENT_MASK(EC_HOST_EVENT_AC_CONNECTED)      |\
+-	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_AC_DISCONNECTED)
++	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_MKBP))
++#else
++#define MAINBOARD_EC_SCI_EVENTS \
++	(EC_HOST_EVENT_MASK(EC_HOST_EVENT_AC_CONNECTED)      |\
++	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_AC_DISCONNECTED)   |\
++	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_THERMAL_THRESHOLD) |\
++	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_THROTTLE_START)    |\
++	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_THROTTLE_STOP)     |\
++	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_PD_MCU)            |\
++	 EC_HOST_EVENT_MASK(EC_HOST_EVENT_MKBP))
+ #endif
+-	)
  
  #define MAINBOARD_EC_SMI_EVENTS 0
  
-@@ -56,4 +60,13 @@
- /* Enable EC sync interrupt, EC_SYNC_IRQ is defined in baseboard/gpio.h */
- #define EC_ENABLE_SYNC_IRQ
- 
-+/* EC configuration based on Kconfig options */
-+#if CONFIG(EC_DISABLE_AC_ADAPTER)
-+#define EC_DISABLE_AC_ADAPTER
-+#endif
-+
-+#if CONFIG(EC_ENABLE_BATTERY_DEVICE)
-+#define EC_ENABLE_BATTERY_DEVICE
-+#endif
-+
- #endif /* __BASEBOARD_EC_H__ */
