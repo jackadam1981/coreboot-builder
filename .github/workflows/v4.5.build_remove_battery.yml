@@ -585,6 +585,15 @@ jobs:
           echo "⚠️ Baseboard EC configuration not found: $EC_BASEBOARD"
         fi
         
+        # 4. Copy modified ec.asl (with battery removal patch applied)
+        EC_ASL="coreboot/src/ec/google/chromeec/acpi/ec.asl"
+        if [ -f "$EC_ASL" ]; then
+          cp "$EC_ASL" roms/ec.asl
+          echo "✅ Copied modified ec.asl (with battery removal patch)"
+        else
+          echo "⚠️ EC ASL file not found: $EC_ASL"
+        fi
+        
         echo "📋 Additional files prepared in roms directory:"
         ls -la roms/
     
@@ -596,7 +605,7 @@ jobs:
         echo "SHA1 files:"
         ls -la roms/*.sha1 || echo "No SHA1 files found"
         echo "Additional files:"
-        ls -la roms/default.config roms/r8168.c roms/kaisa-ec.h roms/baseboard-ec.h 2>/dev/null || echo "Some additional files may be missing"
+        ls -la roms/default.config roms/r8168.c roms/kaisa-ec.h roms/baseboard-ec.h roms/ec.asl 2>/dev/null || echo "Some additional files may be missing"
         echo "All files in roms directory:"
         ls -la roms/
     
@@ -611,6 +620,7 @@ jobs:
           roms/r8168.c
           roms/kaisa-ec.h
           roms/baseboard-ec.h
+          roms/ec.asl
         compression-level: 0
     
     - name: Create Release
@@ -661,6 +671,7 @@ jobs:
           - `r8168.c` - RTL8168 网络驱动源文件
           - `kaisa-ec.h` - Kaisa 主板 EC 配置文件
           - `baseboard-ec.h` - Baseboard EC 配置文件
+          - `ec.asl` - 修改后的 ACPI EC 源文件（已应用电池移除 patch）
           
           ## 🚀 使用方法
           1. 下载 `coreboot_***_${{ env.RELEASE_VERSION }}.rom` 文件
@@ -682,6 +693,7 @@ jobs:
           roms/r8168.c
           roms/kaisa-ec.h
           roms/baseboard-ec.h
+          roms/ec.asl
         draft: false
         prerelease: false
         generate_release_notes: true
