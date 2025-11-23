@@ -129,38 +129,11 @@ jobs:
       run: |
         echo "🔧 Step 3: Applying Kconfig-based modifications and EC optimization patch..."
         echo "📋 This step includes:"
-        echo "   - Apply EDK2 Kconfig patch (add CONFIG_EDK2_NETWORK_PXE_SUPPORT with mutual exclusion)"
         echo "   - Apply Kconfig patches to ec.h and systemagent.c"
         echo "   - Apply ec.asl patch (ACPI file, uses macros from ec.h)"
+        echo "   - Note: EDK2 built-in PXE is configured via CONFIG_EDK2_CUSTOM_BUILD_PARAMS (no Kconfig patch needed)"
         
         cd coreboot
-        
-        # Apply EDK2 Kconfig patch (add CONFIG_EDK2_NETWORK_PXE_SUPPORT)
-        PATCH_FILE_EDK2_KCONFIG="../patches/edk2-kconfig-pxe.patch"
-        if [ ! -f "$PATCH_FILE_EDK2_KCONFIG" ]; then
-          echo "❌ Patch file not found: $PATCH_FILE_EDK2_KCONFIG"
-          exit 1
-        fi
-        
-        echo "📝 Applying EDK2 Kconfig patch: $PATCH_FILE_EDK2_KCONFIG"
-        if patch -p1 --dry-run < "$PATCH_FILE_EDK2_KCONFIG" > /dev/null 2>&1; then
-          echo "✅ Patch can be applied (dry-run successful)"
-          patch -p1 < "$PATCH_FILE_EDK2_KCONFIG"
-          echo "✅ EDK2 Kconfig patch applied successfully"
-        else
-          if patch -p1 --reverse --dry-run < "$PATCH_FILE_EDK2_KCONFIG" > /dev/null 2>&1; then
-            echo "⚠️  Patch appears to be already applied"
-            echo "✅ Skipping patch application"
-          else
-            echo "❌ Patch cannot be applied (file may have changed)"
-            echo "📝 Attempting to apply anyway..."
-            patch -p1 < "$PATCH_FILE_EDK2_KCONFIG" || {
-              echo "❌ Patch application failed"
-              exit 1
-            }
-            echo "✅ Patch applied (with possible conflicts resolved)"
-          fi
-        fi
         
         # Apply ec.h Kconfig patch
         PATCH_FILE_EC_H="../patches/ec-h-kconfig.patch"
@@ -344,33 +317,33 @@ jobs:
           exit 1
         fi
         
-        echo "📝 Step 6.1: Enabling EDK2 Network PXE Support (CONFIG_EDK2_NETWORK_PXE_SUPPORT)..."
-        # Remove any existing CONFIG_EDK2_NETWORK_PXE_SUPPORT line
-        sed -i '/CONFIG_EDK2_NETWORK_PXE_SUPPORT/d' "$CONFIG_FILE"
-        # Enable EDK2 Network PXE Support
-        # Note: Kconfig will automatically disable CONFIG_EDK2_ENABLE_IPXE due to mutual exclusion
+        echo "📝 Step 6.1: Ensuring iPXE is disabled (using EDK2 built-in PXE instead)..."
+        # Remove any existing CONFIG_EDK2_ENABLE_IPXE line
+        sed -i '/CONFIG_EDK2_ENABLE_IPXE/d' "$CONFIG_FILE"
+        # Explicitly disable iPXE (EDK2 built-in PXE and iPXE are mutually exclusive)
         echo "" >> "$CONFIG_FILE"
-        echo "# Enable EDK2 built-in PXE support (mutually exclusive with iPXE, handled by Kconfig)" >> "$CONFIG_FILE"
-        echo "CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" >> "$CONFIG_FILE"
-        echo "✅ CONFIG_EDK2_NETWORK_PXE_SUPPORT enabled"
+        echo "# Disable iPXE (using EDK2 built-in PXE instead)" >> "$CONFIG_FILE"
+        echo "# CONFIG_EDK2_ENABLE_IPXE is not set" >> "$CONFIG_FILE"
+        echo "✅ iPXE disabled (EDK2 built-in PXE will be used)"
         
         echo "📝 Step 6.2: Configuring EDK2 Custom Build Parameters for built-in PXE..."
         # Remove any existing CONFIG_EDK2_CUSTOM_BUILD_PARAMS line
         sed -i '/CONFIG_EDK2_CUSTOM_BUILD_PARAMS/d' "$CONFIG_FILE"
         
-        # Add EDK2 custom build parameters for built-in PXE support (精简版，只保留必需参数)
-        # 必需参数：
-        #   - NETWORK_DRIVER_ENABLE=TRUE: 启用网络驱动
-        #   - NETWORK_ENABLE=TRUE: 启用网络功能
-        #   - NETWORK_IP4_ENABLE=TRUE: 启用 IPv4 支持（PXE 需要）
-        #   - NETWORK_PXE_BOOT_ENABLE=TRUE: 启用 PXE 引导功能
-        #   - NETWORK_SNP_ENABLE=TRUE: 启用 Simple Network Protocol（UEFI 网络协议）
-        #   - NETWORK_RTEK_PCI=TRUE: 启用 Realtek PCI 网卡驱动（Kaisa 使用 RTL8168）
-        # 注意：其他参数（如 NETWORK_IP6_ENABLE, NETWORK_HTTP_* 等）默认值为 FALSE，不需要显式设置
+        # Add EDK2 custom build parameters for built-in PXE support
+        # 必需参数（EDK2 构建参数）：
+        #   - NETWORK_DRIVER_ENABLE=TRUE: 启用网络驱动（UefiPayloadPkg.dsc 默认 FALSE，必须设置）
+        #   - NETWORK_ENABLE=TRUE: 启用网络功能（NetworkDefines.dsc.inc 默认 TRUE，显式设置更安全）
+        #   - NETWORK_PXE_BOOT_ENABLE=TRUE: 启用 PXE 引导功能（NetworkDefines.dsc.inc 默认 TRUE）
+        #   - NETWORK_SNP_ENABLE=TRUE: 启用 Simple Network Protocol（NetworkDefines.dsc.inc 默认 TRUE）
+        #   - NETWORK_IP4_ENABLE=TRUE: 启用 IPv4 支持（NetworkDefines.dsc.inc 默认 TRUE）
+        # 注意：
+        #   - NETWORK_RTEK_PCI 在 EDK2 源码中未找到，可能通过 Option ROM 提供（需要 CONFIG_EDK2_LOAD_OPTION_ROMS=y）
+        #   - 其他参数（如 NETWORK_IP6_ENABLE, NETWORK_HTTP_* 等）默认值为 FALSE，不需要显式设置
         echo "" >> "$CONFIG_FILE"
-        echo "# EDK2 Custom Build Parameters for built-in PXE support (精简版)" >> "$CONFIG_FILE"
-        echo 'CONFIG_EDK2_CUSTOM_BUILD_PARAMS="-D NETWORK_DRIVER_ENABLE=TRUE -D NETWORK_ENABLE=TRUE -D NETWORK_IP4_ENABLE=TRUE -D NETWORK_PXE_BOOT_ENABLE=TRUE -D NETWORK_SNP_ENABLE=TRUE -D NETWORK_RTEK_PCI=TRUE"' >> "$CONFIG_FILE"
-        echo "✅ CONFIG_EDK2_CUSTOM_BUILD_PARAMS configured for EDK2 built-in PXE (精简版: 6个必需参数)"
+        echo "# EDK2 Custom Build Parameters for built-in PXE support" >> "$CONFIG_FILE"
+        echo 'CONFIG_EDK2_CUSTOM_BUILD_PARAMS="-D NETWORK_DRIVER_ENABLE=TRUE -D NETWORK_ENABLE=TRUE -D NETWORK_PXE_BOOT_ENABLE=TRUE -D NETWORK_SNP_ENABLE=TRUE -D NETWORK_IP4_ENABLE=TRUE"' >> "$CONFIG_FILE"
+        echo "✅ CONFIG_EDK2_CUSTOM_BUILD_PARAMS configured for EDK2 built-in PXE (5个必需参数)"
         
         echo "📝 Step 6.3: Enabling EDK2 Load Option ROMs..."
         # Remove any existing CONFIG_EDK2_LOAD_OPTION_ROMS line
@@ -381,7 +354,10 @@ jobs:
         echo "CONFIG_EDK2_LOAD_OPTION_ROMS=y" >> "$CONFIG_FILE"
         echo "✅ CONFIG_EDK2_LOAD_OPTION_ROMS enabled"
         
-        echo "✅ Step 6 completed: EDK2 Network PXE Support configured (Kconfig will handle mutual exclusion with iPXE)"
+        echo "✅ Step 6 completed: EDK2 built-in PXE Support configured"
+        echo "   - iPXE disabled"
+        echo "   - EDK2 network parameters configured via CONFIG_EDK2_CUSTOM_BUILD_PARAMS"
+        echo "   - Option ROM loading enabled (for network card drivers)"
     
     - name: "Step 7: [待实现]"
       run: |
@@ -720,22 +696,22 @@ jobs:
           exit 1
         fi
         
-        echo "📝 Verifying EDK2 Network PXE Support is enabled..."
-        if grep -q "^CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" "$CONFIG_FILE"; then
-          echo "✅ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y found (correct for EDK2 built-in PXE)"
-        else
-          echo "❌ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y not found (required for EDK2 built-in PXE)"
+        echo "📝 Verifying iPXE is disabled..."
+        if grep -q "^# CONFIG_EDK2_ENABLE_IPXE is not set" "$CONFIG_FILE"; then
+          echo "✅ CONFIG_EDK2_ENABLE_IPXE is disabled (correct for EDK2 built-in PXE)"
+        elif grep -q "^CONFIG_EDK2_ENABLE_IPXE=y" "$CONFIG_FILE"; then
+          echo "❌ CONFIG_EDK2_ENABLE_IPXE=y is still enabled (should be disabled for EDK2 built-in PXE)"
           exit 1
+        else
+          echo "⚠️  CONFIG_EDK2_ENABLE_IPXE not explicitly set (default is disabled)"
         fi
         
-        echo "📝 Verifying iPXE is disabled (mutual exclusion)..."
-        if grep -q "^# CONFIG_EDK2_ENABLE_IPXE is not set" "$CONFIG_FILE"; then
-          echo "✅ CONFIG_EDK2_ENABLE_IPXE is disabled (correct, mutually exclusive with EDK2_NETWORK_PXE_SUPPORT)"
-        elif grep -q "^CONFIG_EDK2_ENABLE_IPXE=y" "$CONFIG_FILE"; then
-          echo "❌ CONFIG_EDK2_ENABLE_IPXE=y is still enabled (should be disabled due to mutual exclusion)"
-          exit 1
+        echo "📝 Verifying EDK2 Custom Build Parameters are configured..."
+        if grep -q "CONFIG_EDK2_CUSTOM_BUILD_PARAMS.*NETWORK_DRIVER_ENABLE=TRUE" "$CONFIG_FILE"; then
+          echo "✅ CONFIG_EDK2_CUSTOM_BUILD_PARAMS found with NETWORK_DRIVER_ENABLE=TRUE"
         else
-          echo "⚠️  CONFIG_EDK2_ENABLE_IPXE not explicitly set (Kconfig will handle mutual exclusion)"
+          echo "❌ CONFIG_EDK2_CUSTOM_BUILD_PARAMS not found or missing NETWORK_DRIVER_ENABLE=TRUE"
+          exit 1
         fi
         
         echo "📝 Verifying EDK2 Custom Build Parameters for PXE..."
@@ -765,10 +741,11 @@ jobs:
         fi
         
         echo "📝 Verifying EDK2 Network PXE Support configuration..."
-        if grep -q "^CONFIG_EDK2_NETWORK_PXE_SUPPORT=y" "$CONFIG_FILE"; then
-          echo "✅ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y found (required for PXE boot menu entry)"
+        echo "📝 Verifying EDK2 Custom Build Parameters contain PXE settings..."
+        if grep -q "CONFIG_EDK2_CUSTOM_BUILD_PARAMS.*NETWORK_PXE_BOOT_ENABLE=TRUE" "$CONFIG_FILE"; then
+          echo "✅ CONFIG_EDK2_CUSTOM_BUILD_PARAMS found with NETWORK_PXE_BOOT_ENABLE=TRUE"
         else
-          echo "❌ CONFIG_EDK2_NETWORK_PXE_SUPPORT=y not found (required for PXE boot menu entry)"
+          echo "❌ CONFIG_EDK2_CUSTOM_BUILD_PARAMS not found or missing NETWORK_PXE_BOOT_ENABLE=TRUE"
           exit 1
         fi
         
