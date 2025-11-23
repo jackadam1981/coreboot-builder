@@ -50,20 +50,16 @@ jobs:
       run: |
         echo "🔧 Step 1: Creating git tag for version..."
         
-        # Calculate VERSION_SUFFIX once and set it as environment variable for all subsequent steps
-        VERSION="${{ github.event.inputs.version || '4.3' }}"
-        VERSION_SUFFIX="${VERSION}-$(date +%Y%m%d)_$(date +%H%M)"
-        echo "VERSION_SUFFIX=${VERSION_SUFFIX}" >> $GITHUB_ENV
+        VERSION="${{ github.event.inputs.version || '4.4' }}"
         
         cd coreboot
         
         # Create a lightweight git tag for the version
-        # This tag will be used by build-uefi.sh's git describe --tags --dirty
         git config user.name "GitHub Actions"
         git config user.email "actions@github.com"
-        git tag -f "${VERSION_SUFFIX}" || git tag "${VERSION_SUFFIX}"
+        git tag -f "${VERSION}" || git tag "${VERSION}"
         
-        echo "✅ Step 1 completed: Git tag ${VERSION_SUFFIX} created"
+        echo "✅ Step 1 completed: Git tag ${VERSION} created"
     
     - name: "Step 2: Enable iPXE in config.kaisa.uefi"
       run: |
@@ -93,12 +89,32 @@ jobs:
         
         echo "✅ Step 2 completed: iPXE support enabled in config.kaisa.uefi"
     
-    - name: "Step 3: [待实现]"
+    - name: "Step 3: Modify build-uefi.sh to use version from inputs"
       run: |
-        echo "🔧 Step 3: [待实现]"
+        echo "🔧 Step 3: Modifying build-uefi.sh to use version from inputs..."
+        
         cd coreboot
-        # TODO: 实现 Step 3
-        echo "✅ Step 3 completed"
+        
+        VERSION="${{ github.event.inputs.version || '4.4' }}"
+        BUILD_SCRIPT="build-uefi.sh"
+        
+        if [ ! -f "$BUILD_SCRIPT" ]; then
+          echo "❌ build-uefi.sh not found: $BUILD_SCRIPT"
+          exit 1
+        fi
+        
+        # Backup original build-uefi.sh
+        cp "$BUILD_SCRIPT" "${BUILD_SCRIPT}.bak"
+        echo "📝 Backed up original build-uefi.sh to ${BUILD_SCRIPT}.bak"
+        
+        # Replace 'rev=$(git describe --tags --dirty)' with version from inputs
+        # Pattern: rev=$(git describe --tags --dirty)
+        # Replace with: rev=${VERSION:-$(git describe --tags)}
+        echo "📝 Modifying version detection logic in build-uefi.sh to use VERSION=${VERSION}..."
+        # Escape $ in sed: \$ for literal $
+        sed -i 's|rev=\$(git describe --tags --dirty)|rev=\${VERSION:-\$(git describe --tags)}|g' "$BUILD_SCRIPT"
+        
+        echo "✅ Step 3 completed: build-uefi.sh modified to use VERSION=${VERSION}"
 
     - name: "Step 4: [待实现]"
       run: |
@@ -142,44 +158,13 @@ jobs:
         # TODO: 实现 Step 9
         echo "✅ Step 9 completed"
     
-    - name: "Step 10: Commit all configuration changes"
+    - name: "Step 10: [待实现]"
       run: |
-        echo "🔧 Step 10: Committing all configuration changes to avoid dirty status..."
-        
+        echo "🔧 Step 10: [待实现]"
         cd coreboot
-        
-        # Configure git user (if not already configured)
-        git config user.name "GitHub Actions"
-        git config user.email "actions@github.com"
-        
-        # Check if there are any changes to commit
-        if git diff --quiet; then
-          echo "✅ No changes to commit (all configurations already up to date)"
-        else
-          echo "📝 Staging all modified files..."
-          git add -A
-          
-          echo "📝 Committing configuration changes..."
-          git commit -m "workflow: Apply configuration changes for PXE support build" || {
-            echo "⚠️  Commit failed, checking status..."
-            git status
-            exit 1
-          }
-          
-          echo "✅ All configuration changes committed"
-          echo "📝 Commit details:"
-          git log -1 --stat
-        fi
-        
-        # Verify that working directory is clean
-        if git diff --quiet && git diff --cached --quiet; then
-          echo "✅ Working directory is clean (no dirty status)"
-        else
-          echo "⚠️  Warning: Working directory still has uncommitted changes"
-          git status
-        fi
-        
-        echo "✅ Step 10 completed: All configuration changes committed"
+        # TODO: 实现 Step 10
+        # Note: Since build-uefi.sh is modified via sed at runtime, no commit is needed
+        echo "✅ Step 10 completed"
     
     - name: "Step generate_config: Run make olddefconfig"
       run: |
@@ -213,6 +198,16 @@ jobs:
           exit 1
         fi
         
+        # Check Git status to ensure no unexpected changes (except .config which is in .gitignore)
+        echo "🔍 Checking Git status after make olddefconfig..."
+        git status --short
+        if git diff --quiet && git diff --cached --quiet; then
+          echo "✅ Working directory is clean (no dirty status)"
+        else
+          echo "⚠️  Warning: Working directory has uncommitted changes (excluding .config)"
+          git status
+        fi
+        
         echo "✅ Step generate_config completed: make olddefconfig completed, final .config generated"
     
     - name: "Verify Step 1: Verify git tag"
@@ -220,18 +215,17 @@ jobs:
         echo "🔍 Verify Step 1: Verifying git tag..."
         cd coreboot
         
-        # Use VERSION_SUFFIX from environment variable (set in Step 1)
-        VERSION_SUFFIX="${VERSION_SUFFIX}"
+        VERSION="${{ github.event.inputs.version || '4.4' }}"
         
         # Check if git tag exists
-        if git tag -l | grep -q "^${VERSION_SUFFIX}$"; then
-          echo "✅ Git tag ${VERSION_SUFFIX} exists"
+        if git tag -l | grep -q "^${VERSION}$"; then
+          echo "✅ Git tag ${VERSION} exists"
           echo "📝 Git describe output:"
           GIT_DESCRIBE=$(git describe --tags --dirty 2>/dev/null || echo "")
           if [ -n "$GIT_DESCRIBE" ]; then
             echo "  $GIT_DESCRIBE"
-            # Verify that git describe starts with our version suffix
-            if echo "$GIT_DESCRIBE" | grep -q "^${VERSION_SUFFIX}"; then
+            # Verify that git describe starts with our version
+            if echo "$GIT_DESCRIBE" | grep -q "^${VERSION}"; then
               echo "✅ Git describe matches expected version format"
             else
               echo "⚠️  Git describe format: $GIT_DESCRIBE (may include commit suffix)"
@@ -240,7 +234,7 @@ jobs:
             echo "⚠️  git describe failed (may be expected if no commits)"
           fi
         else
-          echo "❌ Git tag ${VERSION_SUFFIX} not found"
+          echo "❌ Git tag ${VERSION} not found"
           echo "📝 Available tags:"
           git tag -l | head -10
           exit 1
@@ -273,12 +267,32 @@ jobs:
         
         echo "✅ Verify Step 2 completed: iPXE configuration verified"
     
-    - name: "Verify Step 3: [待实现]"
+    - name: "Verify Step 3: Verify build-uefi.sh modification"
       run: |
-        echo "🔍 Verify Step 3: [待实现]"
+        echo "🔍 Verify Step 3: Verifying build-uefi.sh modification..."
         cd coreboot
-        # TODO: 实现验证 Step 3
-        echo "✅ Verify Step 3 completed"
+        
+        BUILD_SCRIPT="build-uefi.sh"
+        
+        if [ ! -f "$BUILD_SCRIPT" ]; then
+          echo "❌ build-uefi.sh not found: $BUILD_SCRIPT"
+          exit 1
+        fi
+        
+        # Verify the change
+        if grep -q 'rev=\${VERSION:-\$(git describe --tags)}' "$BUILD_SCRIPT"; then
+          echo "✅ Successfully verified: build-uefi.sh uses VERSION environment variable"
+          echo "📝 Modified line:"
+          grep 'rev=' "$BUILD_SCRIPT" | head -1
+        else
+          echo "❌ Verification failed: build-uefi.sh was not modified correctly"
+          echo "📝 Current rev= line:"
+          grep 'rev=' "$BUILD_SCRIPT" | head -1 || echo "  (not found)"
+          echo "📝 Expected pattern: rev=\${VERSION:-\$(git describe --tags)}"
+          exit 1
+        fi
+        
+        echo "✅ Verify Step 3 completed: build-uefi.sh modification verified"
     
     - name: "Verify Step 4: [待实现]"
       run: |
@@ -331,21 +345,34 @@ jobs:
     
     - name: Build Kaisa ROM with Docker
       run: |
-          echo "🚀 Building Kaisa ROM: kaisa-v${{ github.event.inputs.version || '4.3' }},${{ github.event.inputs.description || 'Coreboot Kaisa ROM' }}"
+          echo "🚀 Building Kaisa ROM: kaisa-v${{ github.event.inputs.version || '4.4' }},${{ github.event.inputs.description || 'Coreboot Kaisa ROM' }}"
           echo "🐳 Using coreboot/coreboot-sdk Docker image..."
           
           cd coreboot
+          
+          # Verify .config exists (generated by Step generate_config, used for verification)
+          if [ ! -f ".config" ]; then
+            echo "⚠️  Warning: .config not found (should exist from Step generate_config)"
+          else
+            echo "✅ .config exists (will be preserved for verification, but regenerated in Docker)"
+          fi
+          
+          # Verify git describe output before build (should use tag from Step 1)
+          echo "📝 Git describe output before build:"
+          git describe --tags || echo "⚠️  git describe failed"
           
           # Create output directory
           mkdir -p ../roms
           
           # Build using Docker
-          # build-uefi.sh will automatically read version from git tag (created in Step 1)
-          echo "🔧 Starting Docker build..."
-          docker run --rm --user root -v "$(pwd)":/home/coreboot/coreboot -v "$(pwd)/../roms":/home/coreboot/roms -w /home/coreboot/coreboot coreboot/coreboot-sdk:latest bash -c "
-            echo '🔧 Building Kaisa ROM...'
+          # Pass VERSION as environment variable to Docker container
+          # build-uefi.sh will use VERSION if set, otherwise fall back to git describe --tags
+          VERSION="${{ github.event.inputs.version || '4.4' }}"
+          echo "🔧 Starting Docker build with VERSION=${VERSION}..."
+          docker run --rm --user root -v "$(pwd)":/home/coreboot/coreboot -v "$(pwd)/../roms":/home/coreboot/roms -w /home/coreboot/coreboot -e VERSION="${VERSION}" coreboot/coreboot-sdk:latest bash -c "
+            echo '🔧 Building Kaisa ROM with VERSION='\${VERSION}'...'
             git config --global --add safe.directory /home/coreboot/coreboot
-            # build-uefi.sh will use git describe --tags --dirty to get version from git tag
+            # build-uefi.sh will use VERSION from environment variable (modified in Step 3)
             ./build-uefi.sh kaisa
           "
           
@@ -362,14 +389,7 @@ jobs:
       run: |
           echo "📝 Renaming ROM and SHA1 files to include version number..."
           
-          # Use VERSION_SUFFIX from environment variable (set in Step 1)
-          # Format: 4.3-20251122_1430 (VERSION-YYYYMMDD_HHMM)
-          VERSION_SUFFIX="${VERSION_SUFFIX}"
-          
-          if [ -z "$VERSION_SUFFIX" ]; then
-            echo "❌ VERSION_SUFFIX not set in environment"
-            exit 1
-          fi
+          VERSION="${{ github.event.inputs.version || '4.4' }}"
           
           # Find the ROM file (should be only one)
           rom_file=$(ls roms/*.rom 2>/dev/null | head -1)
@@ -383,15 +403,15 @@ jobs:
           original_rom_name=$(basename "$rom_file")
           base_name=$(basename "$rom_file" .rom | sed -E 's/_[0-9]{8}$//')
           
-          # Rename ROM file with VERSION_SUFFIX format: base_name_v4.3-20251122_1430.rom
-          new_rom_name="roms/${base_name}_v${VERSION_SUFFIX}.rom"
+          # Rename ROM file with VERSION format: base_name_v4.4.rom
+          new_rom_name="roms/${base_name}_v${VERSION}.rom"
           echo "📝 Renaming ROM: $original_rom_name → $(basename "$new_rom_name")"
           mv "$rom_file" "$new_rom_name"
           echo "✅ Renamed ROM: $new_rom_name"
           
           # Rename corresponding SHA1 file
           sha1_file="roms/${original_rom_name}.sha1"
-          new_sha1_name="roms/${base_name}_v${VERSION_SUFFIX}.rom.sha1"
+          new_sha1_name="roms/${base_name}_v${VERSION}.rom.sha1"
           echo "📝 Renaming SHA1: $(basename "$sha1_file") → $(basename "$new_sha1_name")"
           mv "$sha1_file" "$new_sha1_name"
           echo "✅ Renamed SHA1: $new_sha1_name"
@@ -471,8 +491,8 @@ jobs:
       if: ${{ github.event_name != 'workflow_dispatch' || (github.event.inputs.version || github.event.inputs.description) }}
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: kaisa-${{ env.VERSION_SUFFIX }}
-        name: "kaisa-${{ env.VERSION_SUFFIX }},${{ github.event.inputs.description || format('版本号：%s', env.VERSION_SUFFIX) }} #${{ github.run_number }}"
+        tag_name: kaisa-${{ github.event.inputs.version || '4.4' }}
+        name: "kaisa-${{ github.event.inputs.version || '4.4' }},${{ github.event.inputs.description || format('版本号：%s', github.event.inputs.version || '4.4') }} #${{ github.run_number }}"
         body: |
           # 🎯 Kaisa ROM v4.4 PXE 支持版本
           
@@ -480,14 +500,14 @@ jobs:
           - **主板型号**: Google Kaisa (Puff) - Chromebox
           - **构建时间**: ${{ github.event.repository.updated_at }}
           - **构建编号**: #${{ github.run_number }}
-          - **版本**: ${{ env.VERSION_SUFFIX }}
+          - **版本**: ${{ github.event.inputs.version || '4.4' }}
           - **构建类型**: PXE 网络引导支持版本
           
           ## ✨ 当前实现功能
           - ✅ 基础构建流程（使用默认配置）
           - ✅ 自动运行 `make olddefconfig` 生成配置
           - ✅ ROM 和 SHA1 文件自动重命名，包含版本号
-            - 格式: `coreboot_***_v{VERSION_SUFFIX}.rom` 和 `coreboot_***_v{VERSION_SUFFIX}.rom.sha1`
+            - 格式: `coreboot_***_v{VERSION}.rom` 和 `coreboot_***_v{VERSION}.rom.sha1`
           - ✅ **版本号设置**：使用 git tag 管理版本号
             - `build-uefi.sh` 自动从 git tag 读取版本号
             - 所有配置更改在 Step 10 统一提交，避免 dirty 状态
@@ -501,15 +521,15 @@ jobs:
           - ⏳ 验证步骤（Verify Step 2-10）待实现
           
           ## 📦 包含文件
-          - `coreboot_***_v${{ env.VERSION_SUFFIX }}.rom` - 主固件文件（包含版本号）
-          - `coreboot_***_v${{ env.VERSION_SUFFIX }}.rom.sha1` - SHA1 校验文件（包含版本号）
+          - `coreboot_***_v${{ github.event.inputs.version || '4.4' }}.rom` - 主固件文件（包含版本号）
+          - `coreboot_***_v${{ github.event.inputs.version || '4.4' }}.rom.sha1` - SHA1 校验文件（包含版本号）
           - `default.config` - 构建配置文件
           - `r8168.c` - RTL8168 网络驱动源文件
           - `kaisa-ec.h` - Kaisa 主板 EC 配置文件
           - `baseboard-ec.h` - Baseboard EC 配置文件
           
           ## 🚀 使用方法
-          1. 下载 `coreboot_***_v${{ env.VERSION_SUFFIX }}.rom` 文件
+          1. 下载 `coreboot_***_v${{ github.event.inputs.version || '4.4' }}.rom` 文件
           2. 使用刷写工具刷入主板
           3. 重启后即可使用
           
@@ -517,7 +537,7 @@ jobs:
           - 刷写前请备份原始固件
           - 确保主板型号为 Google Kaisa
           - 刷写失败可能导致主板无法启动
-          - 版本号格式：`VERSION-YYYYMMDD_HHMM`（例如：4.4-20251122_1430）
+          - 版本号格式：直接使用输入的版本号（例如：4.4）
           - 本版本包含 PXE 网络引导支持，可在 UEFI 启动菜单中选择 "iPXE Network Boot"
           - 更多功能正在开发中，请关注后续版本
         files: |
@@ -531,6 +551,5 @@ jobs:
         prerelease: false
         generate_release_notes: true
       env:
-        VERSION_SUFFIX: ${{ env.VERSION_SUFFIX }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
