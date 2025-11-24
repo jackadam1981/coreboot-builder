@@ -410,21 +410,12 @@ jobs:
         
         cd coreboot
         
-        # Try multiple paths to find the driver file
-        # In GitHub Actions, workspace is at $GITHUB_WORKSPACE
-        # In local testing, it might be at /home/jack/coreboot-builder
-        UNDI_DRIVER_SOURCE=""
-        if [ -f "$GITHUB_WORKSPACE/fixed-files/RtkUndiDxe.efi" ]; then
-          UNDI_DRIVER_SOURCE="$GITHUB_WORKSPACE/fixed-files/RtkUndiDxe.efi"
-        elif [ -f "../fixed-files/RtkUndiDxe.efi" ]; then
-          UNDI_DRIVER_SOURCE="../fixed-files/RtkUndiDxe.efi"
-        elif [ -f "/home/jack/coreboot-builder/fixed-files/RtkUndiDxe.efi" ]; then
-          UNDI_DRIVER_SOURCE="/home/jack/coreboot-builder/fixed-files/RtkUndiDxe.efi"
-        else
-          echo "❌ Realtek UNDI driver not found in any expected location:"
-          echo "   - $GITHUB_WORKSPACE/fixed-files/RtkUndiDxe.efi"
-          echo "   - ../fixed-files/RtkUndiDxe.efi"
-          echo "   - /home/jack/coreboot-builder/fixed-files/RtkUndiDxe.efi"
+        # In GitHub Actions, workspace path is $GITHUB_WORKSPACE
+        UNDI_DRIVER_SOURCE="$GITHUB_WORKSPACE/fixed-files/RtkUndiDxe.efi"
+        
+        # 检查源文件是否存在
+        if [ ! -f "$UNDI_DRIVER_SOURCE" ]; then
+          echo "❌ Realtek UNDI driver not found: $UNDI_DRIVER_SOURCE"
           exit 1
         fi
         
