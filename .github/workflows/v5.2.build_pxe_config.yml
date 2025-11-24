@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version number (e.g., 5.0)'
+        description: 'Version number (e.g., 5.2)'
         required: false
-        default: '5.0'
+        default: '5.2'
         type: string
       description:
         description: 'Release description'
