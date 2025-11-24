@@ -22,9 +22,9 @@ on:
           - 'edk2_pxe'
           - 'ipxe'
       coreboot_commit:
-        description: 'MrChromebox coreboot commit hash (default: 909897bf - last commit with CONFIG_EDK2_NETWORK_PXE_SUPPORT)'
+        description: 'MrChromebox coreboot commit hash (default: b25c7dbfcf - last commit before CONFIG_EDK2_NETWORK_PXE_SUPPORT was reverted)'
         required: false
-        default: '909897bf'
+        default: 'b25c7dbfcf'
         type: string
 
 jobs:
@@ -60,10 +60,10 @@ jobs:
         
         cd coreboot
         
-        # Checkout specific commit (default: 909897bf - last commit with CONFIG_EDK2_NETWORK_PXE_SUPPORT)
-        COREBOOT_COMMIT="${{ github.event.inputs.coreboot_commit || '909897bf' }}"
+        # Checkout specific commit (default: b25c7dbfcf - last commit before CONFIG_EDK2_NETWORK_PXE_SUPPORT was reverted)
+        COREBOOT_COMMIT="${{ github.event.inputs.coreboot_commit || 'b25c7dbfcf' }}"
         echo "🔧 Checking out commit: $COREBOOT_COMMIT"
-        echo "📝 This is the last commit containing CONFIG_EDK2_NETWORK_PXE_SUPPORT (v3.* compatible)"
+        echo "📝 This is the last commit containing CONFIG_EDK2_NETWORK_PXE_SUPPORT (before revert in 909897bf)"
         git checkout "$COREBOOT_COMMIT"
         if [ $? -ne 0 ]; then
           echo "❌ Failed to checkout commit: $COREBOOT_COMMIT"
