@@ -75,10 +75,13 @@ jobs:
         # Use --checkout to ensure submodules match the commit's recorded versions
         # This ensures reproducibility - submodules will be at the exact commit
         # that was recorded in the main repository at commit $COREBOOT_COMMIT
-        git submodule update --init --checkout --recursive --no-fetch
+        echo "📥 Fetching submodules first..."
+        git submodule foreach --recursive git fetch --all || true
+        echo "🔄 Updating submodules..."
+        git submodule update --init --checkout --recursive
         if [ $? -ne 0 ]; then
-          echo "⚠️  Submodule update failed, trying with fetch..."
-          git submodule update --init --checkout --recursive
+          echo "⚠️  Submodule update failed, trying with force checkout..."
+          git submodule update --init --checkout --recursive --force
         fi
         
         echo "📋 Recording submodule versions for reproducibility..."

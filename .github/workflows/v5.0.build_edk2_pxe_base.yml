@@ -66,7 +66,14 @@ jobs:
         echo "✅ Checked out commit: $COREBOOT_COMMIT"
         
         echo "📦 Updating submodules..."
+        echo "📥 Fetching submodules first..."
+        git submodule foreach --recursive git fetch --all || true
+        echo "🔄 Updating submodules..."
         git submodule update --init --checkout --recursive
+        if [ $? -ne 0 ]; then
+          echo "⚠️  Submodule update failed, trying with force checkout..."
+          git submodule update --init --checkout --recursive --force
+        fi
         echo "🔧 Setting proper permissions..."
         chmod -R 755 .
         echo "✅ Source code ready"
