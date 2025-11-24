@@ -1,0 +1,30 @@
+diff --git a/payloads/external/edk2/Kconfig b/payloads/external/edk2/Kconfig
+index 7bfd486f7a..ade2200630 100644
+--- a/payloads/external/edk2/Kconfig
++++ b/payloads/external/edk2/Kconfig
+@@ -317,9 +317,25 @@ config EDK2_CUSTOM_BUILD_PARAMS
+ 
+ 	  This option can support both macros `-D` and Pcds `--pcd`.
+ 
++
++config EDK2_NETWORK_PXE_SUPPORT
++	bool "Enable EDK2 built-in PXE network boot support"
++	depends on !EDK2_REPO_OFFICIAL && !EDK2_ENABLE_IPXE
++	default n
++	help
++	  Enable EDK2's built-in PXE network boot support. This uses EDK2's native
++	  Simple Network Protocol (SNP) implementation for network booting.
++	  
++	  This option is mutually exclusive with CONFIG_EDK2_ENABLE_IPXE. When
++	  this option is enabled, iPXE will be disabled.
++	  
++	  To use this feature, you must also configure CONFIG_EDK2_CUSTOM_BUILD_PARAMS
++	  with network-related build parameters (e.g., NETWORK_PXE_BOOT_ENABLE=TRUE).
++
+ config EDK2_ENABLE_IPXE
+ 	bool "Include iPXE in edk2 payload"
+ 	depends on !EDK2_REPO_OFFICIAL
++	depends on !EDK2_NETWORK_PXE_SUPPORT
+ 	default n
+ 	select PXE
+ 	help
